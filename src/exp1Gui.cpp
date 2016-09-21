@@ -11,10 +11,10 @@
 #include <dynamic_reconfigure/Config.h>
 
 #include "robo_cont_utils.h"
-#include "robo_cont_types/get_gait_controller_status.h"
-#include "robo_cont_types/actionMessage.h"
-#include "robo_cont_types/trajectoryMsg.h"
-#include "robo_cont_types/get_gait_evaluation.h"
+#include "dyret_common/get_gait_controller_status.h"
+#include "dyret_common/actionMessage.h"
+#include "dyret_common/trajectoryMsg.h"
+#include "dyret_common/get_gait_evaluation.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -60,22 +60,22 @@ FILE* getEvoPathFileHandle(std::string fileName){
 
 
 void startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
-  robo_cont_types::get_gait_evaluation srv;
-  srv.request.givenCommand = robo_cont_types::get_gait_evaluation::Request::t_start;
+  dyret_common::get_gait_evaluation srv;
+  srv.request.givenCommand = dyret_common::get_gait_evaluation::Request::t_start;
   if (!get_gait_evaluation_client.call(srv)) printf("Error while calling GaitRecording service with t_start\n");
 }
 
 void resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
-  robo_cont_types::get_gait_evaluation srv;
-  srv.request.givenCommand = robo_cont_types::get_gait_evaluation::Request::t_resetStatistics;
+  dyret_common::get_gait_evaluation srv;
+  srv.request.givenCommand = dyret_common::get_gait_evaluation::Request::t_resetStatistics;
   if (!get_gait_evaluation_client.call(srv)) printf("Error while calling GaitRecording service with t_resetStatistics\n");
 }
 
 std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
-  robo_cont_types::get_gait_evaluation srv;
+  dyret_common::get_gait_evaluation srv;
   std::vector<float> vectorToReturn;
 
-  srv.request.givenCommand = robo_cont_types::get_gait_evaluation::Request::t_getResults;
+  srv.request.givenCommand = dyret_common::get_gait_evaluation::Request::t_getResults;
 
   if (get_gait_evaluation_client.call(srv)) {
     vectorToReturn = srv.response.results;
@@ -138,7 +138,7 @@ void setGaitParams(double givenStepLength,
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client){
-  robo_cont_types::get_gait_controller_status srv;
+  dyret_common::get_gait_controller_status srv;
 
   if (gaitControllerStatus_client.call(srv)) {
       if (srv.response.gaitControllerStatus.actionType == srv.response.gaitControllerStatus.t_idle) return true;
@@ -148,13 +148,13 @@ bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client){
 }
 
 void resetTrajectoryPos(ros::Publisher givenTrajectoryMsgPublisher){
-  robo_cont_types::trajectoryMsg msg;
+  dyret_common::trajectoryMsg msg;
   msg.command = msg.t_resetPosition;
   givenTrajectoryMsgPublisher.publish(msg);
 }
 
 void sendTrajectories(std::vector<float> givenTrajectoryDistances, std::vector<float> givenTrajectoryAngles, std::vector<int> givenTrajectoryTimeouts, ros::Publisher givenTrajectoryMsgPublisher){
-  robo_cont_types::trajectoryMsg msg;
+  dyret_common::trajectoryMsg msg;
 
   msg.trajectorySegments.resize(givenTrajectoryDistances.size());
   for (int i = 0; i < givenTrajectoryDistances.size(); i++){
@@ -445,9 +445,9 @@ int main(int argc, char **argv){
   ros::init(argc, argv, "exp1Gui");
   ros::NodeHandle n;
 
-  get_gait_evaluation_client = n.serviceClient<robo_cont_types::get_gait_evaluation>("get_gait_evaluation");
-  gaitControllerStatus_client = n.serviceClient<robo_cont_types::get_gait_controller_status>("get_gait_controller_status");
-  trajectoryMessage_pub = n.advertise<robo_cont_types::trajectoryMsg>("trajectoryMessages", 1000);
+  get_gait_evaluation_client = n.serviceClient<dyret_common::get_gait_evaluation>("get_gait_evaluation");
+  gaitControllerStatus_client = n.serviceClient<dyret_common::get_gait_controller_status>("get_gait_controller_status");
+  trajectoryMessage_pub = n.advertise<dyret_common::trajectoryMsg>("trajectoryMessages", 1000);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");

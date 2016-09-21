@@ -18,7 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   genmsg
   dynamic_reconfigure
-  robo_cont_types
+  dyret_common
   dynamixel_server
 )
 
