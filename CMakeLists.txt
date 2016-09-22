@@ -19,7 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
   genmsg
   dynamic_reconfigure
   dyret_common
-  dynamixel_server
+  dyret_utils
+  dyret_hardware
 )
 
 find_package(Boost REQUIRED COMPONENTS 

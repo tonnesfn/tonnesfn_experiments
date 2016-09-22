@@ -10,11 +10,13 @@
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
 
-#include "robo_cont_utils.h"
 #include "dyret_common/get_gait_controller_status.h"
 #include "dyret_common/actionMessage.h"
 #include "dyret_common/trajectoryMsg.h"
 #include "dyret_common/get_gait_evaluation.h"
+
+#include "dyret_utils/wait_for_ros.h"
+#include "dyret_utils/timeHandling.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
