@@ -47,3 +47,20 @@ add_executable(exp1Gui
 target_link_libraries(exp1Gui ${catkin_LIBRARIES})
 target_link_libraries(exp1Gui ${Boost_LIBRARIES})
 target_link_libraries(exp1Gui ${TBB_LIBRARIES})
+add_dependencies(exp1Gui
+  ${catkin_EXPORTED_TARGETS})
+
+add_executable(gazeboTest
+               src/gazeboTest.cpp
+              )
+target_link_libraries(gazeboTest ${catkin_LIBRARIES})
+add_dependencies(gazeboTest
+  ${catkin_EXPORTED_TARGETS})
+
+add_executable(hardwareTest
+               src/hardwareTest.cpp
+              )
+target_link_libraries(hardwareTest ${catkin_LIBRARIES})
+add_dependencies(hardwareTest
+  ${catkin_EXPORTED_TARGETS})
+
