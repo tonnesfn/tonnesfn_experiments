@@ -451,9 +451,9 @@ int main(int argc, char **argv){
   gaitControllerStatus_client = n.serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = n.advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
 
-  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
-  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
+  //waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
+  //waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
+  //waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
 
   ros::AsyncSpinner spinner(2);
   spinner.start();
