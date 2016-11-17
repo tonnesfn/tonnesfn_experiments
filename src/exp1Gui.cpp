@@ -682,9 +682,9 @@ int main(int argc, char **argv){
 
   } while (inputChar != '0');
 
-  fclose(evoFitnessLog);
-  fclose(evoParamLog_gen);
-  fclose(evoParamLog_phen);
+  if (evoFitnessLog != NULL) fclose(evoFitnessLog);
+  if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
+  if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
 
   return 0;
 }
