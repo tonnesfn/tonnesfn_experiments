@@ -55,12 +55,58 @@ namespace sferes {
         assert(pop.size());
         assert(begin < pop.size());
         assert(end <= pop.size());
+
         for (size_t i = begin; i < end; ++i) {
           pop[i]->fit() = fit_proto;
           pop[i]->develop();
-          pop[i]->fit().eval(*pop[i]);
-          _nb_evals++;
         }
+
+        // If morphology is included, sort:
+        if (pop[0]->gen().size() > 7) {
+
+          std::vector<std::vector<float>> legLengths;
+          std::vector<int> sortedOrder;
+
+          for (size_t i = begin; i < end; ++i) {
+            auto individual = pop[i]->gen();
+            std::vector<float> vec = {individual.data(7), individual.data(8)};
+            legLengths.push_back(vec);
+          }
+
+          std::vector<float> currentPosition = {0.0, 0.0};
+          bool reachedPosition[legLengths.size()] = {0}; // Initialize to false
+
+          for (int i = 0; i < legLengths.size(); i++) {
+
+            float smallestDistance = 1000.0;
+            int currentIndex = -1;
+
+            for (int j = 0; j < legLengths.size(); j++){
+              if (reachedPosition[j] == false){
+                double currentDistance = std::max(fabs(legLengths[j][0] - currentPosition[0]), fabs(legLengths[j][1] - currentPosition[1]));
+                if (currentDistance < smallestDistance) {
+                  smallestDistance = currentDistance;
+                  currentIndex = j;
+                }
+              }
+            }
+
+            reachedPosition[currentIndex] = true;
+            currentPosition = legLengths[currentIndex];
+            sortedOrder.push_back(currentIndex);
+          }
+
+          for (int i = 0; i < legLengths.size(); i++) {
+            pop[begin+sortedOrder[i]]->fit().eval(*pop[begin+sortedOrder[i]]);
+            _nb_evals++;
+          }
+        } else { // If morphology is NOT included, do unsorted:
+          for (size_t i = begin; i < end; ++i) {
+            pop[i]->fit().eval(*pop[i]);
+            _nb_evals++;
+          }
+        }
+        printf("test\n");
       }
       unsigned nb_evals() const { return _nb_evals; }
     protected:
