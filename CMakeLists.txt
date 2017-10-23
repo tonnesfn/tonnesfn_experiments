@@ -50,6 +50,15 @@ target_link_libraries(exp1Gui ${TBB_LIBRARIES})
 add_dependencies(exp1Gui
   ${catkin_EXPORTED_TARGETS})
 
+add_executable(exp2Gui
+               src/exp2Gui.cpp
+              )
+target_link_libraries(exp2Gui ${catkin_LIBRARIES})
+target_link_libraries(exp2Gui ${Boost_LIBRARIES})
+target_link_libraries(exp2Gui ${TBB_LIBRARIES})
+add_dependencies(exp2Gui
+  ${catkin_EXPORTED_TARGETS})
+
 add_executable(gazeboTest
                src/gazeboTest.cpp
               )

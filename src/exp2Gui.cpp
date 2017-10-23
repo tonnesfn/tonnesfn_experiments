@@ -182,7 +182,9 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
          "speed: %.2f, "
          "wagPhase: %.2f, "
          "wagAmplitude_x: %.2f, "
-         "wagAmplitude_y: %.2f\n",
+         "wagAmplitude_y: %.2f,"
+         "femurLength: %.2f,"
+         "tibiaLength: %.2f\n",
          currentIndividual,
          parameters[0],
          parameters[1],
@@ -191,8 +193,10 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
          parameters[4],
          parameters[5],
          parameters[6],
-         parameters[7]);
-
+         parameters[7],
+         parameters[8],
+         parameters[9]);
+/*
   currentIndividual++;
 
   setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
@@ -278,7 +282,11 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   ss << fitness_inferredSpeed << ", " << fitness_current << ", " << fitness_stability << ", " << fitness_mocapSpeed;
   *fitnessString = ss.str();
 
+  return fitness;*/
+
+  std::vector<float> fitness(fitnessFunctions.size());
   return fitness;
+
 }
 
 using namespace sferes;
@@ -304,9 +312,9 @@ struct Params {
   };
 };
 
-SFERES_FITNESS(FitExp1MO, sferes::fit::Fitness) {
+SFERES_FITNESS(FitExp2MO, sferes::fit::Fitness) {
 public:
-  FitExp1MO()  {}
+  FitExp2MO()  {}
   template<typename Indiv>
   void eval(Indiv& ind) {
 
@@ -328,14 +336,16 @@ public:
     }
 */
 
-    individualParameters = { 50 +  ind.data(0)*100.0, // stepLength       50 -> 150
-                             25 + (ind.data(1)*50.0), // stepHeight       25 -> 75
-                             ind.data(2)*50.0,        // smoothing         0 -> 50
-                             frequency,               // frequency       0.2 -> 1.5
-                             speed,                   // speed
-                             (ind.data(3)*0.4)-0.2,   // wagPhase       -0.2 -> 0.2
-                             ind.data(4)*50.0,        // wagAmplitude_x    0 -> 50
-                             ind.data(5)*50.0         // wagAmplitude_y    0 -> 50
+    individualParameters = { 50 +  ind.data(0)*100.0, // 0: stepLength        50 -> 150
+                             25 + (ind.data(1)*50.0), // 1: stepHeight        25 -> 75
+                             ind.data(2)*50.0,        // 2: smoothing          0 -> 50
+                             frequency,               // 6: frequency        0.2 -> 1.5
+                             speed,                   // 6: speed
+                             (ind.data(3)*0.4)-0.2,   // 3: wagPhase        -0.2 -> 0.2
+                             ind.data(4)*50.0,        // 4: wagAmplitude_x     0 -> 50
+                             ind.data(5)*50.0,        // 5: wagAmplitude_y     0 -> 50
+                             ind.data(7)*25.0,        // 7: femurLength        0 -> 25
+                             ind.data(8)*100.0        // 8: tibiaLength        0 -> 100
                            };
     std::string fitnessDescription_gen  = "stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency\n";
     std::string fitnessDescription_phen = "stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y\n";
@@ -444,7 +454,7 @@ int main(int argc, char **argv){
   evoParamLog_gen = NULL;
   evoParamLog_phen = NULL;
 
-  ros::init(argc, argv, "exp1Gui");
+  ros::init(argc, argv, "exp2Gui");
   ros::NodeHandle n;
 
   get_gait_evaluation_client = n.serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
@@ -458,8 +468,8 @@ int main(int argc, char **argv){
   ros::AsyncSpinner spinner(2);
   spinner.start();
 
-  typedef gen::EvoFloat<7, Params> gen_t;
-  typedef phen::Parameters<gen_t, FitExp1MO<Params>, Params> phen_t;
+  typedef gen::EvoFloat<9, Params> gen_t;   // Number of parameters in each individual:
+  typedef phen::Parameters<gen_t, FitExp2MO<Params>, Params> phen_t;
   typedef eval::Eval<Params> eval_t;
   typedef boost::fusion::vector<stat::ParetoFront<phen_t, Params> >  stat_t;
   typedef modif::Dummy<> modifier_t;

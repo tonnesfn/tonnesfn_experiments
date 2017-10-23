@@ -1,5 +1,7 @@
 *.swp
 
 .cproject
+cmake-build-debug/
+.idea
 .project
 .settings/
