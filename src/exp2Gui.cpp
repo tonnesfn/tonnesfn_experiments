@@ -13,10 +13,11 @@
 #include "dyret_common/GetGaitControllerStatus.h"
 #include "dyret_common/ActionMessage.h"
 #include "dyret_common/Trajectory.h"
+#include "dyret_common/Configuration.h"
 #include "dyret_common/GetGaitEvaluation.h"
 
-#include "dyret_utils/wait_for_ros.h"
 #include "dyret_utils/timeHandling.h"
+#include "dyret_utils/wait_for_ros.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -29,14 +30,17 @@
 
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
+ros::Publisher actuatorCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
+ros::Subscriber actuatorState_sub;
 
 FILE * evoFitnessLog;
 FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
 bool singleObjective;
 double globalSpeed;
-
+float currentFemurLength = 0.0;
+float currentTibiaLength = 0.0;
 int currentIndividual;
 
 std::vector<std::string> fitnessFunctions;
@@ -173,6 +177,35 @@ bool isFitnessObjective(std::string givenString){
   return (std::find(fitnessFunctions.begin(), fitnessFunctions.end(), givenString) != fitnessFunctions.end());
 }
 
+void setLegLengths(float femurLengths, float tibiaLengths){
+  dyret_common::Configuration msg;
+
+  msg.id.resize(0);
+  msg.distance.resize(2);
+
+  msg.distance[0] = femurLengths;
+  msg.distance[1] = tibiaLengths;
+
+  waitForRosInit(actuatorCommand_pub, "actuatorCommand_pub");
+
+  actuatorCommand_pub.publish(msg);
+}
+
+void servoConfigsCallback(const dyret_common::Configuration::ConstPtr& msg) {
+  if (msg->distance.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->distance.size()); }
+
+  currentFemurLength = (msg->distance[0] + msg->distance[2] + msg->distance[4] + msg->distance[6]) / 4.0;
+  currentTibiaLength = (msg->distance[1] + msg->distance[3] + msg->distance[5] + msg->distance[7]) / 4.0;
+}
+
+bool legsAreLength(float femurLengths, float tibiaLengths){
+  if ( (fabs(femurLengths - currentFemurLength) < 0.5) && (fabs(tibiaLengths - currentTibiaLength) < 0.5) ){
+    return true;
+  } else {
+    return false;
+  }
+}
+
 std::vector<float> evaluateIndividual(std::vector<double> parameters, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client){
 
   printf("%03u: Evaluating stepLength %.2f, "
@@ -196,16 +229,21 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
          parameters[7],
          parameters[8],
          parameters[9]);
-/*
+
   currentIndividual++;
 
   setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
+
+  setLegLengths(parameters[8], parameters[9]);
+  while(!legsAreLength(parameters[8], parameters[9])){
+    sleep(1);
+  }
 
   std::vector<float> trajectoryAngles(1);
   std::vector<float> trajectoryDistances(1);
   std::vector<int>   trajectoryTimeouts(1);
   trajectoryDistances[0] = 1000.0;
-  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
+  trajectoryTimeouts[0] = 100.0; // 10 sec timeout
 
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -282,9 +320,6 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   ss << fitness_inferredSpeed << ", " << fitness_current << ", " << fitness_stability << ", " << fitness_mocapSpeed;
   *fitnessString = ss.str();
 
-  return fitness;*/
-
-  std::vector<float> fitness(fitnessFunctions.size());
   return fitness;
 
 }
@@ -460,6 +495,8 @@ int main(int argc, char **argv){
   get_gait_evaluation_client = n.serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = n.serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = n.advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
+  actuatorCommand_pub = n.advertise<dyret_common::Configuration>("actuatorCommands", 10);
+  actuatorState_sub = n.subscribe("/actuatorStates", 1, servoConfigsCallback);
 
   //waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   //waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
@@ -571,7 +608,7 @@ int main(int argc, char **argv){
           individualParameters = { 82.370520,  // stepLength
                                    60.338199,  // stepHeight
                                    47.710946,  // smoothing
-                                    0.241783,  // gaitFrequency
+                                    0.00241783,  // gaitFrequency
                                          NAN,  // speed
                                     0.089293,  // wagPhase -0.2 -> 0.2
                                    44.656688,  // wagAmplitude_x
