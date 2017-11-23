@@ -242,7 +242,7 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   std::vector<float> trajectoryDistances(1);
   std::vector<int>   trajectoryTimeouts(1);
   trajectoryDistances[0] = 1000.0;
-  trajectoryTimeouts[0] = 100.0; // 10 sec timeout
+  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -250,7 +250,7 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   sleep(5);
 
   // Todo: do this check intelligently
-  while(gaitControllerDone(gaitControllerStatus_client) == false) sleep(1);
+  while(gaitControllerDone(gaitControllerStatus_client) == false){ sleep(1);};
 
   std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
@@ -264,14 +264,14 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
       if (i != (gaitResultsForward.size()-1)) printf(", "); else printf("\n");
   }
 
-  trajectoryTimeouts[0] = 12.0; // 12 sec timeout
   trajectoryDistances[0] = 0.0;
+  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
   resetGaitRecording(get_gait_evaluation_client);
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
   sleep(5);
 
-  while(gaitControllerDone(gaitControllerStatus_client) == false) sleep(1);
+  while(gaitControllerDone(gaitControllerStatus_client) == false){ sleep(1);}
 
   std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
@@ -497,9 +497,9 @@ int main(int argc, char **argv){
   actuatorCommand_pub = n.advertise<dyret_common::Configuration>("actuatorCommands", 10);
   actuatorState_sub = n.subscribe("/actuatorStates", 1, servoConfigsCallback);
 
-  //waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
-  //waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  //waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
+  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
+  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
+  waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
 
   ros::AsyncSpinner spinner(2);
   spinner.start();
