@@ -42,6 +42,8 @@ float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
 int currentIndividual;
 
+bool robotOnStand = false;
+
 std::vector<std::string> fitnessFunctions;
 
 FILE* getEvoPathFileHandle(std::string fileName){
@@ -110,6 +112,9 @@ void setGaitParams(double givenStepLength,
   dynamic_reconfigure::DoubleParameter param_wagAmplitude_x;
   dynamic_reconfigure::DoubleParameter param_wagAmplitude_y;
   dynamic_reconfigure::DoubleParameter param_wagPhase;
+  dynamic_reconfigure::IntParameter param_cP;
+  dynamic_reconfigure::IntParameter param_cI;
+  dynamic_reconfigure::IntParameter param_cD;
   dynamic_reconfigure::Config conf;
 
   param_stepLength.name = "stepLength";
@@ -128,6 +133,12 @@ void setGaitParams(double givenStepLength,
   param_wagAmplitude_y.value = givenWagAmplitude_y;
   param_wagPhase.name = "wagPhase";
   param_wagPhase.value = givenWagPhaseOffset;
+  param_cP.name = "cP";
+  param_cP.value = 10;
+  param_cI.name = "cI";
+  param_cI.value = 0;
+  param_cD.name = "cD";
+  param_cD.value = 0;
   conf.doubles.push_back(param_stepLength);
   conf.doubles.push_back(param_stepHeight);
   conf.doubles.push_back(param_smoothing);
@@ -136,6 +147,12 @@ void setGaitParams(double givenStepLength,
   conf.doubles.push_back(param_wagAmplitude_x);
   conf.doubles.push_back(param_wagAmplitude_y);
   conf.doubles.push_back(param_wagPhase);
+
+  if (robotOnStand == true) {
+    conf.ints.push_back(param_cP);
+    conf.ints.push_back(param_cI);
+    conf.ints.push_back(param_cD);
+  }
 
   srv_req.config = conf;
 
@@ -519,9 +536,10 @@ int main(int argc, char **argv){
 
   int inputChar;
   do {
-    printf("1 - Evo SO (mocapSpeed)\n"
-           "2 - Evo SO (stability)\n"
-           "3 - Evo MO (mocapSpeed+stability)\n"
+    printf("1 - Enable/disable stand testing\n"
+           "2 - Evo SO (mocapSpeed)\n"
+           "3 - Evo SO (stability)\n"
+           "4 - Evo MO (mocapSpeed+stability)\n"
            "9 - Test fitness noise (10min)\n"
            "0 - Exit\n> ");
 
@@ -532,16 +550,25 @@ int main(int argc, char **argv){
 
     switch(inputChar){
       case '1':
+        if (robotOnStand == true){
+          printf("   RobotOnStand now disabled!\n");
+        } else {
+          printf("   RobotOnStand now enabled!\n");
+        }
+
+        robotOnStand = !robotOnStand;
+        break;
+      case '2':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
-      case '2':
+      case '3':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
-      case '3':
+      case '4':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
