@@ -335,7 +335,7 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =    8;  // Population size
+    SFERES_CONST unsigned size     =    4;  // Population size
     SFERES_CONST unsigned nb_gen   =   16;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
@@ -379,7 +379,7 @@ public:
                              ind.data(4)*50.0,        // 4: wagAmplitude_x     0 -> 50
                              ind.data(5)*50.0,        // 5: wagAmplitude_y     0 -> 50
                              ind.data(7)*25.0,        // 7: femurLength        0 -> 25
-                             ind.data(8)*100.0        // 8: tibiaLength        0 -> 100
+                             ind.data(8)*95.0         // 8: tibiaLength          0 -> 90
                            };
     std::string fitnessDescription_gen  = "stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency, femurLength, tibiaLength\n";
     std::string fitnessDescription_phen = "stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y, femurLength, tibiaLength\n";
