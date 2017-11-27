@@ -537,9 +537,10 @@ int main(int argc, char **argv){
   int inputChar;
   do {
     printf("1 - Enable/disable stand testing\n"
-           "2 - Evo SO (mocapSpeed)\n"
-           "3 - Evo SO (stability)\n"
-           "4 - Evo MO (mocapSpeed+stability)\n"
+           "2 - Test longest legs\n"
+           "3 - Evo SO (mocapSpeed)\n"
+           "4 - Evo SO (stability)\n"
+           "5 - Evo MO (mocapSpeed+stability)\n"
            "9 - Test fitness noise (10min)\n"
            "0 - Exit\n> ");
 
@@ -559,16 +560,48 @@ int main(int argc, char **argv){
         robotOnStand = !robotOnStand;
         break;
       case '2':
+      {
+        for (int i = 0; i < 1; i++){
+          std::vector<double> individualParameters;
+
+          // MO_speedStability_1_stable
+          individualParameters = {80.00,  // stepLength
+                                  50.00,  // stepHeight
+                                  50.00,  // smoothing
+                                   0.10,  // gaitFrequency
+                                    NAN,  // speed
+                                   0.08,  // wagPhase -0.2 -> 0.2
+                                  35.00,  // wagAmplitude_x
+                                  35.00,  // wagAmplitude_y
+                                  25.00,  // femurLength
+                                  95.00}; // tibiaLength
+
+
+          fitnessFunctions.clear();
+          fitnessFunctions.emplace_back("MocapSpeed");
+          fitnessFunctions.emplace_back("Stability");
+
+          std::string fitnessString;
+          std::vector<float> fitnessResult = evaluateIndividual(individualParameters, &fitnessString, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
+          printf("Returned fitness (%lu): ", fitnessResult.size());
+          for (int i = 0; i < fitnessResult.size(); i++){
+            printf("%.2f ", fitnessResult[i]);
+          }
+          printf("\n");
+        }
+        break;
+      }
+      case '3':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
-      case '3':
+      case '4':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
-      case '4':
+      case '5':
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
