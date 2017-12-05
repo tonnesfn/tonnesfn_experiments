@@ -60,7 +60,7 @@ FILE* getEvoPathFileHandle(std::string fileName){
   line.append("/");
   line.append(fileName.c_str());
 
-  FILE * handleToReturn = fopen(line.c_str(), "w+");
+  FILE * handleToReturn = fopen(line.c_str(), "a+");
 
   return handleToReturn;
 }
@@ -333,7 +333,11 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
   std::stringstream ss;
 
-  ss << fitness_inferredSpeed << ", " << fitness_current << ", " << fitness_stability << ", " << fitness_mocapSpeed;
+    for (int i = 0; i < gaitResultsForward.size(); i++){
+    ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
+  }
+
+  ss << fitness_mocapSpeed << ", " << fitness_stability << ", " << fitness_current;
   *fitnessString = ss.str();
 
   return fitness;
@@ -352,7 +356,7 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =    4;  // Population size
+    SFERES_CONST unsigned size     =   16;  // Population size
     SFERES_CONST unsigned nb_gen   =   16;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
@@ -447,8 +451,8 @@ public:
 
     // Do logging:
     if (evoParamLog_gen == NULL){
-        evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv");
-        fprintf(evoParamLog_gen, "%s", fitnessDescription_gen.c_str());
+      evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv");
+      fprintf(evoParamLog_gen, "%s", fitnessDescription_gen.c_str());
     }
 
     fprintf(evoParamLog_gen, "%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
@@ -466,7 +470,6 @@ public:
 
     if (evoFitnessLog == NULL){
         evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv");
-        fprintf(evoFitnessLog, "inferredSpeed, current, stability, mocapSpeed\n");
     }
 
     fprintf(evoFitnessLog, "%s\n", fitnessString.c_str());

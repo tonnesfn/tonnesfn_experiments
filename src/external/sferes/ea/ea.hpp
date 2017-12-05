@@ -236,6 +236,7 @@ namespace sferes {
       void resume(const std::string& fname) {
         dbg::trace trace("ea", DBG_HERE);
         _make_res_dir();
+        saveCurrentDir();
         _set_status("resumed");
         if (boost::fusion::find<stat::State<Phen, Params> >(_stat) == boost::fusion::end(_stat)) {
           std::cout<<"WARNING: no State found in stat_t, cannot resume" << std::endl;
@@ -427,6 +428,9 @@ namespace sferes {
       void _load(const std::string& fname) {
         dbg::trace trace("ea", DBG_HERE);
         std::cout << "loading " << fname << std::endl;
+
+
+
         std::ifstream ifs(fname.c_str());
         if (ifs.fail()) {
           std::cerr << "Cannot open :" << fname
