@@ -46,7 +46,7 @@ bool robotOnStand = false;
 
 std::vector<std::string> fitnessFunctions;
 
-FILE* getEvoPathFileHandle(std::string fileName){
+FILE* getEvoPathFileHandle(std::string fileName, std::string givenHeader = ""){
   std::string line;
   std::ifstream myfile ("currentEvoDir");
   if (myfile.is_open()) {
@@ -60,7 +60,13 @@ FILE* getEvoPathFileHandle(std::string fileName){
   line.append("/");
   line.append(fileName.c_str());
 
+  std::ifstream infile(line.c_str());
+
   FILE * handleToReturn = fopen(line.c_str(), "a+");
+
+  if (!infile.good() && !givenHeader.empty()){
+    fprintf(handleToReturn, "%s\n", givenHeader.c_str());
+  }
 
   return handleToReturn;
 }
@@ -222,18 +228,18 @@ bool legsAreLength(float femurLengths, float tibiaLengths){
   }
 }
 
-std::vector<float> evaluateIndividual(std::vector<double> parameters, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client){
+std::vector<float> evaluateIndividual(std::vector<double> parameters, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client) {
 
   printf("%03u: Evaluating stepLength %.2f, "
-         "stepHeight %.2f, "
-         "smoothing %.2f, "
-         "frequency: %.2f, "
-         "speed: %.2f, "
-         "wagPhase: %.2f, "
-         "wagAmplitude_x: %.2f, "
-         "wagAmplitude_y: %.2f,"
-         "femurLength: %.2f,"
-         "tibiaLength: %.2f\n",
+             "stepHeight %.2f, "
+             "smoothing %.2f, "
+             "frequency: %.2f, "
+             "speed: %.2f, "
+             "wagPhase: %.2f, "
+             "wagAmplitude_x: %.2f, "
+             "wagAmplitude_y: %.2f,"
+             "femurLength: %.2f,"
+             "tibiaLength: %.2f\n",
          currentIndividual,
          parameters[0],
          parameters[1],
@@ -311,29 +317,31 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
 
   // Inferred speed:
-  if(isFitnessObjective("InferredSpeed")){
-        fitness[currentFitnessIndex] = fitness_inferredSpeed;
-        currentFitnessIndex++;
+  if (isFitnessObjective("InferredSpeed")) {
+    fitness[currentFitnessIndex] = fitness_inferredSpeed;
+    currentFitnessIndex++;
   }
 
-  if(isFitnessObjective("Current")){
-        fitness[currentFitnessIndex] = fitness_current;
-        currentFitnessIndex++;
+  if (isFitnessObjective("Current")) {
+    fitness[currentFitnessIndex] = fitness_current;
+    currentFitnessIndex++;
   }
 
-  if(isFitnessObjective("Stability")){
-        fitness[currentFitnessIndex] = fitness_stability;
-        currentFitnessIndex++;
+  if (isFitnessObjective("Stability")) {
+    fitness[currentFitnessIndex] = fitness_stability;
+    currentFitnessIndex++;
   }
 
-  if (isFitnessObjective("MocapSpeed")){
-      fitness[currentFitnessIndex] = fitness_mocapSpeed;
-      currentFitnessIndex++;
+  if (isFitnessObjective("MocapSpeed")) {
+    fitness[currentFitnessIndex] = fitness_mocapSpeed;
+    currentFitnessIndex++;
   }
 
   std::stringstream ss;
 
-    for (int i = 0; i < gaitResultsForward.size(); i++){
+  ss << currentIndividual << ",";
+
+  for (int i = 0; i < gaitResultsForward.size(); i++) {
     ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
   }
 
@@ -379,7 +387,6 @@ public:
 
     double speed, frequency;
 
-
 //   if (isFitnessObjective("Speed")){
         // If evolving for speed, set frequency from genome
         frequency = 0.2 + ind.data(6) * 1.3;
@@ -402,8 +409,8 @@ public:
                              ind.data(7)*25.0,        // 7: femurLength        0 -> 25
                              ind.data(8)*95.0         // 8: tibiaLength          0 -> 90
                            };
-    std::string fitnessDescription_gen  = "stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency, femurLength, tibiaLength\n";
-    std::string fitnessDescription_phen = "stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y, femurLength, tibiaLength\n";
+    std::string fitnessDescription_gen  = "id, stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency, femurLength, tibiaLength";
+    std::string fitnessDescription_phen = "id, stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y, femurLength, tibiaLength";
 
     bool validSolution;
     std::vector<float> fitnessResult;
@@ -451,25 +458,27 @@ public:
 
     // Do logging:
     if (evoParamLog_gen == NULL){
-      evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv");
-      fprintf(evoParamLog_gen, "%s", fitnessDescription_gen.c_str());
+      evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv", fitnessDescription_gen);
     }
 
-    fprintf(evoParamLog_gen, "%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+    fprintf(evoParamLog_gen, "%d, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+                currentIndividual,
                 ind.data(0), ind.data(1), ind.data(2), ind.data(3),
                 ind.data(4), ind.data(5), ind.data(6), ind.data(7), ind.data(8));
     fflush(evoParamLog_gen);
 
     if (evoParamLog_phen == NULL){
-        evoParamLog_phen = getEvoPathFileHandle("evoParamLog_phen.csv");
-        fprintf(evoParamLog_phen, "%s", fitnessDescription_phen.c_str());
+        evoParamLog_phen = getEvoPathFileHandle("evoParamLog_phen.csv", fitnessDescription_phen);
     }
 
+    fprintf(evoParamLog_phen, "%d,", currentIndividual);
     for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f, ", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
     fflush(evoParamLog_phen);
 
+    std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
+
     if (evoFitnessLog == NULL){
-        evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv");
+        evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv", fitnessDescription);
     }
 
     fprintf(evoFitnessLog, "%s\n", fitnessString.c_str());
@@ -547,7 +556,7 @@ int main(int argc, char **argv){
            "9 - Test fitness noise (10min)\n"
            "0 - Exit\n> ");
 
-    currentIndividual = 1;
+    currentIndividual = -1;
 
     inputChar = getchar();
     std::cin.ignore(1000,'\n');
