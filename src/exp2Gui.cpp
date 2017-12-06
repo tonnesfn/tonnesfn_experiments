@@ -256,14 +256,19 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
   setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
 
+  fprintf(stderr, "Setting leg lengths\n");
   setLegLengths(parameters[8], parameters[9]);
-  while(!legsAreLength(parameters[8], parameters[9])){
-    sleep(0.01);
+  fprintf(stderr, "Set leg lengths, waiting\n");
+  int secPassed = 0;
+  while (!legsAreLength(parameters[8], parameters[9])) {
+    sleep(1);
+    if (secPassed++ > 120) return std::vector<float>(); // 2 min timeout
   }
+  fprintf(stderr, "Leg lengths done\n");
 
   std::vector<float> trajectoryAngles(1);
   std::vector<float> trajectoryDistances(1);
-  std::vector<int>   trajectoryTimeouts(1);
+  std::vector<int> trajectoryTimeouts(1);
   trajectoryDistances[0] = 1000.0;
   trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
@@ -273,18 +278,25 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   sleep(5);
 
   // Todo: do this check intelligently
-  while(gaitControllerDone(gaitControllerStatus_client) == false){ sleep(1);};
+
+  fprintf(stderr, "Waiting for gaitControllerDone 1");
+  secPassed = 0;
+  while (gaitControllerDone(gaitControllerStatus_client) == false) {
+    sleep(1);
+    if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
+  }
+  fprintf(stderr, "Waiting for gaitControllerDone 1");
 
   std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
-  if (gaitResultsForward.size() == 0){
-      return gaitResultsForward;
+  if (gaitResultsForward.size() == 0) {
+    return gaitResultsForward;
   }
 
   printf("\tRes: ");
-  for (int i = 0; i < gaitResultsForward.size(); i++){
-      printf("%.5f", gaitResultsForward[i]);
-      if (i != (gaitResultsForward.size()-1)) printf(", "); else printf("\n");
+  for (int i = 0; i < gaitResultsForward.size(); i++) {
+    printf("%.5f", gaitResultsForward[i]);
+    if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
 
   trajectoryDistances[0] = 0.0;
@@ -294,18 +306,24 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
   sleep(5);
 
-  while(gaitControllerDone(gaitControllerStatus_client) == false){ sleep(1);}
+  secPassed = 0;
+  fprintf(stderr, "Waiting for gaitControllerDone 2");
+  while (gaitControllerDone(gaitControllerStatus_client) == false) {
+    sleep(1);
+    if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
+  }
+  fprintf(stderr, "gaitControllerDone 2");
 
   std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
-  if (gaitResultsReverse.size() == 0){
-      return gaitResultsReverse;
-    }
+  if (gaitResultsReverse.size() == 0) {
+    return gaitResultsReverse;
+  }
 
   printf("\tRes: ");
-  for (int i = 0; i < gaitResultsReverse.size(); i++){
-      printf("%.5f", gaitResultsReverse[i]);
-      if (i != (gaitResultsReverse.size()-1)) printf(", "); else printf("\n");
+  for (int i = 0; i < gaitResultsReverse.size(); i++) {
+    printf("%.5f", gaitResultsReverse[i]);
+    if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
   }
 
   std::vector<float> fitness(fitnessFunctions.size());
