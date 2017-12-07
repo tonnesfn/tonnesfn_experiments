@@ -28,6 +28,11 @@
 #include "external/sferes/run.hpp"
 #include <boost/program_options.hpp>
 
+#include "rosConnection.h"
+
+#include <sstream>
+#include <iostream>
+
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
 ros::Publisher actuatorCommand_pub;
@@ -41,6 +46,9 @@ double globalSpeed;
 float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
 int currentIndividual;
+//ros::NodeHandle* ros_nodehandle = NULL;
+
+rosConnectionHandler_t* rch;
 
 bool robotOnStand = false;
 
@@ -370,6 +378,42 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
 }
 
+void rosConnect(){
+  int argc = 0;
+  char **argv;
+
+  if (rch != NULL) {
+    delete rch;
+
+    get_gait_evaluation_client.shutdown();
+    gaitControllerStatus_client.shutdown();
+    trajectoryMessage_pub.shutdown();
+    actuatorCommand_pub.shutdown();
+    actuatorState_sub.shutdown();
+  }
+
+  rch = new rosConnectionHandler_t(argc, argv);
+
+  std::cout << "ROS OK: " << (ros::ok()?"true":"false") << std::endl;
+  std::cout << "MASTER UP: " << (ros::master::check()?"true":"false") << std::endl;
+
+  get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
+  gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
+  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
+  actuatorCommand_pub = rch->nodeHandle()->advertise<dyret_common::Configuration>("actuatorCommands", 10);
+  actuatorState_sub = rch->nodeHandle()->subscribe("/actuatorStates", 1, servoConfigsCallback);
+
+  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
+  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
+  waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
+
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 100; j++){ ros::spinOnce();}
+    sleep(1);
+  }
+
+}
+
 using namespace sferes;
 using namespace sferes::gen::evo_float;
 
@@ -449,8 +493,10 @@ public:
             }
         }
 
+        if (fitnessResult.size() == 0) validSolution = false;
+
         if ((validSolution == false) || (fitnessResult.size() == 0)){
-          printf("Got invalid fitness: reset the robot and choose action (r/d): ");
+          printf("Got invalid fitness: reset the robot and choose action ((r)etry/(d)iscard/re(c)onnect): ");
 
           char choice;
           scanf(" %c", &choice);
@@ -461,6 +507,12 @@ public:
 
               printf("Discarding\n");
               validSolution = true;
+          } else if (choice == 'c'){
+            rosConnect();
+            printf("Reconnected and retrying\n");
+            sleep(3);
+            currentIndividual--;
+            validSolution = false;
           } else {
               printf("Retrying\n");
               currentIndividual--;
@@ -535,18 +587,7 @@ int main(int argc, char **argv){
   evoParamLog_gen = NULL;
   evoParamLog_phen = NULL;
 
-  ros::init(argc, argv, "exp2Gui");
-  ros::NodeHandle n;
-
-  get_gait_evaluation_client = n.serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
-  gaitControllerStatus_client = n.serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = n.advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
-  actuatorCommand_pub = n.advertise<dyret_common::Configuration>("actuatorCommands", 10);
-  actuatorState_sub = n.subscribe("/actuatorStates", 1, servoConfigsCallback);
-
-  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
-  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
+  rosConnect();
 
   ros::AsyncSpinner spinner(2);
   spinner.start();
@@ -572,6 +613,7 @@ int main(int argc, char **argv){
            "4 - Evo SO (stability)\n"
            "5 - Evo MO (mocapSpeed+stability)\n"
            "9 - Test fitness noise (10min)\n"
+           "r - Reconnect\n"
            "0 - Exit\n> ");
 
     currentIndividual = -1;
@@ -636,6 +678,11 @@ int main(int argc, char **argv){
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
+        break;
+      case 'r':
+        printf("Reconnecting!\n");
+        rosConnect();
+        printf("Reconnected!\n");
         break;
       case '9':
         {
