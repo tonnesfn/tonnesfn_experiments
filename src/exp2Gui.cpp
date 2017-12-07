@@ -264,36 +264,29 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
   setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
 
-  fprintf(stderr, "Setting leg lengths\n");
   setLegLengths(parameters[8], parameters[9]);
-  fprintf(stderr, "Set leg lengths, waiting\n");
   int secPassed = 0;
   while (!legsAreLength(parameters[8], parameters[9])) {
     sleep(1);
     if (secPassed++ > 120) return std::vector<float>(); // 2 min timeout
   }
-  fprintf(stderr, "Leg lengths done\n");
 
   std::vector<float> trajectoryAngles(1);
   std::vector<float> trajectoryDistances(1);
   std::vector<int> trajectoryTimeouts(1);
-  trajectoryDistances[0] = 1000.0;
-  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
+  trajectoryDistances[0] = 1500.0;
+  trajectoryTimeouts[0] = 15.0; // 15 sec timeout
 
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
   sleep(5);
 
-  // Todo: do this check intelligently
-
-  fprintf(stderr, "Waiting for gaitControllerDone 1");
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
   }
-  fprintf(stderr, "Waiting for gaitControllerDone 1");
 
   std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
@@ -306,6 +299,8 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
     printf("%.5f", gaitResultsForward[i]);
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
+
+  /*
 
   trajectoryDistances[0] = 0.0;
   trajectoryTimeouts[0] = 10.0; // 10 sec timeout
@@ -333,14 +328,21 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
     printf("%.5f", gaitResultsReverse[i]);
     if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
   }
+*/
 
   std::vector<float> fitness(fitnessFunctions.size());
   int currentFitnessIndex = 0;
 
+  /*
   float fitness_inferredSpeed = (gaitResultsForward[0] + gaitResultsReverse[0]) / 2.0;
   float fitness_current = (gaitResultsForward[4] + gaitResultsReverse[4]) / 2.0;
   float fitness_stability = (gaitResultsForward[3] + gaitResultsReverse[3] + ((gaitResultsForward[2] + gaitResultsReverse[2]) / 50.0)) / 2.0;
   float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
+*/
+  float fitness_inferredSpeed = gaitResultsForward[0];
+  float fitness_current = gaitResultsForward[4];
+  float fitness_stability = gaitResultsForward[3] + (gaitResultsForward[2] / 50.0);
+  float fitness_mocapSpeed = gaitResultsForward[5];
 
   // Inferred speed:
   if (isFitnessObjective("InferredSpeed")) {
@@ -368,10 +370,11 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   ss << currentIndividual << ",";
 
   for (int i = 0; i < gaitResultsForward.size(); i++) {
-    ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
+    //ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
+    ss << gaitResultsForward[i] << ",";
   }
 
-  ss << fitness_mocapSpeed << ", " << fitness_stability << ", " << fitness_current;
+  ss << fitness_mocapSpeed << "," << fitness_stability << "," << fitness_current;
   *fitnessString = ss.str();
 
   return fitness;
@@ -394,9 +397,6 @@ void rosConnect(){
 
   rch = new rosConnectionHandler_t(argc, argv);
 
-  std::cout << "ROS OK: " << (ros::ok()?"true":"false") << std::endl;
-  std::cout << "MASTER UP: " << (ros::master::check()?"true":"false") << std::endl;
-
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
@@ -406,11 +406,6 @@ void rosConnect(){
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
   waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
-
-  for (int i = 0; i < 5; i++) {
-    for (int j = 0; j < 100; j++){ ros::spinOnce();}
-    sleep(1);
-  }
 
 }
 
@@ -426,7 +421,7 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =   16;  // Population size
+    SFERES_CONST unsigned size     =    8;  // Population size
     SFERES_CONST unsigned nb_gen   =   16;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
@@ -531,7 +526,7 @@ public:
       evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv", fitnessDescription_gen);
     }
 
-    fprintf(evoParamLog_gen, "%d, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+    fprintf(evoParamLog_gen, "%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
                 currentIndividual,
                 ind.data(0), ind.data(1), ind.data(2), ind.data(3),
                 ind.data(4), ind.data(5), ind.data(6), ind.data(7), ind.data(8));
@@ -542,10 +537,11 @@ public:
     }
 
     fprintf(evoParamLog_phen, "%d,", currentIndividual);
-    for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f, ", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
+    for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f,", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
     fflush(evoParamLog_phen);
 
-    std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
+    //std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
+    std::string fitnessDescription = "Id, Speed_I, angVel, linAcc, stability, efficiency, speed_m, speed_m (T), stability (T), current (T)";
 
     if (evoFitnessLog == NULL){
         evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv", fitnessDescription);
