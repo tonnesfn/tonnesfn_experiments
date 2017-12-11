@@ -285,7 +285,7 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
          parameters[9]);
 
   // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
-  if (getMaxServoTemperature() > 60.0){
+  if (getMaxServoTemperature() > 70.0){
     printf("  Temperature is too high at %.1f\n", getMaxServoTemperature());
     return std::vector<float>();
   }
@@ -592,6 +592,7 @@ public:
             enableServos();
 
             std::cout << "Press enter to continue evolution";
+            std::cin.ignore();
             std::cin.ignore();
 
             currentIndividual--;
