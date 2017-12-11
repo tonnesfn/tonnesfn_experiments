@@ -15,6 +15,9 @@
 #include "dyret_common/Trajectory.h"
 #include "dyret_common/Configuration.h"
 #include "dyret_common/GetGaitEvaluation.h"
+#include "dyret_common/GetServoStatuses.h"
+#include "dyret_common/ServoConfig.h"
+#include "dyret_common/ServoConfigArray.h"
 
 #include "dyret_utils/timeHandling.h"
 #include "dyret_utils/wait_for_ros.h"
@@ -38,6 +41,9 @@ ros::Publisher trajectoryMessage_pub;
 ros::Publisher actuatorCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::Subscriber actuatorState_sub;
+ros::ServiceClient servoStatus_client;
+ros::Publisher servoConfig_pub;
+ros::Publisher actionMessages_pub;
 
 FILE * evoFitnessLog;
 FILE * evoParamLog_gen;
@@ -221,7 +227,7 @@ void setLegLengths(float femurLengths, float tibiaLengths){
   actuatorCommand_pub.publish(msg);
 }
 
-void servoConfigsCallback(const dyret_common::Configuration::ConstPtr& msg) {
+void actuatorStateCallback(const dyret_common::Configuration::ConstPtr& msg) {
   if (msg->distance.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->distance.size()); }
 
   currentFemurLength = (msg->distance[0] + msg->distance[2] + msg->distance[4] + msg->distance[6]) / 4.0;
@@ -236,7 +242,25 @@ bool legsAreLength(float femurLengths, float tibiaLengths){
   }
 }
 
+float getMaxServoTemperature(bool printAllTemperatures = false){
+  float maxTemp = -1.0;
+
+  dyret_common::GetServoStatuses  gssres;
+  servoStatus_client.call(gssres);
+
+  if (printAllTemperatures) printf("Servo temperatures: ");
+  for (int i = 0; i < gssres.response.servoStatuses.size(); i++){
+    if (gssres.response.servoStatuses[i].temperature > maxTemp) maxTemp = gssres.response.servoStatuses[i].temperature;
+    if (printAllTemperatures) printf("%.2f ",gssres.response.servoStatuses[i].temperature);
+  }
+  if (printAllTemperatures) printf("\n");
+
+  return maxTemp;
+}
+
 std::vector<float> evaluateIndividual(std::vector<double> parameters, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client) {
+
+  currentIndividual++;
 
   printf("%03u: Evaluating stepLength %.2f, "
              "stepHeight %.2f, "
@@ -260,7 +284,11 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
          parameters[8],
          parameters[9]);
 
-  currentIndividual++;
+  // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
+  if (getMaxServoTemperature() > 60.0){
+    printf("  Temperature is too high at %.1f\n", getMaxServoTemperature());
+    return std::vector<float>();
+  }
 
   setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
 
@@ -285,12 +313,16 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
+    if (secPassed++ > 30) {  // 30 sec timeout
+      printf("Timed out!\n");
+      return std::vector<float>();
+    }
   }
 
   std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
   if (gaitResultsForward.size() == 0) {
+    printf("GaitResultsForward.size() == 0!\n");
     return gaitResultsForward;
   }
 
@@ -377,8 +409,19 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   ss << fitness_mocapSpeed << "," << fitness_stability << "," << fitness_current;
   *fitnessString = ss.str();
 
+  printf("Returning here\n");
+
   return fitness;
 
+}
+
+void sendActionMessage(bool sleep){
+  dyret_common::ActionMessage actionMessage;
+  actionMessage.configuration = dyret_common::ActionMessage::t_mammal;
+  if (sleep == true) actionMessage.actionType = dyret_common::ActionMessage::t_sleep; else actionMessage.actionType = dyret_common::ActionMessage::t_restPose;
+  actionMessage.speed = 0.0;
+  actionMessage.direction = 0.0;
+  actionMessages_pub.publish(actionMessage);
 }
 
 void rosConnect(){
@@ -397,16 +440,48 @@ void rosConnect(){
 
   rch = new rosConnectionHandler_t(argc, argv);
 
+  actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("actionMessages", 10);
+  servoStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetServoStatuses>("/dyret/servoStatuses");
+
+  servoConfig_pub = rch->nodeHandle()->advertise<dyret_common::ServoConfigArray>("/dyret/servoConfigs", 1);
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
   actuatorCommand_pub = rch->nodeHandle()->advertise<dyret_common::Configuration>("actuatorCommands", 10);
-  actuatorState_sub = rch->nodeHandle()->subscribe("/actuatorStates", 1, servoConfigsCallback);
+  actuatorState_sub = rch->nodeHandle()->subscribe("/actuatorStates", 1, actuatorStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
   waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
 
+}
+
+
+void sendServoTorqueMessage(int givenValue){
+  dyret_common::ServoConfigArray msg;
+  std::vector<dyret_common::ServoConfig> msgContents(12);
+
+  for (int i = 0; i < 12; i++) {
+    msgContents[i].servoId = i;
+
+    if (givenValue == 0) msgContents[i].configType = dyret_common::ServoConfig::t_disableTorque;
+    if (givenValue == 1) msgContents[i].configType = dyret_common::ServoConfig::t_enableTorque;
+  }
+
+  msg.servoConfigs = msgContents;
+  servoConfig_pub.publish(msg);
+
+}
+
+// This enables all servoes again. No need to send torque-message, as sending a position automatically enables torque
+void enableServos(){
+  sendActionMessage(false);
+}
+
+void disableServos(){
+  sendActionMessage(true);
+  sleep(1);
+  sendServoTorqueMessage(0);
 }
 
 using namespace sferes;
@@ -421,7 +496,7 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =    8;  // Population size
+    SFERES_CONST unsigned size     =   16;  // Population size
     SFERES_CONST unsigned nb_gen   =   16;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
@@ -491,7 +566,7 @@ public:
         if (fitnessResult.size() == 0) validSolution = false;
 
         if ((validSolution == false) || (fitnessResult.size() == 0)){
-          printf("Got invalid fitness: reset the robot and choose action ((r)etry/(d)iscard/re(c)onnect): ");
+          printf("Got invalid fitness: choose action ((r)etry/(d)iscard/r(e)connect/(c)ooldown): ");
 
           char choice;
           scanf(" %c", &choice);
@@ -502,10 +577,23 @@ public:
 
               printf("Discarding\n");
               validSolution = true;
-          } else if (choice == 'c'){
+          } else if (choice == 'e'){
             rosConnect();
             printf("Reconnected and retrying\n");
             sleep(3);
+            currentIndividual--;
+            validSolution = false;
+          } else if (choice == 'c'){
+            disableServos();
+            printf("Servos disabled\n");
+
+            while (getMaxServoTemperature(true) > 40){ sleep(15); }
+
+            enableServos();
+
+            std::cout << "Press enter to continue evolution";
+            std::cin.ignore();
+
             currentIndividual--;
             validSolution = false;
           } else {
@@ -610,6 +698,8 @@ int main(int argc, char **argv){
            "5 - Evo SO (stability)\n"
            "6 - Evo MO (mocapSpeed+stability)\n"
            "9 - Test fitness noise (10min)\n"
+           "e - Enable servos\n"
+           "d - Disable servos\n"
            "r - Reconnect\n"
            "0 - Exit\n> ");
 
@@ -732,6 +822,13 @@ int main(int argc, char **argv){
 
           break;
         }
+      case 'e':
+        enableServos();
+        printf("Servos enabled!\n");
+        break;
+      case 'd':
+        disableServos();
+        printf("Servos disabled!\n");
       case '0':
         printf("\tExiting program\n");
         break;
