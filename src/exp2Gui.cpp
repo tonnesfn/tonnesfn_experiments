@@ -52,7 +52,9 @@ double globalSpeed;
 float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
 int currentIndividual;
-//ros::NodeHandle* ros_nodehandle = NULL;
+
+const int individuals = 16;
+const int generations = 16;
 
 rosConnectionHandler_t* rch;
 
@@ -85,6 +87,41 @@ FILE* getEvoPathFileHandle(std::string fileName, std::string givenHeader = ""){
   return handleToReturn;
 }
 
+void sendServoTorqueMessage(int givenValue){
+  dyret_common::ServoConfigArray msg;
+  std::vector<dyret_common::ServoConfig> msgContents(12);
+
+  for (int i = 0; i < 12; i++) {
+    msgContents[i].servoId = i;
+
+    if (givenValue == 0) msgContents[i].configType = dyret_common::ServoConfig::t_disableTorque;
+    if (givenValue == 1) msgContents[i].configType = dyret_common::ServoConfig::t_enableTorque;
+  }
+
+  msg.servoConfigs = msgContents;
+  servoConfig_pub.publish(msg);
+
+}
+
+void sendActionMessage(bool sleep){
+  dyret_common::ActionMessage actionMessage;
+  actionMessage.configuration = dyret_common::ActionMessage::t_mammal;
+  if (sleep == true) actionMessage.actionType = dyret_common::ActionMessage::t_sleep; else actionMessage.actionType = dyret_common::ActionMessage::t_restPose;
+  actionMessage.speed = 0.0;
+  actionMessage.direction = 0.0;
+  actionMessages_pub.publish(actionMessage);
+}
+
+// This enables all servoes again. No need to send torque-message, as sending a position automatically enables torque
+void enableServos(){
+  sendActionMessage(false);
+}
+
+void disableServos(){
+  sendActionMessage(true);
+  sleep(1);
+  sendServoTorqueMessage(0);
+}
 
 void startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
   dyret_common::GetGaitEvaluation srv;
@@ -262,6 +299,27 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
   currentIndividual++;
 
+  if (currentIndividual == individuals){
+    currentIndividual = 0;
+    printf("Generation done. ");
+    getMaxServoTemperature(true);
+    printf("Cooldown? (y/n) > ");
+
+    char choice;
+    scanf(" %c", &choice);
+
+    if (choice == 'y'){
+      disableServos();
+      while (getMaxServoTemperature(true) > 50){ sleep(10); }
+      enableServos();
+
+      std::cout << "Press enter to continue evolution";
+      std::cin.ignore();
+      std::cin.ignore();
+    }
+
+  }
+
   printf("%03u: Evaluating stepLength %.2f, "
              "stepHeight %.2f, "
              "smoothing %.2f, "
@@ -415,15 +473,6 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
 
 }
 
-void sendActionMessage(bool sleep){
-  dyret_common::ActionMessage actionMessage;
-  actionMessage.configuration = dyret_common::ActionMessage::t_mammal;
-  if (sleep == true) actionMessage.actionType = dyret_common::ActionMessage::t_sleep; else actionMessage.actionType = dyret_common::ActionMessage::t_restPose;
-  actionMessage.speed = 0.0;
-  actionMessage.direction = 0.0;
-  actionMessages_pub.publish(actionMessage);
-}
-
 void rosConnect(){
   int argc = 0;
   char **argv;
@@ -457,33 +506,6 @@ void rosConnect(){
 }
 
 
-void sendServoTorqueMessage(int givenValue){
-  dyret_common::ServoConfigArray msg;
-  std::vector<dyret_common::ServoConfig> msgContents(12);
-
-  for (int i = 0; i < 12; i++) {
-    msgContents[i].servoId = i;
-
-    if (givenValue == 0) msgContents[i].configType = dyret_common::ServoConfig::t_disableTorque;
-    if (givenValue == 1) msgContents[i].configType = dyret_common::ServoConfig::t_enableTorque;
-  }
-
-  msg.servoConfigs = msgContents;
-  servoConfig_pub.publish(msg);
-
-}
-
-// This enables all servoes again. No need to send torque-message, as sending a position automatically enables torque
-void enableServos(){
-  sendActionMessage(false);
-}
-
-void disableServos(){
-  sendActionMessage(true);
-  sleep(1);
-  sendServoTorqueMessage(0);
-}
-
 using namespace sferes;
 using namespace sferes::gen::evo_float;
 
@@ -496,8 +518,8 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =   16;  // Population size
-    SFERES_CONST unsigned nb_gen   =   16;  // Number of generations
+    SFERES_CONST unsigned size     =   individuals;  // Population size
+    SFERES_CONST unsigned nb_gen   =   generations;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
   };
