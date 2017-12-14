@@ -295,13 +295,12 @@ float getMaxServoTemperature(bool printAllTemperatures = false){
   return maxTemp;
 }
 
-std::vector<float> evaluateIndividual(std::vector<double> parameters, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client) {
+std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client) {
 
   currentIndividual++;
 
   if (currentIndividual == individuals){
     currentIndividual = 0;
-    printf("Generation done. ");
     getMaxServoTemperature(true);
     printf("Cooldown? (y/n) > ");
 
@@ -331,16 +330,16 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
              "femurLength: %.2f,"
              "tibiaLength: %.2f\n",
          currentIndividual,
-         parameters[0],
-         parameters[1],
-         parameters[2],
-         parameters[3],
-         parameters[4],
-         parameters[5],
-         parameters[6],
-         parameters[7],
-         parameters[8],
-         parameters[9]);
+         phenoType[0],
+         phenoType[1],
+         phenoType[2],
+         phenoType[3],
+         phenoType[4],
+         phenoType[5],
+         phenoType[6],
+         phenoType[7],
+         phenoType[8],
+         phenoType[9]);
 
   // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
   if (getMaxServoTemperature() > 70.0){
@@ -348,11 +347,11 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
     return std::vector<float>();
   }
 
-  setGaitParams(parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7]);
+  setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6], phenoType[7]);
 
-  setLegLengths(parameters[8], parameters[9]);
+  setLegLengths(phenoType[8], phenoType[9]);
   int secPassed = 0;
-  while (!legsAreLength(parameters[8], parameters[9])) {
+  while (!legsAreLength(phenoType[8], phenoType[9])) {
     sleep(1);
     if (secPassed++ > 120) return std::vector<float>(); // 2 min timeout
   }
@@ -467,8 +466,6 @@ std::vector<float> evaluateIndividual(std::vector<double> parameters, std::strin
   ss << fitness_mocapSpeed << "," << fitness_stability << "," << fitness_current;
   *fitnessString = ss.str();
 
-  printf("Returning here\n");
-
   return fitness;
 
 }
@@ -529,6 +526,41 @@ struct Params {
   };
 };
 
+std::vector<double> genToPhen(std::vector<double> givenGenotype){
+
+  std::vector<double> phenotype = {50.0 + (givenGenotype[0] * 100.0),   // 0: stepLength        50 -> 150
+                                   25.0 + (givenGenotype[1] * 50.0),  // 1: stepHeight        25 -> 75
+                                   givenGenotype[2] * 50.0,           // 2: smoothing          0 -> 50
+                                   0.2 + (givenGenotype[6] * 1.3),    // 6: frequency        0.2 -> 1.5
+                                   NAN,                               // 6: speed
+                                   (givenGenotype[3] * 0.4) - 0.2,    // 3: wagPhase        -0.2 -> 0.2
+                                   givenGenotype[4] * 50.0,           // 4: wagAmplitude_x     0 -> 50
+                                   givenGenotype[5] * 50.0,           // 5: wagAmplitude_y     0 -> 50
+                                   givenGenotype[7] * 25.0,           // 7: femurLength        0 -> 25
+                                   givenGenotype[8] * 95.0            // 8: tibiaLength        0 -> 90
+  };
+
+  return phenotype;
+}
+
+std::vector<double> phenToGen(std::vector<double> givenFenotype){
+
+  std::vector<double> genotype = {(givenFenotype[0] - 50) / 100.0,   // 0: stepLength        50 -> 150
+                                  (givenFenotype[1] - 25) / 50.0,    // 1: stepHeight        25 -> 75
+                                  givenFenotype[2] / 50.0,           // 2: smoothing          0 -> 50
+                                  (givenFenotype[5] + 0.2) / 0.4,    // 3: wagPhase        -0.2 -> 0.2
+                                  givenFenotype[6] / 50.0,           // 4: wagAmplitude_x     0 -> 50
+                                  givenFenotype[7] / 50.0,           // 5: wagAmplitude_y     0 -> 50
+                                  (givenFenotype[3] - 0.2) / 1.3,    // 6: frequency        0.2 -> 1.5
+                                  givenFenotype[8] / 25.0,           // 7: femurLength        0 -> 25
+                                  givenFenotype[9] / 95.0            // 8: tibiaLength        0 -> 90
+  };
+
+  return genotype;
+
+}
+
+
 SFERES_FITNESS(FitExp2MO, sferes::fit::Fitness) {
 public:
   FitExp2MO()  {}
@@ -537,32 +569,14 @@ public:
 
     this->_objs.resize(fitnessFunctions.size());
 
-    std::vector<double> individualParameters;
+    std::vector<double> individualData(9);
 
-    double speed, frequency;
-
-//   if (isFitnessObjective("Speed")){
-        // If evolving for speed, set frequency from genome
-        frequency = 0.2 + ind.data(6) * 1.3;
-        speed = NAN;
-/*    } else {
-        // If not evolving from speed, set speed directly
-       frequency = NAN;
-        speed = globalSpeed;
+    for (int i = 0; i < individualData.size(); i++){
+      individualData[i] = ind.data(i);
     }
-*/
 
-    individualParameters = { 50 +  ind.data(0)*100.0, // 0: stepLength        50 -> 150
-                             25 + (ind.data(1)*50.0), // 1: stepHeight        25 -> 75
-                             ind.data(2)*50.0,        // 2: smoothing          0 -> 50
-                             frequency,               // 6: frequency        0.2 -> 1.5
-                             speed,                   // 6: speed
-                             (ind.data(3)*0.4)-0.2,   // 3: wagPhase        -0.2 -> 0.2
-                             ind.data(4)*50.0,        // 4: wagAmplitude_x     0 -> 50
-                             ind.data(5)*50.0,        // 5: wagAmplitude_y     0 -> 50
-                             ind.data(7)*25.0,        // 7: femurLength        0 -> 25
-                             ind.data(8)*95.0         // 8: tibiaLength          0 -> 90
-                           };
+    std::vector<double> individualParameters = genToPhen(individualData);
+
     std::string fitnessDescription_gen  = "id, stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency, femurLength, tibiaLength";
     std::string fitnessDescription_phen = "id, stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y, femurLength, tibiaLength";
 
@@ -716,7 +730,7 @@ int main(int argc, char **argv){
   do {
     printf("1 - Enable/disable stand testing\n"
            "2 - Test shortest legs\n"
-           "3 - Test longest legs\n"
+           "3 - Verify fitness\n"
            "4 - Evo SO (mocapSpeed)\n"
            "5 - Evo SO (stability)\n"
            "6 - Evo MO (mocapSpeed+stability)\n"
@@ -726,7 +740,7 @@ int main(int argc, char **argv){
            "r - Reconnect\n"
            "0 - Exit\n> ");
 
-    currentIndividual = -1;
+    currentIndividual = individuals-1;
 
     inputChar = getchar();
     std::cin.ignore(1000,'\n');
@@ -776,46 +790,79 @@ int main(int argc, char **argv){
       case '3':
       {
         for (int i = 0; i < 1; i++){
-          std::vector<double> individualParameters;
+          /*
+              <item>0.9807704687</item>
+              <item>0.1261194497</item>
+              <item>0.2375369668</item>
+              <item>0.7244447470</item>
+              <item>0.7155894041</item>
+              <item>0.8119214177</item>
+              <item>0.7696463466</item>
+              <item>0.8878445625</item>
+              <item>0.8023326397</item>
 
-          // MO_speedStability_1_stable
-          individualParameters = {80.00,  // stepLength
-                                  50.00,  // stepHeight
-                                  50.00,  // smoothing
-                                  0.10,  // gaitFrequency
-                                  NAN,  // speed
-                                  0.08,  // wagPhase -0.2 -> 0.2
-                                  35.00,  // wagAmplitude_x
-                                  35.00,  // wagAmplitude_y
-                                  25.00,  // femurLength
-                                  95.00}; // tibiaLength
+              <item>-0.20830115</item>
+              <item>14.50396156</item>
+           */
 
+          std::vector<double> givenIndividual = {0.9807704687,
+                                                 0.1261194497,
+                                                 0.2375369668,
+                                                 0.7244447470,
+                                                 0.7155894041,
+                                                 0.8119214177,
+                                                 0.7696463466,
+                                                 0.8878445625,
+                                                 0.8023326397};
+
+          std::vector<double> givenInd_phen = genToPhen(givenIndividual);
+          std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
+
+          printf("  GivenIndividual: ");
+          for (int i = 0; i < givenIndividual.size(); i++){
+            printf("%.4f, ", givenIndividual[i]);
+          }
+          printf("\n");
+
+          printf("  givenInd_phen: ");
+          for (int i = 0; i < givenInd_phen.size(); i++){
+            printf("%.4f, ", givenInd_phen[i]);
+          }
+          printf("\n");
 
           fitnessFunctions.clear();
           fitnessFunctions.emplace_back("MocapSpeed");
           fitnessFunctions.emplace_back("Stability");
 
-          std::string fitnessString;
-          std::vector<float> fitnessResult = evaluateIndividual(individualParameters, &fitnessString, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
-          printf("Returned fitness (%lu): ", fitnessResult.size());
-          for (int i = 0; i < fitnessResult.size(); i++){
-            printf("%.2f ", fitnessResult[i]);
+          for (int i = 0; i < 10; i++) {
+
+            std::string fitnessString;
+            std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
+                                                                  gaitControllerStatus_client, trajectoryMessage_pub,
+                                                                  get_gait_evaluation_client);
+            printf("Returned fitness (%lu): ", fitnessResult.size());
+            for (int j = 0; j < fitnessResult.size(); j++) {
+              printf("%.2f ", fitnessResult[i]);
+            }
+            printf("\n");
           }
-          printf("\n");
         }
         break;
       }
       case '4':
+        currentIndividual = individuals-1;
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
       case '5':
+        currentIndividual = individuals-1;
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
       case '6':
+        currentIndividual = individuals-1;
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
@@ -829,11 +876,11 @@ int main(int argc, char **argv){
       case '9':
         {
 
-          for (int i = 0; i < 10; i++){
+          for (int i = 0; i < 3; i++){
               resetGaitRecording(get_gait_evaluation_client);
               startGaitRecording(get_gait_evaluation_client);
 
-              sleep(60);
+              sleep(30);
 
               std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client);
               printf("\tRes: ");
