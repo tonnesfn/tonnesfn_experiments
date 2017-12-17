@@ -713,7 +713,7 @@ int main(int argc, char **argv){
   typedef gen::EvoFloat<9, Params> gen_t;   // Number of parameters in each individual:
   typedef phen::Parameters<gen_t, FitExp2MO<Params>, Params> phen_t;
   typedef eval::Eval<Params> eval_t;
-  typedef boost::fusion::vector<stat::ParetoFront<phen_t, Params> >  stat_t;
+  typedef boost::fusion::vector<stat::State<phen_t, Params> >  stat_t;
   typedef modif::Dummy<> modifier_t;
   typedef ea::Nsga2<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
   ea_t ea;
