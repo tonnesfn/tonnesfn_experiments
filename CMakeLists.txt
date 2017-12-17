@@ -8,6 +8,7 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF)
 
+add_definitions( -DADD_DIVERSITY_FITNESS)
 add_definitions( -DSFERES_NO_STATE)
 
 find_package(message_generation)

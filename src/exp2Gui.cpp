@@ -564,7 +564,7 @@ public:
   template<typename Indiv>
   void eval(Indiv& ind) {
 
-    this->_objs.resize(fitnessFunctions.size());
+    this->_objs.resize(fitnessFunctions.size()+1);
 
     std::vector<double> individualData(9);
 

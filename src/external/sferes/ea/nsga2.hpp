@@ -100,15 +100,45 @@ namespace sferes {
         _apply_modifier(_mixed_pop);
 #ifndef NDEBUG
         BOOST_FOREACH(indiv_t& ind, _mixed_pop)
-        for (size_t i = 0; i < ind->fit().objs().size(); ++i) {
-          assert(!std::isnan(ind->fit().objs()[i]));
-        }
+                for (size_t i = 0; i < ind->fit().objs().size(); ++i) {
+                  assert(!std::isnan(ind->fit().objs()[i]));
+                }
 #endif
+
+#ifdef ADD_DIVERSITY_FITNESS
+        const int K = 3;
+
+        // Add diversity fitness by K-nearest neighbors:
+        BOOST_FOREACH(indiv_t& ind, _mixed_pop) {
+
+                // Find distance to all other individuals:
+                std::vector<double> distances;
+
+                BOOST_FOREACH(indiv_t &ind2, _mixed_pop) {
+                        distances.push_back(sqrt(pow(ind2->data(ind2->size() - 1) - ind->data(ind->size() - 1), 2) +
+                                                 pow(ind2->data(ind2->size() - 2) - ind->data(ind->size() - 2), 2)));
+                        }
+
+                // Sort distances and average K lowest
+                std::sort(distances.begin(), distances.end());
+
+                distances.erase(distances.begin()); // Erase the first element (distance to this individual (always 0))
+
+                double diversity_fitness = 0.0;
+                for (int i = 0; i < K; i++) diversity_fitness += distances[i];
+                diversity_fitness = diversity_fitness / K;
+
+                // Write that average distance to fitness
+                ind->fit().set_obj(ind->fit().objs().size() - 1, diversity_fitness);
+              }
+#endif
+
         _fill_nondominated_sort(_mixed_pop, _parent_pop);
         _mixed_pop.clear();
         _child_pop.clear();
 
         _convert_pop(_parent_pop, this->_pop);
+        // Should update pareto front here!
 
         assert(_parent_pop.size() == Params::pop::size);
         assert(_pareto_front.size() <= Params::pop::size * 2);
