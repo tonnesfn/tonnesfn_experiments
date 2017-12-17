@@ -360,7 +360,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
   std::vector<float> trajectoryDistances(1);
   std::vector<int> trajectoryTimeouts(1);
   trajectoryDistances[0] = 1500.0;
-  trajectoryTimeouts[0] = 15.0; // 15 sec timeout
+  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -371,7 +371,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > 30) {  // 30 sec timeout
-      printf("Timed out!\n");
       return std::vector<float>();
     }
   }
@@ -379,59 +378,57 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
   std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
   if (gaitResultsForward.size() == 0) {
-    printf("GaitResultsForward.size() == 0!\n");
+    fprintf(stderr, "GaitResultsForward.size() == 0!\n");
     return gaitResultsForward;
   }
 
-  printf("\tRes: ");
+  printf("\tRes F: ");
   for (int i = 0; i < gaitResultsForward.size(); i++) {
     printf("%.5f", gaitResultsForward[i]);
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
 
-  /*
-
-  trajectoryDistances[0] = 0.0;
+  trajectoryDistances[0] = 1000.0;
   trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
+  resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
   sleep(5);
 
   secPassed = 0;
-  fprintf(stderr, "Waiting for gaitControllerDone 2");
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
   }
-  fprintf(stderr, "gaitControllerDone 2");
 
   std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
   if (gaitResultsReverse.size() == 0) {
+    fprintf(stderr, "GaitResultsReverse.size() == 0!\n");
     return gaitResultsReverse;
   }
 
-  printf("\tRes: ");
+  printf("\tRes R: ");
   for (int i = 0; i < gaitResultsReverse.size(); i++) {
     printf("%.5f", gaitResultsReverse[i]);
     if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
   }
-*/
+
 
   std::vector<float> fitness(fitnessFunctions.size());
   int currentFitnessIndex = 0;
 
-  /*
   float fitness_inferredSpeed = (gaitResultsForward[0] + gaitResultsReverse[0]) / 2.0;
   float fitness_current = (gaitResultsForward[4] + gaitResultsReverse[4]) / 2.0;
-  float fitness_stability = (gaitResultsForward[3] + gaitResultsReverse[3] + ((gaitResultsForward[2] + gaitResultsReverse[2]) / 50.0)) / 2.0;
+  float fitness_stability = (gaitResultsForward[6] + gaitResultsReverse[6]) / 2.0;
   float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
-*/
+/*
   float fitness_inferredSpeed = gaitResultsForward[0];
   float fitness_current = gaitResultsForward[4];
   float fitness_stability = gaitResultsForward[3] + (gaitResultsForward[2] / 50.0);
   float fitness_mocapSpeed = gaitResultsForward[5];
+*/
 
   // Inferred speed:
   if (isFitnessObjective("InferredSpeed")) {
@@ -459,8 +456,8 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
   ss << currentIndividual << ",";
 
   for (int i = 0; i < gaitResultsForward.size(); i++) {
-    //ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
-    ss << gaitResultsForward[i] << ",";
+    ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
+    //ss << gaitResultsForward[i] << ",";
   }
 
   ss << fitness_mocapSpeed << "," << fitness_stability << "," << fitness_current;
@@ -665,8 +662,8 @@ public:
     for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f,", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
     fflush(evoParamLog_phen);
 
-    //std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
-    std::string fitnessDescription = "Id, Speed_I, angVel, linAcc, stability, efficiency, speed_m, speed_m (T), stability (T), current (T)";
+    std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
+    //std::string fitnessDescription = "Id, Speed_I, angVel, linAcc, stability, efficiency, speed_m, speed_m (T), stability (T), current (T)";
 
     if (evoFitnessLog == NULL){
         evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv", fitnessDescription);
@@ -876,7 +873,7 @@ int main(int argc, char **argv){
       case '9':
         {
 
-          for (int i = 0; i < 3; i++){
+          for (int i = 0; i < 100; i++){
               resetGaitRecording(get_gait_evaluation_client);
               startGaitRecording(get_gait_evaluation_client);
 
