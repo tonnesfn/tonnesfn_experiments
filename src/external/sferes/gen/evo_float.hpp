@@ -147,6 +147,11 @@ namespace sferes {
           SFERES_CONST float sigma = Ev::params_t::evo_float::sigma;
           float f = ev.data(i)
                     + misc::gaussian_rand<float>(0, sigma * sigma);
+
+          // Ensure mirroring around edges:
+          if (f > 1.0f) f = 2.0f - f;
+          if (f < 0.0f) f = -f;
+
           ev.data(i, misc::put_in_range(f, 0.0f, 1.0f));
         }
       };
