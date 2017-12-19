@@ -54,7 +54,7 @@ float currentTibiaLength = 0.0;
 int currentIndividual;
 
 const int individuals = 16;
-const int generations = 16;
+const int generations = 18;
 
 rosConnectionHandler_t* rch;
 
@@ -395,10 +395,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
 
-  trajectoryDistances[0] = 1000.0;
+  trajectoryDistances[0] = 0.0;
   trajectoryTimeouts[0] = 10.0; // 10 sec timeout
 
-  resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
+  //resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
   sleep(5);
