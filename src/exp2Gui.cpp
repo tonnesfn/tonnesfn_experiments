@@ -701,7 +701,15 @@ std::string getEvoInfoString(){
   return stringStream.str();
 }
 
+void resetEvoDir(){
+  FILE * currentDirFile;
+  currentDirFile = fopen("currentEvoDir", "w");
+  fclose(currentDirFile);
+}
+
 int main(int argc, char **argv){
+
+  resetEvoDir();
 
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
