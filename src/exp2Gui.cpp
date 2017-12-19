@@ -299,6 +299,9 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
 
   currentIndividual++;
 
+  // (Return empty fitness to test)
+  //return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
+
   if (currentIndividual == individuals){
     currentIndividual = 0;
     getMaxServoTemperature(true);
@@ -310,10 +313,14 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
     if (choice == 'y'){
       disableServos();
       while (getMaxServoTemperature(true) > 50){ sleep(10); }
+
+      std::cout << "Press enter to enable servos";
+      std::cin.ignore();
+      std::cin.ignore();
+
       enableServos();
 
       std::cout << "Press enter to continue evolution";
-      std::cin.ignore();
       std::cin.ignore();
     }
 
