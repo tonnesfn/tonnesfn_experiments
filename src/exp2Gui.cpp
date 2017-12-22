@@ -702,9 +702,7 @@ std::string getEvoInfoString(){
 }
 
 void resetEvoDir(){
-  FILE * currentDirFile;
-  currentDirFile = fopen("currentEvoDir", "w");
-  fclose(currentDirFile);
+  if(remove( "currentevodir" ) != 0) printf("Removed currentevodir file\n");
 }
 
 int main(int argc, char **argv){
@@ -852,11 +850,13 @@ int main(int argc, char **argv){
             std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
                                                                   gaitControllerStatus_client, trajectoryMessage_pub,
                                                                   get_gait_evaluation_client);
+            printf("%s\n", fitnessString.c_str());
             printf("Returned fitness (%lu): ", fitnessResult.size());
             for (int j = 0; j < fitnessResult.size(); j++) {
-              printf("%.2f ", fitnessResult[i]);
+              printf("%.2f ", fitnessResult[j]);
             }
             printf("\n");
+
           }
         }
         break;
