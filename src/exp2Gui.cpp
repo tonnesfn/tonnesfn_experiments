@@ -295,7 +295,12 @@ float getMaxServoTemperature(bool printAllTemperatures = false){
   return maxTemp;
 }
 
-std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string* fitnessString, bool speedAspectLocked, ros::ServiceClient gaitControllerStatus_client, ros::Publisher trajectoryMessage_pub, ros::ServiceClient get_gait_evaluation_client) {
+std::vector<float> evaluateIndividual(std::vector<double> phenoType,
+                                      std::string* fitnessString,
+                                      bool speedAspectLocked,
+                                      ros::ServiceClient gaitControllerStatus_client,
+                                      ros::Publisher trajectoryMessage_pub,
+                                      ros::ServiceClient get_gait_evaluation_client) {
 
   currentIndividual++;
 
@@ -305,7 +310,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType, std::string
   if (currentIndividual == individuals){
     currentIndividual = 0;
     getMaxServoTemperature(true);
-    printf("Cooldown? (y/n) > ");
+    printf("Cooldown to 50C? (y/n) > ");
 
     char choice;
     scanf(" %c", &choice);
@@ -532,16 +537,16 @@ struct Params {
 
 std::vector<double> genToPhen(std::vector<double> givenGenotype){
 
-  std::vector<double> phenotype = {50.0 + (givenGenotype[0] * 100.0),   // 0: stepLength        50 -> 150
+  std::vector<double> phenotype = {50.0 + (givenGenotype[0] * 100.0), // 0: stepLength        50 -> 150
                                    25.0 + (givenGenotype[1] * 50.0),  // 1: stepHeight        25 -> 75
                                    givenGenotype[2] * 50.0,           // 2: smoothing          0 -> 50
-                                   0.2 + (givenGenotype[6] * 1.3),    // 6: frequency        0.2 -> 1.5
+                                   givenGenotype[6],                  // 6: frequency          0 -> 1
                                    NAN,                               // 6: speed
                                    (givenGenotype[3] * 0.4) - 0.2,    // 3: wagPhase        -0.2 -> 0.2
                                    givenGenotype[4] * 50.0,           // 4: wagAmplitude_x     0 -> 50
                                    givenGenotype[5] * 50.0,           // 5: wagAmplitude_y     0 -> 50
                                    givenGenotype[7] * 25.0,           // 7: femurLength        0 -> 25
-                                   givenGenotype[8] * 95.0            // 8: tibiaLength        0 -> 90
+                                   givenGenotype[8] * 50.0            // 8: tibiaLength        0 -> 50
   };
 
   return phenotype;
@@ -555,9 +560,9 @@ std::vector<double> phenToGen(std::vector<double> givenFenotype){
                                   (givenFenotype[5] + 0.2) / 0.4,    // 3: wagPhase        -0.2 -> 0.2
                                   givenFenotype[6] / 50.0,           // 4: wagAmplitude_x     0 -> 50
                                   givenFenotype[7] / 50.0,           // 5: wagAmplitude_y     0 -> 50
-                                  (givenFenotype[3] - 0.2) / 1.3,    // 6: frequency        0.2 -> 1.5
+                                  givenFenotype[3],                  // 6: frequency          0 -> 1
                                   givenFenotype[8] / 25.0,           // 7: femurLength        0 -> 25
-                                  givenFenotype[9] / 95.0            // 8: tibiaLength        0 -> 90
+                                  givenFenotype[9] / 50.0            // 8: tibiaLength        0 -> 50
   };
 
   return genotype;
@@ -581,8 +586,8 @@ public:
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
-    std::string fitnessDescription_gen  = "id, stepLength, stepHeight, smoothing, wagPhase, wagAmplitude_x, wagAmplitude_y, frequency, femurLength, tibiaLength";
-    std::string fitnessDescription_phen = "id, stepLength, stepHeight, smoothing, frequency, speed, wagPhase, wagAmplitude_x, wagAmplitude_y, femurLength, tibiaLength";
+    std::string fitnessDescription_gen  = "id,stepLength,stepHeight,smoothing,wagPhase,wagAmplitude_x,wagAmplitude_y,frequency,femurLength,tibiaLength";
+    std::string fitnessDescription_phen = "id,stepLength,stepHeight,smoothing,frequency,speed,wagPhase,wagAmplitude_x,wagAmplitude_y,femurLength,tibiaLength";
 
     bool validSolution;
     std::vector<float> fitnessResult;
@@ -627,7 +632,7 @@ public:
             disableServos();
             printf("Servos disabled\n");
 
-            while (getMaxServoTemperature(true) > 40){ sleep(15); }
+            while (getMaxServoTemperature(true) > 50){ sleep(15); }
 
             enableServos();
 
@@ -669,7 +674,17 @@ public:
     for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f,", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
     fflush(evoParamLog_phen);
 
-    std::string fitnessDescription = "Id, Speed_I (F), Speed_I (R), angVel (F), angVel (R), linAcc (F), linAcc(R), stability (F), stability(R), efficiency (F), efficiency (R), speed_m (F), speed_m (R), speed_m (T), stability (T), current (T)";
+    std::string fitnessDescription = "Id,"
+                                     "Speed_I (F),Speed_I (R),"
+                                     "angVel (F),angVel (R),"
+                                     "linAcc (F),linAcc(R),"
+                                     "orientation (F),orientation(R),"
+                                     "efficiency (F),efficiency (R),"
+                                     "speed_m (F),speed_m (R),"
+                                     "stability (F),stability (R),"
+                                     "speed_m (T),"
+                                     "stability (T),"
+                                     "current (T)";
     //std::string fitnessDescription = "Id, Speed_I, angVel, linAcc, stability, efficiency, speed_m, speed_m (T), stability (T), current (T)";
 
     if (evoFitnessLog == NULL){
@@ -739,7 +754,6 @@ int main(int argc, char **argv){
   int inputChar;
   do {
     printf("1 - Enable/disable stand testing\n"
-           "2 - Test shortest legs\n"
            "3 - Verify fitness\n"
            "4 - Evo SO (mocapSpeed)\n"
            "5 - Evo SO (stability)\n"
@@ -765,65 +779,19 @@ int main(int argc, char **argv){
 
         robotOnStand = !robotOnStand;
         break;
-      case '2':
-      {
-        for (int i = 0; i < 1; i++){
-          std::vector<double> individualParameters;
-
-          // MO_speedStability_1_stable
-          individualParameters = {80.00,  // stepLength
-                                  50.00,  // stepHeight
-                                  50.00,  // smoothing
-                                   0.10,  // gaitFrequency
-                                    NAN,  // speed
-                                   0.08,  // wagPhase -0.2 -> 0.2
-                                  35.00,  // wagAmplitude_x
-                                  35.00,  // wagAmplitude_y
-                                   0.00,  // femurLength
-                                   0.00}; // tibiaLength
-
-
-          fitnessFunctions.clear();
-          fitnessFunctions.emplace_back("MocapSpeed");
-          fitnessFunctions.emplace_back("Stability");
-
-          std::string fitnessString;
-          std::vector<float> fitnessResult = evaluateIndividual(individualParameters, &fitnessString, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
-          printf("Returned fitness (%lu): ", fitnessResult.size());
-          for (int i = 0; i < fitnessResult.size(); i++){
-            printf("%.2f ", fitnessResult[i]);
-          }
-          printf("\n");
-        }
-        break;
-      }
       case '3':
       {
         for (int i = 0; i < 1; i++){
+
           /*
-              <item>0.9807704687</item>
-              <item>0.1261194497</item>
-              <item>0.2375369668</item>
-              <item>0.7244447470</item>
-              <item>0.7155894041</item>
-              <item>0.8119214177</item>
-              <item>0.7696463466</item>
-              <item>0.8878445625</item>
-              <item>0.8023326397</item>
+           0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.8674162626, 0.3620291352, 0.03699165583
 
-              <item>-0.20830115</item>
-              <item>14.50396156</item>
-           */
+           <item>-3.215271831e-01</item>
+           <item>8.403041840e+00</item>
+           <item>1.645827740e-01</item>
+          */
 
-          std::vector<double> givenIndividual = {0.9807704687,
-                                                 0.1261194497,
-                                                 0.2375369668,
-                                                 0.7244447470,
-                                                 0.7155894041,
-                                                 0.8119214177,
-                                                 0.7696463466,
-                                                 0.8878445625,
-                                                 0.8023326397};
+          std::vector<double> givenIndividual = {0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.8674162626, 0.3620291352, 0.03699165583};
 
           std::vector<double> givenInd_phen = genToPhen(givenIndividual);
           std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
