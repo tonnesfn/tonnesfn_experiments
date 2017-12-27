@@ -108,9 +108,11 @@ namespace sferes {
 #ifdef ADD_DIVERSITY_FITNESS
         const int K = 3;
 
+        bool calculatedDiversity = false;
+
         // Add diversity fitness by K-nearest neighbors:
         BOOST_FOREACH(indiv_t& ind, _mixed_pop) {
-
+            if (ind->fit().objs().size() <= 2){ break; } // If an extra objective has not been added, break
                 // Find distance to all other individuals:
                 std::vector<double> distances;
 
@@ -130,7 +132,10 @@ namespace sferes {
 
                 // Write that average distance to fitness
                 ind->fit().set_obj(ind->fit().objs().size() - 1, diversity_fitness);
+                calculatedDiversity = true;
               }
+
+        if (calculatedDiversity == true) printf("Calculated diversity\n");
 #endif
 
         _fill_nondominated_sort(_mixed_pop, _parent_pop);
