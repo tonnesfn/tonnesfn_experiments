@@ -145,12 +145,20 @@ namespace sferes {
       struct Mutation_f<Ev, gaussian> {
         void operator()(Ev& ev, size_t i) {
           SFERES_CONST float sigma = Ev::params_t::evo_float::sigma;
+          float mutAmount = misc::gaussian_rand<float>(0, sigma);
           float f = ev.data(i)
-                    + misc::gaussian_rand<float>(0, sigma * sigma);
+                    + mutAmount;
+
+/*          FILE * mutLog;
+          mutLog = fopen("mutLog.csv", "a+");
+          fprintf(mutLog, "%f\n", mutAmount);
+          fclose(mutLog);
+*/
 
           // Ensure mirroring around edges:
           if (f > 1.0f) f = 2.0f - f;
           if (f < 0.0f) f = -f;
+
 
           ev.data(i, misc::put_in_range(f, 0.0f, 1.0f));
         }
