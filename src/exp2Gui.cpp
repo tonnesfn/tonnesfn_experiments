@@ -53,8 +53,11 @@ float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
 int currentIndividual;
 
-const int individuals = 16;
+const int individuals = 8;
 const int generations = 18;
+
+bool evolveMorph = true;
+std::string morphology;
 
 rosConnectionHandler_t* rch;
 
@@ -576,13 +579,36 @@ public:
   template<typename Indiv>
   void eval(Indiv& ind) {
 
-    this->_objs.resize(fitnessFunctions.size()+1);
+    // Only add diversity if we are evolving morphology
+    if (evolveMorph == true) {
+      this->_objs.resize(fitnessFunctions.size() + 1);
+    } else {
+      this->_objs.resize(fitnessFunctions.size());
+    }
+
+    // Set length of individual if not evolving morphology:
+    if (evolveMorph == false) {
+      if (morphology == "small") {
+        ind.gen().data(7, 0.0);
+        ind.gen().data(8, 0.0);
+      } else if (morphology == "medium"){
+        ind.gen().data(7, 0.5);
+        ind.gen().data(8, 0.5);
+      } else if (morphology == "large") {
+        ind.gen().data(7, 1.0);
+        ind.gen().data(8, 1.0);
+      } else {
+        fprintf(stderr, "Morphology \"%s\" not recognized!\n", morphology.c_str());
+      }
+    }
 
     std::vector<double> individualData(9);
 
     for (int i = 0; i < individualData.size(); i++){
-      individualData[i] = ind.data(i);
+      individualData[i] = ind.gen().data(i);
+      printf("%.2f ", ind.gen().data(i));
     }
+    printf("\n");
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
@@ -753,15 +779,16 @@ int main(int argc, char **argv){
 
   int inputChar;
   do {
-    printf("1 - Enable/disable stand testing\n"
-           "3 - Verify fitness\n"
-           "4 - Evo SO (mocapSpeed)\n"
-           "5 - Evo SO (stability)\n"
-           "6 - Evo MO (mocapSpeed+stability)\n"
-           "9 - Test fitness noise (10min)\n"
+    printf("1 - Evo control - small\n"
+           "2 - Evo control - medium\n"
+           "3 - Evo control - large\n"
+           "4 - CO-evo morph+cont\n"
+           "s - Enable/disable stand testing\n"
+           "v - Verify fitness\n"
+           "n - Test fitness noise\n"
            "e - Enable servos\n"
            "d - Disable servos\n"
-           "r - Reconnect\n"
+           "r - Reconnect to master\n"
            "0 - Exit\n> ");
 
     currentIndividual = individuals-1;
@@ -770,7 +797,8 @@ int main(int argc, char **argv){
     std::cin.ignore(1000,'\n');
 
     switch(inputChar){
-      case '1':
+      // Enable/disable stand testing:
+      case 's':
         if (robotOnStand == true){
           printf("   RobotOnStand now disabled!\n");
         } else {
@@ -779,7 +807,9 @@ int main(int argc, char **argv){
 
         robotOnStand = !robotOnStand;
         break;
-      case '3':
+
+      // Verify fitness:
+      case 'v':
       {
         for (int i = 0; i < 1; i++){
 
@@ -829,31 +859,59 @@ int main(int argc, char **argv){
         }
         break;
       }
+
+      // Evo control - small:
+      case '1':
+        evolveMorph = false; // Disable morphology evolution
+        morphology = "small";
+        currentIndividual = individuals-1;
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+        run_ea(argc, argv, ea, getEvoInfoString());
+        break;
+
+      // Evo control - medium:
+      case '2':
+        evolveMorph = false;
+        morphology = "medium";
+        currentIndividual = individuals-1;
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+        run_ea(argc, argv, ea, getEvoInfoString());
+        break;
+
+      // Evo control - large:
+      case '3':
+        evolveMorph = false;
+        morphology = "large";
+        currentIndividual = individuals-1;
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+        run_ea(argc, argv, ea, getEvoInfoString());
+        break;
+
+      // CO-evo morph+cont:
       case '4':
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-      case '5':
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("Stability");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-      case '6':
+        evolveMorph = true;
         currentIndividual = individuals-1;
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
+
+      // Reconnect to master:
       case 'r':
         printf("Reconnecting!\n");
         rosConnect();
         printf("Reconnected!\n");
         break;
-      case '9':
+
+      // Test fitness noise:
+      case 'n':
         {
 
           for (int i = 0; i < 100; i++){
@@ -872,13 +930,20 @@ int main(int argc, char **argv){
 
           break;
         }
+
+      // Enable servos:
       case 'e':
         enableServos();
         printf("Servos enabled!\n");
         break;
+
+      // Disable servos:
       case 'd':
         disableServos();
         printf("Servos disabled!\n");
+        break;
+
+      // Exit:
       case '0':
         printf("\tExiting program\n");
         break;
