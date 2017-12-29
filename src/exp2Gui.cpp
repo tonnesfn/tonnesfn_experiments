@@ -160,7 +160,8 @@ void setGaitParams(double givenStepLength,
                    double givenGaitSpeed,
                    double givenWagPhaseOffset,
                    double givenWagAmplitude_x,
-                   double givenWagAmplitude_y){
+                   double givenWagAmplitude_y,
+                   double givenLiftDuration){
 
   dynamic_reconfigure::ReconfigureRequest srv_req;
   dynamic_reconfigure::ReconfigureResponse srv_resp;
@@ -172,6 +173,7 @@ void setGaitParams(double givenStepLength,
   dynamic_reconfigure::DoubleParameter param_wagAmplitude_x;
   dynamic_reconfigure::DoubleParameter param_wagAmplitude_y;
   dynamic_reconfigure::DoubleParameter param_wagPhase;
+  dynamic_reconfigure::DoubleParameter param_liftDuration;
   dynamic_reconfigure::IntParameter param_cP;
   dynamic_reconfigure::IntParameter param_cI;
   dynamic_reconfigure::IntParameter param_cD;
@@ -193,6 +195,8 @@ void setGaitParams(double givenStepLength,
   param_wagAmplitude_y.value = givenWagAmplitude_y;
   param_wagPhase.name = "wagPhase";
   param_wagPhase.value = givenWagPhaseOffset;
+  param_liftDuration.name = "liftDuration";
+  param_liftDuration.value = givenLiftDuration;
   param_cP.name = "cP";
   param_cP.value = 10;
   param_cI.name = "cI";
@@ -207,6 +211,7 @@ void setGaitParams(double givenStepLength,
   conf.doubles.push_back(param_wagAmplitude_x);
   conf.doubles.push_back(param_wagAmplitude_y);
   conf.doubles.push_back(param_wagPhase);
+  conf.doubles.push_back(param_liftDuration);
 
   if (robotOnStand == true) {
     conf.ints.push_back(param_cP);
@@ -343,7 +348,8 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
              "wagAmplitude_x: %.2f, "
              "wagAmplitude_y: %.2f,"
              "femurLength: %.2f,"
-             "tibiaLength: %.2f\n",
+             "tibiaLength: %.2f,"
+             "liftDuration: %.2f\n",
          currentIndividual,
          phenoType[0],
          phenoType[1],
@@ -354,7 +360,8 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
          phenoType[6],
          phenoType[7],
          phenoType[8],
-         phenoType[9]);
+         phenoType[9],
+         phenoType[10]);
 
   // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
   if (getMaxServoTemperature() > 70.0){
@@ -362,7 +369,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     return std::vector<float>();
   }
 
-  setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6], phenoType[7]);
+  setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6], phenoType[7], phenoType[10]);
 
   setLegLengths(phenoType[8], phenoType[9]);
   int secPassed = 0;
@@ -549,7 +556,8 @@ std::vector<double> genToPhen(std::vector<double> givenGenotype){
                                    givenGenotype[4] * 50.0,           // 4: wagAmplitude_x     0 -> 50
                                    givenGenotype[5] * 50.0,           // 5: wagAmplitude_y     0 -> 50
                                    givenGenotype[7] * 25.0,           // 7: femurLength        0 -> 25
-                                   givenGenotype[8] * 50.0            // 8: tibiaLength        0 -> 50
+                                   givenGenotype[8] * 50.0,           // 8: tibiaLength        0 -> 50
+                                   (givenGenotype[9] * 0.15) + 0.05   // 9: liftDuration    0.05 -> 0.20
   };
 
   return phenotype;
@@ -565,7 +573,8 @@ std::vector<double> phenToGen(std::vector<double> givenFenotype){
                                   givenFenotype[7] / 50.0,           // 5: wagAmplitude_y     0 -> 50
                                   givenFenotype[3],                  // 6: frequency          0 -> 1
                                   givenFenotype[8] / 25.0,           // 7: femurLength        0 -> 25
-                                  givenFenotype[9] / 50.0            // 8: tibiaLength        0 -> 50
+                                  givenFenotype[9] / 50.0,           // 8: tibiaLength        0 -> 50
+                                  (givenFenotype[10] - 0.05) / 0.15  // 9: liftDuration    0.05 -> 0.20
   };
 
   return genotype;
@@ -602,7 +611,7 @@ public:
       }
     }
 
-    std::vector<double> individualData(9);
+    std::vector<double> individualData(10);
 
     for (int i = 0; i < individualData.size(); i++){
       individualData[i] = ind.gen().data(i);
@@ -612,8 +621,8 @@ public:
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
-    std::string fitnessDescription_gen  = "id,stepLength,stepHeight,smoothing,wagPhase,wagAmplitude_x,wagAmplitude_y,frequency,femurLength,tibiaLength";
-    std::string fitnessDescription_phen = "id,stepLength,stepHeight,smoothing,frequency,speed,wagPhase,wagAmplitude_x,wagAmplitude_y,femurLength,tibiaLength";
+    std::string fitnessDescription_gen  = "id,stepLength,stepHeight,smoothing,wagPhase,wagAmplitude_x,wagAmplitude_y,frequency,femurLength,tibiaLength,liftDuration";
+    std::string fitnessDescription_phen = "id,stepLength,stepHeight,smoothing,frequency,speed,wagPhase,wagAmplitude_x,wagAmplitude_y,femurLength,tibiaLength,liftDuration";
 
     bool validSolution;
     std::vector<float> fitnessResult;
@@ -764,7 +773,7 @@ int main(int argc, char **argv){
   ros::AsyncSpinner spinner(2);
   spinner.start();
 
-  typedef gen::EvoFloat<9, Params> gen_t;   // Number of parameters in each individual:
+  typedef gen::EvoFloat<10, Params> gen_t;   // Number of parameters in each individual:
   typedef phen::Parameters<gen_t, FitExp2MO<Params>, Params> phen_t;
   typedef eval::Eval<Params> eval_t;
   typedef boost::fusion::vector<stat::State<phen_t, Params> >  stat_t;
@@ -821,7 +830,17 @@ int main(int argc, char **argv){
            <item>1.645827740e-01</item>
           */
 
-          std::vector<double> givenIndividual = {0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.8674162626, 0.3620291352, 0.03699165583};
+          std::vector<double> givenIndividual = {0.01112037897,
+                                                 0.7483010888,
+                                                 0.8399485350,
+                                                 0.9170328379,
+                                                 0.2148616016,
+                                                 0.8183637857,
+                                                 0.4,
+                                                 0.3620291352,
+                                                 0.03699165583,
+                                                 0.5};
+          //std::vector<double> givenIndividual = {0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.2674162626, 0.3620291352, 0.03699165583};
 
           std::vector<double> givenInd_phen = genToPhen(givenIndividual);
           std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
