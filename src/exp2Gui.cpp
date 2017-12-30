@@ -881,6 +881,7 @@ int main(int argc, char **argv){
 
       // Evo control - small:
       case '1':
+        assert(individuals == 8);
         evolveMorph = false; // Disable morphology evolution
         morphology = "small";
         currentIndividual = individuals-1;
@@ -892,6 +893,7 @@ int main(int argc, char **argv){
 
       // Evo control - medium:
       case '2':
+        assert(individuals == 8);
         evolveMorph = false;
         morphology = "medium";
         currentIndividual = individuals-1;
@@ -903,6 +905,7 @@ int main(int argc, char **argv){
 
       // Evo control - large:
       case '3':
+        assert(individuals == 8);
         evolveMorph = false;
         morphology = "large";
         currentIndividual = individuals-1;
@@ -914,6 +917,7 @@ int main(int argc, char **argv){
 
       // CO-evo morph+cont:
       case '4':
+        assert(individuals == 16);
         evolveMorph = true;
         currentIndividual = individuals-1;
         fitnessFunctions.clear();
