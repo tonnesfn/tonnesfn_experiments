@@ -695,10 +695,11 @@ public:
       evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv", fitnessDescription_gen);
     }
 
-    fprintf(evoParamLog_gen, "%d,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
+    fprintf(evoParamLog_gen, "%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
                 currentIndividual,
                 ind.data(0), ind.data(1), ind.data(2), ind.data(3),
-                ind.data(4), ind.data(5), ind.data(6), ind.data(7), ind.data(8));
+                ind.data(4), ind.data(5), ind.data(6), ind.data(7),
+                ind.data(8), ind.data(9));
     fflush(evoParamLog_gen);
 
     if (evoParamLog_phen == NULL){
