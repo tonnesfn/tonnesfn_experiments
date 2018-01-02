@@ -67,6 +67,9 @@
 #include "../stc.hpp"
 #include "../stat/state.hpp"
 
+#include <chrono>
+#include <ctime>
+
 #ifndef VERSION
 #define VERSION "version_unknown"
 #endif
@@ -203,8 +206,13 @@ namespace sferes {
         std::string filePath = _res_dir;
         filePath.append("/evoInfo.txt");
 
-        evoInfoFile = fopen(filePath.c_str(), "w");
-        fprintf(evoInfoFile,"%s",evoInfo.c_str());
+        evoInfoFile = fopen(filePath.c_str(), "a");
+
+        auto time = std::chrono::system_clock::now();
+        std::time_t end_time = std::chrono::system_clock::to_time_t(time);
+
+        fprintf(evoInfoFile,"%s", std::ctime(&end_time));
+        fprintf(evoInfoFile, "%s", evoInfo.c_str());
         fclose(evoInfoFile);
 
       }

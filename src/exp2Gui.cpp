@@ -738,14 +738,22 @@ std::string getEvoInfoString(){
   stringStream.precision(2);
 
   stringStream << ("  Fitness: ");
-  for (int i = 0; i < fitnessFunctions.size(); i++) stringStream << fitnessFunctions[i].c_str();
+  for (int i = 0; i < fitnessFunctions.size(); i++) stringStream << fitnessFunctions[i].c_str() << " ";
   stringStream << "\n";
 
-  stringStream << "    Pop: " << Params::pop::size << ", Gen: " << Params::pop::nb_gen << "\n";
+  if (evolveMorph == false){
+    stringStream << "  Evolving morphology\n";
+    stringStream << "      morphology: " << morphology.c_str() << "\n";
+  } else stringStream << "  Only evolving control\n";
+
+  stringStream << "  Evolutionary parameters:\n";
+  stringStream << "    Pop: " << Params::pop::size << "\n    Gen: " << Params::pop::nb_gen << "\n";
+
   if (Params::evo_float::mutation_type == gaussian) stringStream << "  Mutation type: Gaussian\n"; else stringStream << "Mutation type: Unknown\n";
   stringStream << "      Mut_p: " <<  Params::evo_float::mutation_rate << ", Mut_a: " << Params::evo_float::sigma << "\n";
   if (Params::evo_float::cross_over_type == recombination) stringStream << "  Crossover type: Recombination\n"; else stringStream << "Crossover type: Unknown\n";
   stringStream << "      C_p: " << Params::evo_float::cross_rate << "\n\n";
+
 
   printf("%s", stringStream.str().c_str());
 
