@@ -51,6 +51,7 @@ FILE * evoParamLog_phen;
 double globalSpeed;
 float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
+int evaluationTimeout = 10;
 int currentIndividual;
 
 const int individuals = 8;
@@ -382,7 +383,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   std::vector<float> trajectoryDistances(1);
   std::vector<int> trajectoryTimeouts(1);
   trajectoryDistances[0] = 1500.0;
-  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
+  trajectoryTimeouts[0] = evaluationTimeout; // 10 sec timeout
 
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -411,7 +412,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   }
 
   trajectoryDistances[0] = 0.0;
-  trajectoryTimeouts[0] = 10.0; // 10 sec timeout
+  trajectoryTimeouts[0] = evaluationTimeout; // 10 sec timeout
 
   //resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -772,6 +773,7 @@ int main(int argc, char **argv){
   fitnessFunctions.emplace_back("Efficiency");
 
   globalSpeed = 5.0;
+  evaluationTimeout = 10; // 10 seconds timeout
 
   evoFitnessLog = NULL;
   evoParamLog_gen = NULL;
@@ -802,6 +804,7 @@ int main(int argc, char **argv){
            "3 - Evo control - large\n"
            "4 - CO-evo morph+cont\n"
            "s - Enable/disable stand testing\n"
+           "m - Manual individual\n"
            "v - Verify fitness\n"
            "n - Test fitness noise\n"
            "e - Enable servos\n"
@@ -825,6 +828,56 @@ int main(int argc, char **argv){
 
         robotOnStand = !robotOnStand;
         break;
+
+      // Manual individual:
+      case 'm':
+      {
+        evaluationTimeout = 20; // 20 seconds timeout;
+        std::vector<double> givenIndividual = phenToGen(std::vector<double> {150.0,   // stepLength        50 -> 150
+                                                                              75.0,   // stepHeight        25 -> 75
+                                                                               0.0,   // smoothing          0 -> 50
+                                                                               0.1,   // frequency          0 -> 1
+                                                                               NAN,   // speed
+                                                                               0.0,   // wagPhase        -0.2 -> 0.2
+                                                                              50.0,   // wagAmplitude_x     0 -> 50
+                                                                              50.0,   // wagAmplitude_y     0 -> 50
+                                                                               0.0,   // femurLength        0 -> 25
+                                                                               0.0,   // tibiaLength        0 -> 50
+                                                                              0.20}); // liftDuration    0.05 -> 0.20
+
+        std::vector<double> givenInd_phen = genToPhen(givenIndividual);
+        std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
+
+        printf("  GivenIndividual: ");
+        for (int i = 0; i < givenIndividual.size(); i++){
+          printf("%.4f, ", givenIndividual[i]);
+        }
+        printf("\n");
+
+        printf("  givenInd_phen: ");
+        for (int i = 0; i < givenInd_phen.size(); i++){
+          printf("%.4f, ", givenInd_phen[i]);
+        }
+        printf("\n");
+
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+
+        std::string fitnessString;
+        std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
+                                                              gaitControllerStatus_client, trajectoryMessage_pub,
+                                                              get_gait_evaluation_client);
+        printf("%s\n", fitnessString.c_str());
+        printf("Returned fitness (%lu): ", fitnessResult.size());
+        for (int j = 0; j < fitnessResult.size(); j++) {
+          printf("%.2f ", fitnessResult[j]);
+        }
+        printf("\n");
+
+        evaluationTimeout = 10; // back to 10 sec timeout
+        break;
+      }
 
       // Verify fitness:
       case 'v':
