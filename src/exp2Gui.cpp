@@ -58,6 +58,7 @@ const int individuals = 8;
 const int generations = 18;
 
 bool evolveMorph = true;
+bool addDiversity = true;
 std::string morphology;
 
 rosConnectionHandler_t* rch;
@@ -376,7 +377,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   int secPassed = 0;
   while (!legsAreLength(phenoType[8], phenoType[9])) {
     sleep(1);
-    if (secPassed++ > 120) return std::vector<float>(); // 2 min timeout
+    if (secPassed++ > 60) return std::vector<float>(); // 1 min timeout
   }
 
   std::vector<float> trajectoryAngles(1);
@@ -590,7 +591,7 @@ public:
   void eval(Indiv& ind) {
 
     // Only add diversity if we are evolving morphology
-    if (evolveMorph == true) {
+    if (evolveMorph == true && addDiversity) {
       this->_objs.resize(fitnessFunctions.size() + 1);
     } else {
       this->_objs.resize(fitnessFunctions.size());
@@ -742,10 +743,16 @@ std::string getEvoInfoString(){
   for (int i = 0; i < fitnessFunctions.size(); i++) stringStream << fitnessFunctions[i].c_str() << " ";
   stringStream << "\n";
 
+  if (addDiversity == true){
+    stringStream << "  Adding diversity fitness\n";
+  } else {
+    stringStream << "  Not diversity fitness\n";
+  }
+
   if (evolveMorph == false){
-    stringStream << "  Evolving morphology\n";
+    stringStream << "  Only evolving control\n";
     stringStream << "      morphology: " << morphology.c_str() << "\n";
-  } else stringStream << "  Only evolving control\n";
+  } else stringStream << "  Evolving morphology\n";
 
   stringStream << "  Evolutionary parameters:\n";
   stringStream << "    Pop: " << Params::pop::size << "\n    Gen: " << Params::pop::nb_gen << "\n";
@@ -802,7 +809,8 @@ int main(int argc, char **argv){
     printf("1 - Evo control - small\n"
            "2 - Evo control - medium\n"
            "3 - Evo control - large\n"
-           "4 - CO-evo morph+cont\n"
+           "4 - CO-evo morph+cont (without diversity)\n"
+           "5 - CO-evo morph+cont (with diversity)\n"
            "s - Enable/disable stand testing\n"
            "m - Manual individual\n"
            "v - Verify fitness\n"
@@ -812,6 +820,7 @@ int main(int argc, char **argv){
            "r - Reconnect to master\n"
            "0 - Exit\n> ");
 
+    addDiversity = true;
     currentIndividual = individuals-1;
 
     inputChar = getchar();
@@ -977,8 +986,12 @@ int main(int argc, char **argv){
         run_ea(argc, argv, ea, getEvoInfoString());
         break;
 
-      // CO-evo morph+cont:
+      // CO-evo morph+cont without diversity:
       case '4':
+        addDiversity = false;
+
+      // CO-evo morph+cont with diversity:
+      case '5':
         assert(individuals == 16);
         evolveMorph = true;
         currentIndividual = individuals-1;
