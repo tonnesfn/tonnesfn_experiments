@@ -54,11 +54,13 @@ float currentTibiaLength = 0.0;
 int evaluationTimeout = 10;
 int currentIndividual;
 
-const int individuals = 8;
+const int individuals = 16;
 const int generations = 18;
 
 bool evolveMorph = true;
 bool addDiversity = true;
+bool instantFitness = false;
+
 std::string morphology;
 
 rosConnectionHandler_t* rch;
@@ -315,7 +317,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   currentIndividual++;
 
   // (Return empty fitness to test)
-  //return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
+  if (instantFitness == true) {
+    return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
+                              static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
+  }
 
   if (currentIndividual == individuals){
     currentIndividual = 0;
@@ -811,6 +816,9 @@ int main(int argc, char **argv){
            "3 - Evo control - large\n"
            "4 - CO-evo morph+cont (without diversity)\n"
            "5 - CO-evo morph+cont (with diversity)\n"
+           "0 - Exit\n"
+           "\n"
+           "i - Enable/disable instant fitness\n"
            "s - Enable/disable stand testing\n"
            "m - Manual individual\n"
            "v - Verify fitness\n"
@@ -818,7 +826,7 @@ int main(int argc, char **argv){
            "e - Enable servos\n"
            "d - Disable servos\n"
            "r - Reconnect to master\n"
-           "0 - Exit\n> ");
+           "> ");
 
     addDiversity = true;
     currentIndividual = individuals-1;
@@ -891,27 +899,36 @@ int main(int argc, char **argv){
       // Verify fitness:
       case 'v':
       {
-        for (int i = 0; i < 1; i++){
+          // Shortish legs (femur: 21.93,tibia: 2.42), middle of pareto front como:
+          /*std::vector<double> givenIndividual = {0.4871676862,
+                                                 0.1755770892,
+                                                 0.9409136772,
+                                                 0.7317621112,
+                                                 0.5558653474,
+                                                 0.7069196701,
+                                                 0.5979642868,
+                                                 0.8773227930,
+                                                 0.0484822168,
+                                                 0.8266043663};
+          //*/
+	      // <item>-0.22527801</item>
+		  // <item>4.795419693</item>
+		  // <item>0.306772738</item>
 
-          /*
-           0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.8674162626, 0.3620291352, 0.03699165583
-
-           <item>-3.215271831e-01</item>
-           <item>8.403041840e+00</item>
-           <item>1.645827740e-01</item>
-          */
-
-          std::vector<double> givenIndividual = {0.01112037897,
-                                                 0.7483010888,
-                                                 0.8399485350,
-                                                 0.9170328379,
-                                                 0.2148616016,
-                                                 0.8183637857,
-                                                 0.4,
-                                                 0.3620291352,
-                                                 0.03699165583,
-                                                 0.5};
-          //std::vector<double> givenIndividual = {0.01112037897, 0.7483010888, 0.8399485350, 0.9170328379, 0.2148616016, 0.8183637857, 0.2674162626, 0.3620291352, 0.03699165583};
+          // Long legs (femur: , tibia: , middle of pareto front lc:
+          std::vector<double> givenIndividual = {0.935921788,
+                                                 0.856585800,
+                                                 0.271217256,
+                                                 0.943526923,
+                                                 0.161614120,
+                                                 0.218575939,
+                                                 0.572470367,
+                                                 1.000000000,
+                                                 1.000000000,
+                                                 0.242379263};
+          //*/
+		  // -0.23602275
+		  // 5.678853035
 
           std::vector<double> givenInd_phen = genToPhen(givenIndividual);
           std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
@@ -932,7 +949,7 @@ int main(int argc, char **argv){
           fitnessFunctions.emplace_back("MocapSpeed");
           fitnessFunctions.emplace_back("Stability");
 
-          for (int i = 0; i < 10; i++) {
+          for (int i = 0; i < 5; i++) {
 
             std::string fitnessString;
             std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
@@ -946,7 +963,7 @@ int main(int argc, char **argv){
             printf("\n");
 
           }
-        }
+
         break;
       }
 
@@ -999,6 +1016,13 @@ int main(int argc, char **argv){
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
         run_ea(argc, argv, ea, getEvoInfoString());
+        break;
+
+      // Enable instant fitness:
+      case 'i':
+        instantFitness = !instantFitness;
+
+        if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n"); else printf("Instant fitness evaluation now disabled!\n");
         break;
 
       // Reconnect to master:
