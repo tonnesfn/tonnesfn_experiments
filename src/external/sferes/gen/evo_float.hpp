@@ -145,7 +145,17 @@ namespace sferes {
       struct Mutation_f<Ev, gaussian> {
         void operator()(Ev& ev, size_t i) {
           SFERES_CONST float sigma = Ev::params_t::evo_float::sigma;
-          float mutAmount = misc::gaussian_rand<float>(0, sigma);
+
+          FILE *genFile;
+          genFile = fopen("generation", "r");
+
+          int generation;
+          fscanf(genFile, "%d", &generation);
+          fclose(genFile);
+
+          double sigma_new = std::fmax(sigma * (1 - (generation * 0.075)), 0.025f);
+
+          float mutAmount = misc::gaussian_rand<float>(0, sigma_new);
           float f = ev.data(i)
                     + mutAmount;
 

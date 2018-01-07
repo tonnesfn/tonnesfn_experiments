@@ -367,6 +367,10 @@ namespace sferes {
       std::string _exp_name;
 
       void _iter() {
+        FILE *fp = fopen("generation", "w");
+        fprintf(fp,"%lu",_gen);
+        fclose(fp);
+
         epoch();
         update_stats();
         if (_gen % Params::pop::dump_period == 0)

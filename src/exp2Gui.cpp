@@ -799,6 +799,10 @@ int main(int argc, char **argv){
 
   resetEvoDir();
 
+  FILE *fp = fopen("generation", "w");
+  fprintf(fp,"%d",0);
+  fclose(fp);
+
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
 
