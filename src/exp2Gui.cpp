@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <iomanip>
 
 #include "ros/ros.h"
 
@@ -54,7 +55,7 @@ float currentTibiaLength = 0.0;
 int evaluationTimeout = 10;
 int currentIndividual;
 
-const int individuals = 16;
+const int individuals =  8;
 const int generations = 18;
 
 bool evolveMorph = true;
@@ -289,6 +290,22 @@ bool legsAreLength(float femurLengths, float tibiaLengths){
   } else {
     return false;
   }
+}
+
+float getServoVoltage(){
+
+  dyret_common::GetServoStatuses  gssres;
+  servoStatus_client.call(gssres);
+
+  float voltages = 0.0;
+  float counter = 0.0;
+
+  for (int i = 0; i < gssres.response.servoStatuses.size(); i++){
+    voltages += gssres.response.servoStatuses[i].voltage;
+    counter += 1.0;
+  }
+
+  return voltages / counter;
 }
 
 float getMaxServoTemperature(bool printAllTemperatures = false){
@@ -749,9 +766,9 @@ std::string getEvoInfoString(){
   stringStream << "\n";
 
   if (addDiversity == true){
-    stringStream << "  Adding diversity fitness\n";
+    stringStream << "    Adding diversity fitness\n";
   } else {
-    stringStream << "  Not diversity fitness\n";
+    stringStream << "    Not adding diversity fitness\n";
   }
 
   if (evolveMorph == false){
@@ -765,8 +782,9 @@ std::string getEvoInfoString(){
   if (Params::evo_float::mutation_type == gaussian) stringStream << "  Mutation type: Gaussian\n"; else stringStream << "Mutation type: Unknown\n";
   stringStream << "      Mut_p: " <<  Params::evo_float::mutation_rate << ", Mut_a: " << Params::evo_float::sigma << "\n";
   if (Params::evo_float::cross_over_type == recombination) stringStream << "  Crossover type: Recombination\n"; else stringStream << "Crossover type: Unknown\n";
-  stringStream << "      C_p: " << Params::evo_float::cross_rate << "\n\n";
+  stringStream << "      C_p: " << Params::evo_float::cross_rate << "\n";
 
+  stringStream << "  Voltage: " << std::setprecision(4) << getServoVoltage() << "\n\n";
 
   printf("%s", stringStream.str().c_str());
 
@@ -1009,7 +1027,6 @@ int main(int argc, char **argv){
 
       // CO-evo morph+cont with diversity:
       case '5':
-        assert(individuals == 16);
         evolveMorph = true;
         currentIndividual = individuals-1;
         fitnessFunctions.clear();
