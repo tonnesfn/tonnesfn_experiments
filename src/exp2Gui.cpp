@@ -574,13 +574,13 @@ std::vector<double> genToPhen(std::vector<double> givenGenotype){
   std::vector<double> phenotype = {50.0 + (givenGenotype[0] * 100.0), // 0: stepLength        50 -> 150
                                    25.0 + (givenGenotype[1] * 50.0),  // 1: stepHeight        25 -> 75
                                    givenGenotype[2] * 50.0,           // 2: smoothing          0 -> 50
-                                   givenGenotype[6],                  // 6: frequency          0 -> 1
+                                   0.1 + (givenGenotype[6] * 0.9),    // 6: frequency         0.1 -> 1
                                    NAN,                               // 6: speed
                                    (givenGenotype[3] * 0.4) - 0.2,    // 3: wagPhase        -0.2 -> 0.2
                                    givenGenotype[4] * 50.0,           // 4: wagAmplitude_x     0 -> 50
                                    givenGenotype[5] * 50.0,           // 5: wagAmplitude_y     0 -> 50
                                    givenGenotype[7] * 25.0,           // 7: femurLength        0 -> 25
-                                   givenGenotype[8] * 50.0,           // 8: tibiaLength        0 -> 50
+                                   givenGenotype[8] * 95.0,           // 8: tibiaLength        0 -> 95
                                    (givenGenotype[9] * 0.15) + 0.05   // 9: liftDuration    0.05 -> 0.20
   };
 
@@ -595,9 +595,9 @@ std::vector<double> phenToGen(std::vector<double> givenFenotype){
                                   (givenFenotype[5] + 0.2) / 0.4,    // 3: wagPhase        -0.2 -> 0.2
                                   givenFenotype[6] / 50.0,           // 4: wagAmplitude_x     0 -> 50
                                   givenFenotype[7] / 50.0,           // 5: wagAmplitude_y     0 -> 50
-                                  givenFenotype[3],                  // 6: frequency          0 -> 1
+                                  (givenFenotype[3] - 0.1) / 0.9,    // 6: frequency        0.1 -> 1
                                   givenFenotype[8] / 25.0,           // 7: femurLength        0 -> 25
-                                  givenFenotype[9] / 50.0,           // 8: tibiaLength        0 -> 50
+                                  givenFenotype[9] / 95.0,           // 8: tibiaLength        0 -> 95
                                   (givenFenotype[10] - 0.05) / 0.15  // 9: liftDuration    0.05 -> 0.20
   };
 
