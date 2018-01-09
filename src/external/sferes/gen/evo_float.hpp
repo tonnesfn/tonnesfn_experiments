@@ -153,7 +153,7 @@ namespace sferes {
           fscanf(genFile, "%d", &generation);
           fclose(genFile);
 
-          double sigma_new = std::fmax(sigma * (1 - (generation * 0.075)), 0.025f);
+          double sigma_new = std::fmax(sigma * (1 - (generation * 0.05)), 0.05f);
 
           float mutAmount = misc::gaussian_rand<float>(0, sigma_new);
           float f = ev.data(i)
