@@ -57,6 +57,8 @@ int currentIndividual;
 
 const int individuals =  8;
 const int generations = 18;
+constexpr float phen_maxStepLength = 300.0;
+constexpr float phen_maxFrequency  = 2.0;
 
 bool evolveMorph = true;
 bool addDiversity = true;
@@ -571,17 +573,17 @@ struct Params {
 
 std::vector<double> genToPhen(std::vector<double> givenGenotype){
 
-  std::vector<double> phenotype = {50.0 + (givenGenotype[0] * 100.0), // 0: stepLength        50 -> 150
-                                   25.0 + (givenGenotype[1] * 50.0),  // 1: stepHeight        25 -> 75
-                                   givenGenotype[2] * 50.0,           // 2: smoothing          0 -> 50
-                                   0.1 + (givenGenotype[6] * 0.9),    // 6: frequency         0.1 -> 1
-                                   NAN,                               // 6: speed
-                                   (givenGenotype[3] * 0.4) - 0.2,    // 3: wagPhase        -0.2 -> 0.2
-                                   givenGenotype[4] * 50.0,           // 4: wagAmplitude_x     0 -> 50
-                                   givenGenotype[5] * 50.0,           // 5: wagAmplitude_y     0 -> 50
-                                   givenGenotype[7] * 25.0,           // 7: femurLength        0 -> 25
-                                   givenGenotype[8] * 95.0,           // 8: tibiaLength        0 -> 95
-                                   (givenGenotype[9] * 0.15) + 0.05   // 9: liftDuration    0.05 -> 0.20
+  std::vector<double> phenotype = {givenGenotype[0] * phen_maxStepLength,  // 0: stepLength
+                                   25.0 + (givenGenotype[1] * 50.0),       // 1: stepHeight        25 -> 75
+                                   givenGenotype[2] * 50.0,                // 2: smoothing          0 -> 50
+                                   givenGenotype[6] * phen_maxFrequency,   // 6: frequency
+                                   NAN,                                    // 6: speed
+                                   (givenGenotype[3] * 0.4) - 0.2,         // 3: wagPhase        -0.2 -> 0.2
+                                   givenGenotype[4] * 50.0,                // 4: wagAmplitude_x     0 -> 50
+                                   givenGenotype[5] * 50.0,                // 5: wagAmplitude_y     0 -> 50
+                                   givenGenotype[7] * 25.0,                // 7: femurLength        0 -> 25
+                                   givenGenotype[8] * 95.0,                // 8: tibiaLength        0 -> 95
+                                   (givenGenotype[9] * 0.15) + 0.05        // 9: liftDuration    0.05 -> 0.20
   };
 
   return phenotype;
@@ -589,16 +591,16 @@ std::vector<double> genToPhen(std::vector<double> givenGenotype){
 
 std::vector<double> phenToGen(std::vector<double> givenFenotype){
 
-  std::vector<double> genotype = {(givenFenotype[0] - 50) / 100.0,   // 0: stepLength        50 -> 150
-                                  (givenFenotype[1] - 25) / 50.0,    // 1: stepHeight        25 -> 75
-                                  givenFenotype[2] / 50.0,           // 2: smoothing          0 -> 50
-                                  (givenFenotype[5] + 0.2) / 0.4,    // 3: wagPhase        -0.2 -> 0.2
-                                  givenFenotype[6] / 50.0,           // 4: wagAmplitude_x     0 -> 50
-                                  givenFenotype[7] / 50.0,           // 5: wagAmplitude_y     0 -> 50
-                                  (givenFenotype[3] - 0.1) / 0.9,    // 6: frequency        0.1 -> 1
-                                  givenFenotype[8] / 25.0,           // 7: femurLength        0 -> 25
-                                  givenFenotype[9] / 95.0,           // 8: tibiaLength        0 -> 95
-                                  (givenFenotype[10] - 0.05) / 0.15  // 9: liftDuration    0.05 -> 0.20
+  std::vector<double> genotype = {givenFenotype[0] / phen_maxStepLength,  // 0: stepLength
+                                  (givenFenotype[1] - 25) / 50.0,         // 1: stepHeight        25 -> 75
+                                  givenFenotype[2] / 50.0,                // 2: smoothing          0 -> 50
+                                  (givenFenotype[5] + 0.2) / 0.4,         // 3: wagPhase        -0.2 -> 0.2
+                                  givenFenotype[6] / 50.0,                // 4: wagAmplitude_x     0 -> 50
+                                  givenFenotype[7] / 50.0,                // 5: wagAmplitude_y     0 -> 50
+                                  givenFenotype[3] / phen_maxFrequency,   // 6: frequency
+                                  givenFenotype[8] / 25.0,                // 7: femurLength        0 -> 25
+                                  givenFenotype[9] / 95.0,                // 8: tibiaLength        0 -> 95
+                                  (givenFenotype[10] - 0.05) / 0.15       // 9: liftDuration    0.05 -> 0.20
   };
 
   return genotype;
@@ -639,9 +641,7 @@ public:
 
     for (int i = 0; i < individualData.size(); i++){
       individualData[i] = ind.gen().data(i);
-      printf("%.2f ", ind.gen().data(i));
     }
-    printf("\n");
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
@@ -872,10 +872,10 @@ int main(int argc, char **argv){
       case 'm':
       {
         evaluationTimeout = 20; // 20 seconds timeout;
-        std::vector<double> givenIndividual = phenToGen(std::vector<double> {150.0,   // stepLength        50 -> 150
-                                                                              75.0,   // stepHeight        25 -> 75
+        std::vector<double> givenIndividual = phenToGen(std::vector<double> {5.0,   // stepLength
+                                                                              5.0,   // stepHeight        25 -> 75
                                                                                0.0,   // smoothing          0 -> 50
-                                                                               0.1,   // frequency          0 -> 1
+                                                                               2,   // frequency          0 -> 1
                                                                                NAN,   // speed
                                                                                0.0,   // wagPhase        -0.2 -> 0.2
                                                                               50.0,   // wagAmplitude_x     0 -> 50
@@ -904,7 +904,7 @@ int main(int argc, char **argv){
         fitnessFunctions.emplace_back("Stability");
 
         std::string fitnessString;
-        std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
+        std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
                                                               gaitControllerStatus_client, trajectoryMessage_pub,
                                                               get_gait_evaluation_client);
         printf("%s\n", fitnessString.c_str());
