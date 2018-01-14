@@ -103,10 +103,16 @@ namespace sferes {
       void random() {
         BOOST_FOREACH(float &v, this->_data) v = misc::rand<float>();
 
-        while ((((this->_data[0]*300.0) * ((this->_data[6]*2.0)*60.0)) / 1000.0) > 10.0){
+        while (((((this->_data[0]*300.0) * ((this->_data[6]*2.0)*60.0)) / 1000.0) > 10.0)
+               || ((this->_data[0]*300.0) < 5.0)
+               || ((this->_data[6]*2.0) < 0.1)){
           this->_data[0] = misc::rand<float>();
           this->_data[6] = misc::rand<float>();
         }
+
+        FILE *fp = fopen("random.csv", "a");
+        fprintf(fp, "%.4f, %.4f\n", this->_data[0], this->_data[6]);
+        fclose(fp);
 
         _check_invariant();
       }
@@ -179,7 +185,9 @@ namespace sferes {
 
           if (i == 6){ // 0: stepLength, 6: frequency
             // Reroll until valid:
-            while ((((ev.data(0)*300.0) * ((ev.data(6)*2.0)*60.0)) / 1000.0) > 10.0){
+            while (((((ev.data(0)*300.0) * ((ev.data(6)*2.0)*60.0)) / 1000.0) > 10.0)
+                   || ((ev.data(0)*300.0) < 5.0)
+                   || ((ev.data(6)*2.0) < 0.1)){
 
               ev.data(0, ev.data(0) + misc::gaussian_rand<float>(0, sigma_new));
               if (ev.data(0) > 1.0f) ev.data(0, 2.0f - ev.data(0));
@@ -189,6 +197,10 @@ namespace sferes {
               if (ev.data(6) > 1.0f) ev.data(6, 2.0f - ev.data(6));
               if (ev.data(6) < 0.0f) ev.data(6, -ev.data(6));
             }
+
+            FILE *fp = fopen("mutate.csv", "a");
+            fprintf(fp, "%.4f, %.4f\n", ev.data(0), ev.data(6));
+            fclose(fp);
           }
         }
       };
