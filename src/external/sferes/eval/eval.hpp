@@ -67,14 +67,11 @@ namespace sferes {
           std::vector<std::vector<float>> legLengths;
           std::vector<int> sortedOrder;
 
-          //printf("Leg lengths: \n");
           for (size_t i = begin; i < end; ++i) {
             auto individual = pop[i]->gen();
-            std::vector<float> vec = {individual.data(7), individual.data(8)};
-            //printf("%.2f, %.2f\n", vec[0], vec[1]);
+            std::vector<float> vec = {individual.data(7), individual.data(8)*4.0f}; // 4.0 from size diff of femur (25mm) and tibia (95mm)
             legLengths.push_back(vec);
           }
-          //printf("\n");
 
           std::vector<float> currentPosition = {0.0, 0.0};
           bool reachedPosition[legLengths.size()] = {0}; // Initialize to false
