@@ -926,36 +926,22 @@ int main(int argc, char **argv){
       // Verify fitness:
       case 'v':
       {
-          // Shortish legs (femur: 21.93,tibia: 2.42), middle of pareto front como:
-          /*std::vector<double> givenIndividual = {0.4871676862,
-                                                 0.1755770892,
-                                                 0.9409136772,
-                                                 0.7317621112,
-                                                 0.5558653474,
-                                                 0.7069196701,
-                                                 0.5979642868,
-                                                 0.8773227930,
-                                                 0.0484822168,
-                                                 0.8266043663};
-          //*/
-	      // <item>-0.22527801</item>
-		  // <item>4.795419693</item>
-		  // <item>0.306772738</item>
 
-          // Long legs (femur: , tibia: , middle of pareto front lc:
-          std::vector<double> givenIndividual = {0.935921788,
-                                                 0.856585800,
-                                                 0.271217256,
-                                                 0.943526923,
-                                                 0.161614120,
-                                                 0.218575939,
-                                                 0.572470367,
-                                                 1.000000000,
-                                                 1.000000000,
-                                                 0.242379263};
-          //*/
-		  // -0.23602275
-		  // 5.678853035
+          FILE * verifyLog = fopen("verifyLog.txt", "a");
+
+          std::vector<double> givenIndividual = {0.815712, 0.657186, 0.347453, 0.701708, 0.139433, 0.216984, 0.238656, 0.554432, 0.804846, 0.056431};
+
+          fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
+          fprintf(verifyLog, "Original: \n");
+          fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
+          fprintf(verifyLog, "Individual: ");
+          bool first = true;
+          for (int i = 0; i < givenIndividual.size(); i++){
+            if (first == false) fprintf(verifyLog, ", ");
+            fprintf(verifyLog, "%f", givenIndividual[i]);
+            if (first == true) first = false;
+          }
+          fclose(verifyLog);
 
           std::vector<double> givenInd_phen = genToPhen(givenIndividual);
           std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
@@ -976,7 +962,7 @@ int main(int argc, char **argv){
           fitnessFunctions.emplace_back("MocapSpeed");
           fitnessFunctions.emplace_back("Stability");
 
-          for (int i = 0; i < 5; i++) {
+          for (int i = 0; i < 10; i++) {
 
             std::string fitnessString;
             std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
@@ -984,13 +970,20 @@ int main(int argc, char **argv){
                                                                   get_gait_evaluation_client);
             printf("%s\n", fitnessString.c_str());
             printf("Returned fitness (%lu): ", fitnessResult.size());
+            FILE * verifyLog = fopen("verifyLog.txt", "a");
+            fprintf(verifyLog, "\n    ");
+            bool first = true;
             for (int j = 0; j < fitnessResult.size(); j++) {
               printf("%.2f ", fitnessResult[j]);
+
+              if (first == false) fprintf(verifyLog, ", ");
+              fprintf(verifyLog, "%f",fitnessResult[j]);
+              if (first == true) first = false;
             }
+            fclose(verifyLog);
             printf("\n");
 
           }
-
         break;
       }
 
