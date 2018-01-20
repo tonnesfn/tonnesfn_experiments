@@ -351,7 +351,12 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
 
     if (choice == 'y'){
       disableServos();
-      while (getMaxServoTemperature(true) > 50){ sleep(10); }
+      long long int currentTime = getMs();
+      printf("00.0 ");
+      while (getMaxServoTemperature(true) > 50){
+        sleep(10);
+        printf("%3.1f: ",((getMs() - currentTime)/1000.0)/60.0);
+      }
 
       std::cout << "Press enter to enable servos";
       std::cin.ignore();
