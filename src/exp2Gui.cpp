@@ -49,11 +49,13 @@ ros::Publisher actionMessages_pub;
 FILE * evoFitnessLog;
 FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
-double globalSpeed;
 float currentFemurLength = 0.0;
 float currentTibiaLength = 0.0;
 int evaluationTimeout = 10;
+float evaluationDistance = 1500.0;
 int currentIndividual;
+
+const int numberOfEvalsInTesting = 10;
 
 const int individuals =  8;
 const int generations = 18;
@@ -337,6 +339,29 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
 
   // (Return empty fitness to test)
   if (instantFitness == true) {
+    printf("%03u: Evaluating stepLength %.2f, "
+               "stepHeight %.2f, "
+               "smoothing %.2f, "
+               "frequency: %.2f, "
+               "speed: %.2f, "
+               "wagPhase: %.2f, "
+               "wagAmplitude_x: %.2f, "
+               "wagAmplitude_y: %.2f,"
+               "femurLength: %.2f,"
+               "tibiaLength: %.2f,"
+               "liftDuration: %.2f\n",
+           currentIndividual,
+           phenoType[0],
+           phenoType[1],
+           phenoType[2],
+           phenoType[3],
+           phenoType[4],
+           phenoType[5],
+           phenoType[6],
+           phenoType[7],
+           phenoType[8],
+           phenoType[9],
+           phenoType[10]);
     return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
@@ -412,9 +437,8 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   std::vector<float> trajectoryAngles(1);
   std::vector<float> trajectoryDistances(1);
   std::vector<int> trajectoryTimeouts(1);
-  trajectoryDistances[0] = 1500.0;
-  trajectoryTimeouts[0] = evaluationTimeout; // 10 sec timeout
-
+  trajectoryDistances[0] = evaluationDistance;
+  trajectoryTimeouts[0] = evaluationTimeout;
   resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
   sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub);
@@ -423,7 +447,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > 30) {  // 30 sec timeout
+    if (secPassed++ > evaluationTimeout) {
       return std::vector<float>();
     }
   }
@@ -441,8 +465,8 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
 
-  trajectoryDistances[0] = 0.0;
-  trajectoryTimeouts[0] = evaluationTimeout; // 10 sec timeout
+  trajectoryDistances[0] = evaluationDistance;
+  trajectoryTimeouts[0] = evaluationTimeout;
 
   //resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
   resetGaitRecording(get_gait_evaluation_client);
@@ -452,7 +476,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > 35) return std::vector<float>(); // 35 sec timeout
+    if (secPassed++ > evaluationTimeout) return std::vector<float>();
   }
 
   std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
@@ -811,7 +835,6 @@ int main(int argc, char **argv){
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
 
-  globalSpeed = 5.0;
   evaluationTimeout = 10; // 10 seconds timeout
 
   evoFitnessLog = NULL;
@@ -848,7 +871,12 @@ int main(int argc, char **argv){
            "i - Enable/disable instant fitness\n"
            "s - Enable/disable stand testing\n"
            "m - Manual individual\n"
-           "v - Verify fitness\n"
+           "t - Test small robot (small control)\n"
+           "y - Test large robot (small control)\n"
+           "u - Test large robot (large control)\n"
+           "v - Verify fitness (gen)\n"
+           "- - Smallest legs\n"
+           "+ - Largest legs\n"
            "n - Test fitness noise\n"
            "e - Enable servos\n"
            "d - Disable servos\n"
@@ -874,62 +902,235 @@ int main(int argc, char **argv){
         break;
 
       // Manual individual:
-      case 'm':
-      {
-        evaluationTimeout = 20; // 20 seconds timeout;
-        std::vector<double> givenIndividual = phenToGen(std::vector<double> {5.0,   // stepLength
-                                                                              5.0,   // stepHeight        25 -> 75
-                                                                               0.0,   // smoothing          0 -> 50
-                                                                               2,   // frequency          0 -> 1
-                                                                               NAN,   // speed
-                                                                               0.0,   // wagPhase        -0.2 -> 0.2
-                                                                              50.0,   // wagAmplitude_x     0 -> 50
-                                                                              50.0,   // wagAmplitude_y     0 -> 50
-                                                                               0.0,   // femurLength        0 -> 25
-                                                                               0.0,   // tibiaLength        0 -> 50
-                                                                              0.20}); // liftDuration    0.05 -> 0.20
-
-        std::vector<double> givenInd_phen = genToPhen(givenIndividual);
-        std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
-
-        printf("  GivenIndividual: ");
-        for (int i = 0; i < givenIndividual.size(); i++){
-          printf("%.4f, ", givenIndividual[i]);
-        }
-        printf("\n");
-
-        printf("  givenInd_phen: ");
-        for (int i = 0; i < givenInd_phen.size(); i++){
-          printf("%.4f, ", givenInd_phen[i]);
-        }
-        printf("\n");
+      case 'm': {
+        std::vector<double> givenInd_phen = {250.0,   // stepLength
+                                             100.0,   // stepHeight
+                                               0.0,   // smoothing
+                                               0.1,   // frequency
+                                               NAN,   // speed
+                                               0.0,   // wagPhase
+                                              25.0,   // wagAmp_x
+                                              25.0,   // wagAmp_y
+                                               0.0,   // femurLength
+                                               0.0,   // tibiaLength
+                                              0.20};  // liftDuration
 
         fitnessFunctions.clear();
         fitnessFunctions.emplace_back("MocapSpeed");
         fitnessFunctions.emplace_back("Stability");
 
+        evaluationTimeout = 1000;
+        evaluationDistance = 1000000.0;
         std::string fitnessString;
         std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
                                                               gaitControllerStatus_client, trajectoryMessage_pub,
                                                               get_gait_evaluation_client);
+        evaluationTimeout = 10;
+        evaluationDistance = 1500.0;
         printf("%s\n", fitnessString.c_str());
         printf("Returned fitness (%lu): ", fitnessResult.size());
+
         for (int j = 0; j < fitnessResult.size(); j++) {
           printf("%.2f ", fitnessResult[j]);
         }
-        printf("\n");
 
-        evaluationTimeout = 10; // back to 10 sec timeout
+        printf("\n");
+        break;
+      }
+       // Test small robot (small control):
+      case 't':
+      {
+        FILE * verifyLog = fopen("verifyLog.txt", "a");
+
+        std::vector<double> givenInd_phen = {185.0,   // stepLength
+                                              75.0,   // stepHeight
+                                              50.0,   // smoothing
+                                             0.275,   // frequency
+                                               NAN,   // speed
+                                               0.0,   // wagPhase
+                                              15.0,   // wagAmp_x
+                                              10.0,   // wagAmp_y
+                                               0.0,   // femurLength
+                                               0.0,   // tibiaLength
+                                              0.20};  // liftDuration
+
+        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
+        fprintf(verifyLog, "Original: \n");
+        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
+        fprintf(verifyLog, "Individual: ");
+        bool first = true;
+        for (int i = 0; i < givenInd_phen.size(); i++){
+          if (first == false) fprintf(verifyLog, ", ");
+          fprintf(verifyLog, "%f", givenInd_phen[i]);
+          if (first == true) first = false;
+        }
+        fclose(verifyLog);
+
+
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+
+        for (int i = 0; i < numberOfEvalsInTesting; i++) {
+
+          std::string fitnessString;
+          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
+                                                                gaitControllerStatus_client, trajectoryMessage_pub,
+                                                                get_gait_evaluation_client);
+          printf("%s\n", fitnessString.c_str());
+          printf("Returned fitness (%lu): ", fitnessResult.size());
+          FILE * verifyLog = fopen("verifyLog.txt", "a");
+          fprintf(verifyLog, "\n    ");
+          bool first = true;
+          for (int j = 0; j < fitnessResult.size(); j++) {
+            printf("%.2f ", fitnessResult[j]);
+
+            if (first == false) fprintf(verifyLog, ", ");
+            fprintf(verifyLog, "%f",fitnessResult[j]);
+            if (first == true) first = false;
+          }
+          fclose(verifyLog);
+          printf("\n");
+
+        }
+        break;
+      }
+
+      // Test large robot (large control):
+      case 'u':
+      {
+        FILE * verifyLog = fopen("verifyLog.txt", "a");
+
+        std::vector<double> givenInd_phen = {215.0,   // stepLength
+                                             75.0,   // stepHeight
+                                             50.0,   // smoothing
+                                             0.35,   // frequency
+                                             NAN,   // speed
+                                             0.0,   // wagPhase
+                                             15.0,   // wagAmp_x
+                                             10.0,   // wagAmp_y
+                                             25.0,   // femurLength
+                                             95.0,   // tibiaLength
+                                             0.20};  // liftDuration
+
+        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
+        fprintf(verifyLog, "Original: \n");
+        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
+        fprintf(verifyLog, "Individual: ");
+        bool first = true;
+        for (int i = 0; i < givenInd_phen.size(); i++){
+          if (first == false) fprintf(verifyLog, ", ");
+          fprintf(verifyLog, "%f", givenInd_phen[i]);
+          if (first == true) first = false;
+        }
+        fclose(verifyLog);
+
+
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+
+        for (int i = 0; i < numberOfEvalsInTesting; i++) {
+
+          std::string fitnessString;
+          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
+                                                                gaitControllerStatus_client, trajectoryMessage_pub,
+                                                                get_gait_evaluation_client);
+          printf("%s\n", fitnessString.c_str());
+          printf("Returned fitness (%lu): ", fitnessResult.size());
+          FILE * verifyLog = fopen("verifyLog.txt", "a");
+          fprintf(verifyLog, "\n    ");
+          bool first = true;
+          for (int j = 0; j < fitnessResult.size(); j++) {
+            printf("%.2f ", fitnessResult[j]);
+
+            if (first == false) fprintf(verifyLog, ", ");
+            fprintf(verifyLog, "%f",fitnessResult[j]);
+            if (first == true) first = false;
+          }
+          fclose(verifyLog);
+          printf("\n");
+
+        }
+        break;
+      }
+
+      // Test large robot (small control):
+      case 'y':
+      {
+        FILE * verifyLog = fopen("verifyLog.txt", "a");
+
+        std::vector<double> givenInd_phen = {185.0,   // stepLength
+                                              75.0,   // stepHeight
+                                              50.0,   // smoothing
+                                             0.275,   // frequency
+                                               NAN,   // speed
+                                               0.0,   // wagPhase
+                                              15.0,   // wagAmp_x
+                                              10.0,   // wagAmp_y
+                                              20.0,   // femurLength
+                                              76.0,   // tibiaLength
+                                              0.20};  // liftDuration
+
+        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
+        fprintf(verifyLog, "Original: \n");
+        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
+        fprintf(verifyLog, "Individual: ");
+        bool first = true;
+        for (int i = 0; i < givenInd_phen.size(); i++){
+          if (first == false) fprintf(verifyLog, ", ");
+          fprintf(verifyLog, "%f", givenInd_phen[i]);
+          if (first == true) first = false;
+        }
+
+        fprintf(verifyLog, "\n\n");
+        fclose(verifyLog);
+
+
+        fitnessFunctions.clear();
+        fitnessFunctions.emplace_back("MocapSpeed");
+        fitnessFunctions.emplace_back("Stability");
+
+        for (int i = 0; i < numberOfEvalsInTesting; i++) {
+
+          std::string fitnessString;
+          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
+                                                                gaitControllerStatus_client, trajectoryMessage_pub,
+                                                                get_gait_evaluation_client);
+          printf("%s\n", fitnessString.c_str());
+          printf("Returned fitness (%lu): ", fitnessResult.size());
+          FILE * verifyLog = fopen("verifyLog.txt", "a");
+          fprintf(verifyLog, "\n    ");
+          bool first = true;
+          for (int j = 0; j < fitnessResult.size(); j++) {
+            printf("%.2f ", fitnessResult[j]);
+
+            if (first == false) fprintf(verifyLog, ", ");
+            fprintf(verifyLog, "%f",fitnessResult[j]);
+            if (first == true) first = false;
+          }
+          fclose(verifyLog);
+          printf("\n");
+
+        }
         break;
       }
 
       // Verify fitness:
       case 'v':
       {
-
           FILE * verifyLog = fopen("verifyLog.txt", "a");
 
-          std::vector<double> givenIndividual = {0.815712, 0.657186, 0.347453, 0.701708, 0.139433, 0.216984, 0.238656, 0.554432, 0.804846, 0.056431};
+          std::vector<double> givenIndividual = {9.165965915e-01,
+                                                 6.675732732e-01,
+                                                 6.556332111e-01,
+                                                 4.473016262e-01,
+                                                 3.195006847e-01,
+                                                 5.865598917e-01,
+                                                 1.816536188e-01,
+                                                 6.321113110e-01,
+                                                 7.642766833e-01,
+                                                 8.208969831e-01};
 
           fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
           fprintf(verifyLog, "Original: \n");
@@ -962,7 +1163,7 @@ int main(int argc, char **argv){
           fitnessFunctions.emplace_back("MocapSpeed");
           fitnessFunctions.emplace_back("Stability");
 
-          for (int i = 0; i < 10; i++) {
+          for (int i = 0; i < 5; i++) {
 
             std::string fitnessString;
             std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
@@ -1082,6 +1283,16 @@ int main(int argc, char **argv){
       case 'd':
         disableServos();
         printf("Servos disabled!\n");
+        break;
+
+      case '-':
+        setLegLengths(0.0,0.0);
+        printf("Shortest legs requested\n");
+        break;
+
+      case '+':
+        setLegLengths(25.0,95.0);
+        printf("Largest legs requested\n");
         break;
 
       // Exit:
