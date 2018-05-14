@@ -4,7 +4,7 @@
 #include "dyret_common/ActionMessage.h"
 #include "dyret_common/Trajectory.h"
 
-#include "dyret_utils/wait_for_ros.h"
+#include "dyret_common/wait_for_ros.h"
 
 ros::Publisher trajectoryMessage_pub;
 

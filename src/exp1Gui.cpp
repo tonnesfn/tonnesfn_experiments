@@ -15,8 +15,8 @@
 #include "dyret_common/Trajectory.h"
 #include "dyret_common/GetGaitEvaluation.h"
 
-#include "dyret_utils/wait_for_ros.h"
-#include "dyret_utils/timeHandling.h"
+#include "dyret_common/wait_for_ros.h"
+#include "dyret_common/timeHandling.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"

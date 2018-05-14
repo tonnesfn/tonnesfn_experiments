@@ -16,12 +16,11 @@
 #include "dyret_common/Trajectory.h"
 #include "dyret_common/Configuration.h"
 #include "dyret_common/GetGaitEvaluation.h"
-#include "dyret_common/GetServoStatuses.h"
 #include "dyret_common/ServoConfig.h"
 #include "dyret_common/ServoConfigArray.h"
 
-#include "dyret_utils/timeHandling.h"
-#include "dyret_utils/wait_for_ros.h"
+#include "dyret_common/timeHandling.h"
+#include "dyret_common/wait_for_ros.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -104,10 +103,10 @@ void sendServoTorqueMessage(int givenValue){
   std::vector<dyret_common::ServoConfig> msgContents(12);
 
   for (int i = 0; i < 12; i++) {
-    msgContents[i].servoId = i;
+    msgContents[i].id = i;
 
-    if (givenValue == 0) msgContents[i].configType = dyret_common::ServoConfig::t_disableTorque;
-    if (givenValue == 1) msgContents[i].configType = dyret_common::ServoConfig::t_enableTorque;
+    if (givenValue == 0) msgContents[i].type = dyret_common::ServoConfig::TYPE_DISABLE_TORQUE;
+    if (givenValue == 1) msgContents[i].type = dyret_common::ServoConfig::TYPE_ENABLE_TORQUE;
   }
 
   msg.servoConfigs = msgContents;
@@ -297,7 +296,7 @@ bool legsAreLength(float femurLengths, float tibiaLengths){
 }
 
 float getServoVoltage(){
-
+/*
   dyret_common::GetServoStatuses  gssres;
   servoStatus_client.call(gssres);
 
@@ -309,11 +308,12 @@ float getServoVoltage(){
     counter += 1.0;
   }
 
-  return voltages / counter;
+  return voltages / counter;*/
+  return 0.0;
 }
 
 float getMaxServoTemperature(bool printAllTemperatures = false){
-  float maxTemp = -1.0;
+/*  float maxTemp = -1.0;
 
   dyret_common::GetServoStatuses  gssres;
   servoStatus_client.call(gssres);
@@ -325,7 +325,9 @@ float getMaxServoTemperature(bool printAllTemperatures = false){
   }
   if (printAllTemperatures) printf("\n");
 
-  return maxTemp;
+  return maxTemp;*/
+
+  return 0.0;
 }
 
 std::vector<float> evaluateIndividual(std::vector<double> phenoType,
@@ -561,7 +563,6 @@ void rosConnect(){
   rch = new rosConnectionHandler_t(argc, argv);
 
   actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("actionMessages", 10);
-  servoStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetServoStatuses>("/dyret/servoStatuses");
 
   servoConfig_pub = rch->nodeHandle()->advertise<dyret_common::ServoConfigArray>("/dyret/servoConfigs", 1);
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
