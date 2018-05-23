@@ -275,7 +275,7 @@ void setLegLengths(float femurLengths, float tibiaLengths){
   msg.distance[0] = femurLengths;
   msg.distance[1] = tibiaLengths;
 
-  waitForRosInit(actuatorCommand_pub, "actuatorCommand_pub");
+  //waitForRosInit(actuatorCommand_pub, "actuatorCommand_pub");
 
   actuatorCommand_pub.publish(msg);
 }
