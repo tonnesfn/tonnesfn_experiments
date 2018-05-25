@@ -16,8 +16,8 @@
 #include "dyret_common/Trajectory.h"
 #include "dyret_common/Configuration.h"
 #include "dyret_common/GetGaitEvaluation.h"
-#include "dyret_common/ServoConfig.h"
-#include "dyret_common/ServoConfigArray.h"
+#include "dyret_common/ServoConfigs.h"
+#include "dyret_common/ConfigureServos.h"
 
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
@@ -36,13 +36,13 @@
 #include <sstream>
 #include <iostream>
 
+ros::ServiceClient servoConfigClient;
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
 ros::Publisher actuatorCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::Subscriber actuatorState_sub;
 ros::ServiceClient servoStatus_client;
-ros::Publisher servoConfig_pub;
 ros::Publisher actionMessages_pub;
 
 FILE * evoFitnessLog;
@@ -98,20 +98,42 @@ FILE* getEvoPathFileHandle(std::string fileName, std::string givenHeader = ""){
   return handleToReturn;
 }
 
-void sendServoTorqueMessage(int givenValue){
-  dyret_common::ServoConfigArray msg;
-  std::vector<dyret_common::ServoConfig> msgContents(12);
+bool callServoConfigService(dyret_common::ConfigureServos givenCall, ros::ServiceClient givenServoConfigService){
+  if (givenServoConfigService.call(givenCall))  {
+    switch(givenCall.response.status){
+      case dyret_common::ConfigureServos::Response::STATUS_NOERROR:
+        ROS_INFO("Configure servo service returned no error");
+        break;
+      case dyret_common::ConfigureServos::Response::STATUS_STATE:
+        ROS_ERROR("State error from configure servo response");
+        break;
+      case dyret_common::ConfigureServos::Response::STATUS_PARAMETER:
+        ROS_ERROR("Parameter error from configure servo response");
+        break;
+      default:
+        ROS_ERROR("Unknown error from configure servo response");
+        break;
+    }
 
-  for (int i = 0; i < 12; i++) {
-    msgContents[i].id = i;
+    if (givenCall.response.status == givenCall.response.STATUS_NOERROR) return true;
 
-    if (givenValue == 0) msgContents[i].type = dyret_common::ServoConfig::TYPE_DISABLE_TORQUE;
-    if (givenValue == 1) msgContents[i].type = dyret_common::ServoConfig::TYPE_ENABLE_TORQUE;
+  } else {
+    ROS_ERROR("Failed to call servo config service");
+    return false;
   }
 
-  msg.servoConfigs = msgContents;
-  servoConfig_pub.publish(msg);
+}
 
+bool sendServoTorqueMessage(bool enable){
+  dyret_common::ConfigureServos srv;
+
+  if (enable == true){
+    srv.request.configurations.type =dyret_common::ServoConfigs::TYPE_ENABLE_TORQUE;
+  } else {
+    srv.request.configurations.type =dyret_common::ServoConfigs::TYPE_DISABLE_TORQUE;
+  }
+
+  return callServoConfigService(srv, servoConfigClient);
 }
 
 void sendActionMessage(bool sleep){
@@ -564,7 +586,7 @@ void rosConnect(){
 
   actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("actionMessages", 10);
 
-  servoConfig_pub = rch->nodeHandle()->advertise<dyret_common::ServoConfigArray>("/dyret/servoConfigs", 1);
+  servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::ConfigureServos>("/dyret/configure_servos");
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);

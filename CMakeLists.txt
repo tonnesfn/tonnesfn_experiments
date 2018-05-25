@@ -43,22 +43,13 @@ include_directories(include
   ${TBB_INCLUDE_DIRS}
 )
 
-add_executable(exp1Gui
-               src/exp1Gui.cpp
+add_executable(expGui
+               src/expGui.cpp
               )
-target_link_libraries(exp1Gui ${catkin_LIBRARIES})
-target_link_libraries(exp1Gui ${Boost_LIBRARIES})
-target_link_libraries(exp1Gui ${TBB_LIBRARIES})
-add_dependencies(exp1Gui
-  ${catkin_EXPORTED_TARGETS})
-
-add_executable(exp2Gui
-               src/exp2Gui.cpp
-              )
-target_link_libraries(exp2Gui ${catkin_LIBRARIES})
-target_link_libraries(exp2Gui ${Boost_LIBRARIES})
-target_link_libraries(exp2Gui ${TBB_LIBRARIES})
-add_dependencies(exp2Gui
+target_link_libraries(expGui ${catkin_LIBRARIES})
+target_link_libraries(expGui ${Boost_LIBRARIES})
+target_link_libraries(expGui ${TBB_LIBRARIES})
+add_dependencies(expGui
   ${catkin_EXPORTED_TARGETS})
 
 add_executable(gazeboTest
