@@ -14,10 +14,11 @@
 #include "dyret_common/GetGaitControllerStatus.h"
 #include "dyret_common/ActionMessage.h"
 #include "dyret_common/Trajectory.h"
-#include "dyret_common/Configuration.h"
 #include "dyret_common/GetGaitEvaluation.h"
 #include "dyret_common/ServoConfigs.h"
 #include "dyret_common/ConfigureServos.h"
+#include "dyret_common/ActuatorCommand.h"
+#include "dyret_common/ActuatorStates.h"
 
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
@@ -289,24 +290,23 @@ bool isFitnessObjective(std::string givenString){
 }
 
 void setLegLengths(float femurLengths, float tibiaLengths){
-  dyret_common::Configuration msg;
+  dyret_common::ActuatorCommand msg;
 
-  msg.id.resize(0);
-  msg.distance.resize(2);
+  msg.length.resize(2);
 
-  msg.distance[0] = femurLengths;
-  msg.distance[1] = tibiaLengths;
+  msg.length[0] = femurLengths;
+  msg.length[1] = tibiaLengths;
 
   //waitForRosInit(actuatorCommand_pub, "actuatorCommand_pub");
 
   actuatorCommand_pub.publish(msg);
 }
 
-void actuatorStateCallback(const dyret_common::Configuration::ConstPtr& msg) {
-  if (msg->distance.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->distance.size()); }
+void actuatorStateCallback(const dyret_common::ActuatorStates::ConstPtr& msg) {
+  if (msg->position.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->position.size()); }
 
-  currentFemurLength = (msg->distance[0] + msg->distance[2] + msg->distance[4] + msg->distance[6]) / 4.0;
-  currentTibiaLength = (msg->distance[1] + msg->distance[3] + msg->distance[5] + msg->distance[7]) / 4.0;
+  currentFemurLength = (msg->position[0] + msg->position[2] + msg->position[4] + msg->position[6]) / 4.0;
+  currentTibiaLength = (msg->position[1] + msg->position[3] + msg->position[5] + msg->position[7]) / 4.0;
 }
 
 bool legsAreLength(float femurLengths, float tibiaLengths){
@@ -590,8 +590,8 @@ void rosConnect(){
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
-  actuatorCommand_pub = rch->nodeHandle()->advertise<dyret_common::Configuration>("actuatorCommands", 10);
-  actuatorState_sub = rch->nodeHandle()->subscribe("/actuatorStates", 1, actuatorStateCallback);
+  actuatorCommand_pub = rch->nodeHandle()->advertise<dyret_common::ActuatorCommand>("dyret/actuator_board/command", 10);
+  actuatorState_sub = rch->nodeHandle()->subscribe("dyret/actuator_board/states", 1, actuatorStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
