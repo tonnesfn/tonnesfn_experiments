@@ -19,6 +19,7 @@
 #include "dyret_common/ConfigureServos.h"
 #include "dyret_common/ActuatorCommand.h"
 #include "dyret_common/ActuatorStates.h"
+#include "dyret_common/Pose.h"
 
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
@@ -40,7 +41,7 @@
 ros::ServiceClient servoConfigClient;
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
-ros::Publisher actuatorCommand_pub;
+ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::Subscriber actuatorState_sub;
 ros::ServiceClient servoStatus_client;
@@ -290,16 +291,14 @@ bool isFitnessObjective(std::string givenString){
 }
 
 void setLegLengths(float femurLengths, float tibiaLengths){
-  dyret_common::ActuatorCommand msg;
+  dyret_common::Pose msg;
 
-  msg.length.resize(2);
+  msg.prismatic.resize(2);
 
-  msg.length[0] = femurLengths;
-  msg.length[1] = tibiaLengths;
+  msg.prismatic[0] = femurLengths;
+  msg.prismatic[1] = tibiaLengths;
 
-  //waitForRosInit(actuatorCommand_pub, "actuatorCommand_pub");
-
-  actuatorCommand_pub.publish(msg);
+  poseCommand_pub.publish(msg);
 }
 
 void actuatorStateCallback(const dyret_common::ActuatorStates::ConstPtr& msg) {
@@ -578,7 +577,7 @@ void rosConnect(){
     get_gait_evaluation_client.shutdown();
     gaitControllerStatus_client.shutdown();
     trajectoryMessage_pub.shutdown();
-    actuatorCommand_pub.shutdown();
+    poseCommand_pub.shutdown();
     actuatorState_sub.shutdown();
   }
 
@@ -590,7 +589,7 @@ void rosConnect(){
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
-  actuatorCommand_pub = rch->nodeHandle()->advertise<dyret_common::ActuatorCommand>("dyret/actuator_board/command", 10);
+  poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("dyret/pose_command", 10);
   actuatorState_sub = rch->nodeHandle()->subscribe("dyret/actuator_board/states", 1, actuatorStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
