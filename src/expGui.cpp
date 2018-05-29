@@ -15,10 +15,10 @@
 #include "dyret_common/ActionMessage.h"
 #include "dyret_common/Trajectory.h"
 #include "dyret_common/GetGaitEvaluation.h"
-#include "dyret_common/ServoConfigs.h"
-#include "dyret_common/ConfigureServos.h"
-#include "dyret_common/ActuatorCommand.h"
-#include "dyret_common/ActuatorStates.h"
+#include "dyret_common/Configuration.h"
+#include "dyret_common/Configure.h"
+#include "dyret_common/ActuatorBoardCommand.h"
+#include "dyret_common/ActuatorBoardState.h"
 #include "dyret_common/Pose.h"
 
 #include "dyret_common/timeHandling.h"
@@ -100,16 +100,16 @@ FILE* getEvoPathFileHandle(std::string fileName, std::string givenHeader = ""){
   return handleToReturn;
 }
 
-bool callServoConfigService(dyret_common::ConfigureServos givenCall, ros::ServiceClient givenServoConfigService){
+bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
   if (givenServoConfigService.call(givenCall))  {
     switch(givenCall.response.status){
-      case dyret_common::ConfigureServos::Response::STATUS_NOERROR:
+      case dyret_common::Configure::Response::STATUS_NOERROR:
         ROS_INFO("Configure servo service returned no error");
         break;
-      case dyret_common::ConfigureServos::Response::STATUS_STATE:
+      case dyret_common::Configure::Response::STATUS_STATE:
         ROS_ERROR("State error from configure servo response");
         break;
-      case dyret_common::ConfigureServos::Response::STATUS_PARAMETER:
+      case dyret_common::Configure::Response::STATUS_PARAMETER:
         ROS_ERROR("Parameter error from configure servo response");
         break;
       default:
@@ -127,12 +127,12 @@ bool callServoConfigService(dyret_common::ConfigureServos givenCall, ros::Servic
 }
 
 bool sendServoTorqueMessage(bool enable){
-  dyret_common::ConfigureServos srv;
+  dyret_common::Configure srv;
 
   if (enable == true){
-    srv.request.configurations.type =dyret_common::ServoConfigs::TYPE_ENABLE_TORQUE;
+    srv.request.configuration.revolute.type =dyret_common::RevoluteConfig::TYPE_ENABLE_TORQUE;
   } else {
-    srv.request.configurations.type =dyret_common::ServoConfigs::TYPE_DISABLE_TORQUE;
+    srv.request.configuration.revolute.type =dyret_common::RevoluteConfig::TYPE_DISABLE_TORQUE;
   }
 
   return callServoConfigService(srv, servoConfigClient);
@@ -301,7 +301,7 @@ void setLegLengths(float femurLengths, float tibiaLengths){
   poseCommand_pub.publish(msg);
 }
 
-void actuatorStateCallback(const dyret_common::ActuatorStates::ConstPtr& msg) {
+void actuatorStateCallback(const dyret_common::ActuatorBoardState::ConstPtr& msg) {
   if (msg->position.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->position.size()); }
 
   currentFemurLength = (msg->position[0] + msg->position[2] + msg->position[4] + msg->position[6]) / 4.0;
@@ -583,18 +583,18 @@ void rosConnect(){
 
   rch = new rosConnectionHandler_t(argc, argv);
 
-  actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("actionMessages", 10);
+  actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("/dyret/gaitcontroller/actionMessages", 10);
 
-  servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::ConfigureServos>("/dyret/configure_servos");
+  servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::Configure>("/dyret/configuration");
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("trajectoryMessages", 1000);
-  poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("dyret/pose_command", 10);
-  actuatorState_sub = rch->nodeHandle()->subscribe("dyret/actuator_board/states", 1, actuatorStateCallback);
+  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_common::Trajectory>("/dyret/gaitController/trajectoryMessages", 1000);
+  poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("/dyret/command", 10);
+  actuatorState_sub = rch->nodeHandle()->subscribe("/dyret/actuator_board/state", 1, actuatorStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "trajectoryMessage");
+  waitForRosInit(trajectoryMessage_pub, "/dyret/gaitController/trajectoryMessage");
 
 }
 

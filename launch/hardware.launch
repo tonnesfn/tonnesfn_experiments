@@ -1,4 +1,4 @@
 <launch>
-  <include file="$(find dyret_gazebo)/launch/dyret.launch" />
   <include file="$(find dyret_controller)/launch/fullController.launch" />
+  <include file="$(find dyret_hardware)/launch/standalone.launch" />
 </launch>
