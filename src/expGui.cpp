@@ -24,6 +24,8 @@
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
 
+#include "dyret_controller/PositionCommand.h"
+
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
 #include "external/sferes/ea/nsga2.hpp"
@@ -46,6 +48,7 @@ ros::ServiceClient gaitControllerStatus_client;
 ros::Subscriber actuatorState_sub;
 ros::ServiceClient servoStatus_client;
 ros::Publisher actionMessages_pub;
+ros::Publisher positionCommand_pub;
 
 FILE * evoFitnessLog;
 FILE * evoParamLog_gen;
@@ -56,7 +59,7 @@ int evaluationTimeout = 10;
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
-const int numberOfEvalsInTesting = 10;
+const int numberOfEvalsInTesting = 1;
 
 const int individuals =  8;
 const int generations = 18;
@@ -299,6 +302,29 @@ void setLegLengths(float femurLengths, float tibiaLengths){
   msg.prismatic[1] = tibiaLengths;
 
   poseCommand_pub.publish(msg);
+}
+
+// Positions is a 12 length vector with positions for all 4 legs
+void setLegPositions(std::vector<float> positions){
+  assert(positions.size() == 12);
+  dyret_controller::PositionCommand msg;
+
+  for (int i = 0; i < msg.legPosition.size(); i++){
+    msg.legPosition[i].x = positions[i*3];
+    msg.legPosition[i].y = positions[(i*3)+1];
+    msg.legPosition[i].z = positions[(i*3)+2];
+  }
+
+  positionCommand_pub.publish(msg);
+
+}
+
+void testLegPositionAll(std::vector<float> position){
+  assert(position.size() == 3);
+  std::vector<float> positions;
+  for (int i = 0; i < 4; i++) positions.insert(positions.end(), position.begin(), position.end());
+
+  setLegPositions(positions);
 }
 
 void actuatorStateCallback(const dyret_common::ActuatorBoardState::ConstPtr& msg) {
@@ -584,6 +610,7 @@ void rosConnect(){
   rch = new rosConnectionHandler_t(argc, argv);
 
   actionMessages_pub = rch->nodeHandle()->advertise<dyret_common::ActionMessage>("/dyret/gaitcontroller/actionMessages", 10);
+  positionCommand_pub = rch->nodeHandle()->advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
 
   servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::Configure>("/dyret/configuration");
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_common::GetGaitEvaluation>("get_gait_evaluation");
@@ -890,6 +917,7 @@ int main(int argc, char **argv){
            "5 - CO-evo morph+cont (with diversity)\n"
            "0 - Exit\n"
            "\n"
+           "q - Test inverse kinematics\n"
            "i - Enable/disable instant fitness\n"
            "s - Enable/disable stand testing\n"
            "m - Manual individual\n"
@@ -1209,6 +1237,42 @@ int main(int argc, char **argv){
           }
         break;
       }
+
+      case 'q': {
+        printf("Testing inverse kinematics:\n");
+
+        std::vector<float> position;
+
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+        testLegPositionAll(std::vector<float>{80.0f,  0.0f, -450.0f}); // Test X
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f, 80.0f, -450.0f}); // Test Y
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -420.0f}); // Test Z
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+        setLegPositions(std::vector<float>{-50.0f,  50.0f, -450.0f,
+                                             0.0f,   0.0f, -450.0f,
+                                             0.0f,   0.0f, -450.0f,
+                                             0.0f,   0.0f, -450.0f});
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+        setLegPositions(std::vector<float>{  0.0f,   0.0f, -450.0f,
+                                            50.0f,  50.0f, -450.0f,
+                                             0.0f,   0.0f, -450.0f,
+                                             0.0f,   0.0f, -450.0f});
+        sleep(3);
+        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+        sleep(3);
+      }
+        break;
 
       // Evo control - small:
       case '1':

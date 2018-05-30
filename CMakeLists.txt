@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   dyret_common
   dyret_hardware
+  dyret_controller
 )
 
 find_package(Boost REQUIRED COMPONENTS 
