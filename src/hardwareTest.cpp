@@ -48,10 +48,10 @@ int main(int argc, char **argv){
   ROS_INFO("HardwareTest initialized");
 
   gaitControllerStatus_client = n.serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = n.advertise<dyret_controller::Trajectory>("/dyret/gaitController/trajectoryMessages", 1000);
+  trajectoryMessage_pub = n.advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages", 1000);
 
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "/dyret/gaitController/trajectoryMessage");
+  waitForRosInit(trajectoryMessage_pub, "/dyret/dyret_controller/trajectoryMessage");
 
   resetTrajectoryPos(trajectoryMessage_pub);
 

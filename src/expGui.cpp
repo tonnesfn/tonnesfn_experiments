@@ -609,19 +609,19 @@ void rosConnect(){
 
   rch = new rosConnectionHandler_t(argc, argv);
 
-  actionMessages_pub = rch->nodeHandle()->advertise<dyret_controller::ActionMessage>("/dyret/gaitcontroller/actionMessages", 10);
+  actionMessages_pub = rch->nodeHandle()->advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
   positionCommand_pub = rch->nodeHandle()->advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
 
   servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::Configure>("/dyret/configuration");
   get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_controller::Trajectory>("/dyret/gaitController/trajectoryMessages", 1000);
+  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages", 1000);
   poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("/dyret/command", 10);
   actuatorState_sub = rch->nodeHandle()->subscribe("/dyret/actuator_board/state", 1, actuatorStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "/dyret/gaitController/trajectoryMessage");
+  waitForRosInit(trajectoryMessage_pub, "/dyret/dyret_controller/trajectoryMessage");
 
 }
 
