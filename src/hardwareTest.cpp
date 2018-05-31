@@ -1,17 +1,16 @@
 #include "ros/ros.h"
 
-#include "dyret_common/GetGaitControllerStatus.h"
-#include "dyret_common/ActionMessage.h"
-#include "dyret_common/Trajectory.h"
-
 #include "dyret_common/wait_for_ros.h"
+
+#include "dyret_controller/Trajectory.h"
+#include "dyret_controller/GetGaitControllerStatus.h"
 
 ros::Publisher trajectoryMessage_pub;
 
 ros::ServiceClient gaitControllerStatus_client;
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client){
-  dyret_common::GetGaitControllerStatus srv;
+                        dyret_controller::GetGaitControllerStatus srv;
 
   if (gaitControllerStatus_client.call(srv)) {
       if (srv.response.gaitControllerStatus.actionType == srv.response.gaitControllerStatus.t_idle) return true;
@@ -21,13 +20,13 @@ bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client){
 }
 
 void resetTrajectoryPos(ros::Publisher givenTrajectoryMsgPublisher){
-  dyret_common::Trajectory msg;
+  dyret_controller::Trajectory msg;
   msg.command = msg.t_resetPosition;
   givenTrajectoryMsgPublisher.publish(msg);
 }
 
 void sendTrajectories(std::vector<float> givenTrajectoryDistances, std::vector<float> givenTrajectoryAngles, std::vector<int> givenTrajectoryTimeouts, ros::Publisher givenTrajectoryMsgPublisher){
-  dyret_common::Trajectory msg;
+  dyret_controller::Trajectory msg;
 
   msg.trajectorySegments.resize(givenTrajectoryDistances.size());
   for (int i = 0; i < givenTrajectoryDistances.size(); i++){
@@ -48,8 +47,8 @@ int main(int argc, char **argv){
 
   ROS_INFO("HardwareTest initialized");
 
-  gaitControllerStatus_client = n.serviceClient<dyret_common::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = n.advertise<dyret_common::Trajectory>("/dyret/gaitController/trajectoryMessages", 1000);
+  gaitControllerStatus_client = n.serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
+  trajectoryMessage_pub = n.advertise<dyret_controller::Trajectory>("/dyret/gaitController/trajectoryMessages", 1000);
 
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
   waitForRosInit(trajectoryMessage_pub, "/dyret/gaitController/trajectoryMessage");
