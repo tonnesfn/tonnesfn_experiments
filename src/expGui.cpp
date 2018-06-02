@@ -40,6 +40,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "individuals.h"
+
 ros::ServiceClient servoConfigClient;
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
@@ -61,7 +63,7 @@ int currentIndividual;
 
 const int numberOfEvalsInTesting = 1;
 
-const int individuals =  8;
+const int popSize =  8;
 const int generations = 18;
 constexpr float phen_maxStepLength = 300.0;
 constexpr float phen_maxFrequency  = 2.0;
@@ -75,6 +77,9 @@ std::string morphology;
 rosConnectionHandler_t* rch;
 
 bool robotOnStand = false;
+
+int argc_g;
+char **argv_g;
 
 std::vector<std::string> fitnessFunctions;
 
@@ -415,7 +420,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
 
-  if (currentIndividual == individuals){
+  if (currentIndividual == popSize){
     currentIndividual = 0;
     getMaxServoTemperature(true);
     printf("Cooldown to 50C? (y/n) > ");
@@ -638,7 +643,7 @@ struct Params {
     SFERES_CONST cross_over_t cross_over_type = recombination;
   };
   struct pop {
-    SFERES_CONST unsigned size     =   individuals;  // Population size
+    SFERES_CONST unsigned size     =   popSize;  // Population size
     SFERES_CONST unsigned nb_gen   =   generations;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
@@ -834,6 +839,19 @@ public:
   }
 };
 
+namespace expGui {
+
+// Setup evolutionary framework
+  typedef gen::EvoFloat<10, Params> gen_t;   // Number of parameters in each individual:
+  typedef phen::Parameters<gen_t, FitExp2MO<Params>, Params> phen_t;
+  typedef eval::Eval<Params> eval_t;
+  typedef boost::fusion::vector<stat::State<phen_t, Params> > stat_t;
+  typedef modif::Dummy<> modifier_t;
+  typedef ea::Nsga2<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
+  ea_t ea;
+
+}
+
 std::string getEvoInfoString(){
 
   std::ostringstream stringStream;
@@ -873,7 +891,202 @@ void resetEvoDir(){
   if(remove( "currentevodir" ) != 0) printf("Removed currentevodir file\n");
 }
 
+void run_individual(std::vector<double> givenIndividual){
+
+  fitnessFunctions.clear();
+  fitnessFunctions.emplace_back("MocapSpeed");
+  fitnessFunctions.emplace_back("Stability");
+
+  for (int i = 0; i < numberOfEvalsInTesting; i++) {
+
+    std::string fitnessString;
+    std::vector<float> fitnessResult = evaluateIndividual(givenIndividual, &fitnessString, false,
+                                                          gaitControllerStatus_client, trajectoryMessage_pub,
+                                                          get_gait_evaluation_client);
+    printf("%s\n", fitnessString.c_str());
+    printf("Returned fitness (%lu): ", fitnessResult.size());
+    FILE * verifyLog = fopen("verifyLog.txt", "a");
+    fprintf(verifyLog, "\n    ");
+    bool first = true;
+    for (int j = 0; j < fitnessResult.size(); j++) {
+      printf("%.2f ", fitnessResult[j]);
+
+      if (first == false) fprintf(verifyLog, ", ");
+      fprintf(verifyLog, "%f",fitnessResult[j]);
+      if (first == true) first = false;
+    }
+    fclose(verifyLog);
+    printf("\n");
+
+  }
+
+}
+
+void menu_walk(){
+
+  std::string choice;
+  for(;;) {
+    std::cout << "  Please choose one walk: (enter to go back)\n";
+
+    printf("    ss - Test small robot (small control)\n"
+           "    ls - Test large robot (small control)\n"
+           "    ll - Test large robot (large control)\n");
+    printf("\n> ");
+
+    getline(std::cin, choice);
+    std::cin.clear();
+    if (choice.empty() == true){
+      break;
+    } else {
+      if (choice == "ss"){
+        run_individual(individuals::smallRobotSmallControl);
+      } else if (choice == "ls"){
+        run_individual(individuals::largeRobotSmallControl);
+      } else if (choice == "ll"){
+        run_individual(individuals::largeRobotLargeControl);
+      }
+    }
+  }
+};
+
+void evolve_control(std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
+  assert(popSize == 8);
+  evolveMorph = evolveMorphology; // Disable morphology evolution
+  morphology = "givenMorphology";
+  currentIndividual = popSize-1;
+  fitnessFunctions.clear();
+  fitnessFunctions.emplace_back("MocapSpeed");
+  fitnessFunctions.emplace_back("Stability");
+  run_ea(argc_g, argv_g, expGui::ea, getEvoInfoString());
+};
+
+void menu_experiments() {
+  std::string choice;
+  for (;;) {
+    std::cout << "  Please choose one experiment: (enter to go back)\n";
+
+    printf("    cs - evolve control, small morphology\n"
+           "    cm - evolve control, medium morphology\n"
+           "    cl - evolve control, large morphology\n"
+           "    my - evolve cont+morph, with diversity\n"
+           "    mn - evolve cont+morph, w/o diversity\n");
+    printf("\n> ");
+
+    getline(std::cin, choice);
+    std::cin.clear();
+    if (choice.empty() == true) {
+      break;
+    } else {
+      if (choice == "cs") {
+        evolve_control("small", false, false);
+      } else if (choice == "cm") {
+        evolve_control("medium", false, false);
+      } else if (choice == "cl") {
+        evolve_control("large", false, false);
+      } else if (choice == "my") {
+        evolve_control("", true, true);
+      } else if (choice == "mn") {
+        evolve_control("", true, false);
+      }
+    }
+  }
+}
+
+void menu_configure() {
+  std::string choice;
+  for (;;) {
+    std::cout << "  Please choose a setting to change: (enter to go back)\n";
+
+    printf("    i - enable/disable instant fitness\n");
+    printf("    r - reconnect to ROS resources\n");
+    printf("    e - enable servo torques\n");
+    printf("    d - disable servo torques\n");
+    printf("\n> ");
+
+    getline(std::cin, choice);
+    std::cin.clear();
+    if (choice.empty() == true) {
+      break;
+    } else {
+      if (choice == "i") {
+        instantFitness = !instantFitness;
+        if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n");
+        else
+          printf("Instant fitness evaluation now disabled!\n");
+      } else if (choice == "r") {
+        printf("Reconnecting!\n");
+        rosConnect();
+        printf("Reconnected!\n");
+      } else if (choice == "e"){
+        enableServos();
+        printf("Servos enabled!\n");
+      } else if (choice == "d"){
+        disableServos();
+        printf("Servos disabled!\n");
+      }
+    }
+  };
+}
+
+void testInverseKinematics(){
+  printf("Testing inverse kinematics:\n");
+
+  std::vector<float> position;
+
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+  testLegPositionAll(std::vector<float>{80.0f,  0.0f, -450.0f}); // Test X
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f, 80.0f, -450.0f}); // Test Y
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -420.0f}); // Test Z
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+  setLegPositions(std::vector<float>{-50.0f,  50.0f, -450.0f,
+                                     0.0f,   0.0f, -450.0f,
+                                     0.0f,   0.0f, -450.0f,
+                                     0.0f,   0.0f, -450.0f});
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+  setLegPositions(std::vector<float>{  0.0f,   0.0f, -450.0f,
+                                       50.0f,  50.0f, -450.0f,
+                                       0.0f,   0.0f, -450.0f,
+                                       0.0f,   0.0f, -450.0f});
+  sleep(3);
+  testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
+  sleep(3);
+}
+
+void menu_test(){
+  std::string choice;
+  for(;;) {
+    std::cout << "  Please choose one test: (enter to go back)\n";
+
+    printf("    inv - test inverseKinematics\n");
+    printf("\n> ");
+
+    getline(std::cin, choice);
+    std::cin.clear();
+    if (choice.empty() == true){
+      break;
+    } else {
+      if (choice == "inv"){
+        testInverseKinematics();
+      }
+    }
+  }
+};
+
 int main(int argc, char **argv){
+
+  argc_g = argc;
+  argv_g = argv;
 
   resetEvoDir();
 
@@ -895,46 +1108,67 @@ int main(int argc, char **argv){
   ros::AsyncSpinner spinner(2);
   spinner.start();
 
-  typedef gen::EvoFloat<10, Params> gen_t;   // Number of parameters in each individual:
-  typedef phen::Parameters<gen_t, FitExp2MO<Params>, Params> phen_t;
-  typedef eval::Eval<Params> eval_t;
-  typedef boost::fusion::vector<stat::State<phen_t, Params> >  stat_t;
-  typedef modif::Dummy<> modifier_t;
-  typedef ea::Nsga2<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
-  ea_t ea;
-
   std::string evoInfo = "testInfo";
 
   resetTrajectoryPos(trajectoryMessage_pub);
   resetGaitRecording(get_gait_evaluation_client);
 
+  std::map< std::string, boost::function<void()> > menu;
+  menu["walk"] = &menu_walk;
+  menu["experiments"] = &menu_experiments;
+  menu["configure"] = &menu_configure;
+  menu["test"] = &menu_test;
+
+  std::string choice;
+  for(;;) {
+    std::cout << "Please choose: (enter to quit)\n";
+    std::map<std::string, boost::function<void()> >::iterator it = menu.begin();
+    while(it != menu.end()) {
+      std::cout << "  " << (it++)->first << std::endl;
+    }
+    printf("\n> ");
+
+    getline(std::cin, choice);
+    std::cin.clear();
+    if (choice.empty() == true){
+      ros::shutdown();
+      exit(0);
+    } else if(menu.find(choice) == menu.end()) {
+      printf("Unknown choice!\n");
+      continue;
+    }
+
+    menu[choice]();
+  }
+/*
+
   int inputChar;
   do {
-    printf("1 - Evo control - small\n"
-           "2 - Evo control - medium\n"
-           "3 - Evo control - large\n"
-           "4 - CO-evo morph+cont (without diversity)\n"
-           "5 - CO-evo morph+cont (with diversity)\n"
-           "0 - Exit\n"
+    printf("1 - Evo control - small\n"                      // experiment
+           "2 - Evo control - medium\n"                     // experiment
+           "3 - Evo control - large\n"                      // experiment
+           "4 - CO-evo morph+cont (without diversity)\n"    // experiment
+           "5 - CO-evo morph+cont (with diversity)\n"       // experiment
+           "0 - Exit\n"                                     // exit (special)
            "\n"
-           "q - Test inverse kinematics\n"
-           "i - Enable/disable instant fitness\n"
-           "s - Enable/disable stand testing\n"
-           "m - Manual individual\n"
-           "t - Test small robot (small control)\n"
-           "y - Test large robot (small control)\n"
-           "u - Test large robot (large control)\n"
-           "v - Verify fitness (gen)\n"
-           "- - Smallest legs\n"
-           "+ - Largest legs\n"
-           "n - Test fitness noise\n"
-           "e - Enable servos\n"
-           "d - Disable servos\n"
-           "r - Reconnect to master\n"
+           "q - Test inverse kinematics\n"                  // testing
+           "i - Enable/disable instant fitness\n"           // configure
+           "s - Enable/disable stand testing\n"             // configure
+           "m - Manual individual\n"                        // walk
+           "t - Test small robot (small control)\n"         // walk
+           "y - Test large robot (small control)\n"         // walk
+           "u - Test large robot (large control)\n"         // walk
+           "v - Verify fitness (gen)\n"                     // experiment
+           "- - Smallest legs\n"                            // joints
+           "+ - Largest legs\n"                             // joints
+           "n - Test fitness noise\n"                       // experiment
+           "e - Enable servos\n"                            // joints
+           "d - Disable servos\n"                           // joints
+           "r - Reconnect to master\n"                      // configure
            "> ");
 
     addDiversity = true;
-    currentIndividual = individuals-1;
+    currentIndividual = popSize-1;
 
     inputChar = getchar();
     std::cin.ignore(1000,'\n');
@@ -951,220 +1185,6 @@ int main(int argc, char **argv){
         robotOnStand = !robotOnStand;
         break;
 
-      // Manual individual:
-      case 'm': {
-        std::vector<double> givenInd_phen = {250.0,   // stepLength
-                                             100.0,   // stepHeight
-                                               0.0,   // smoothing
-                                               0.1,   // frequency
-                                               NAN,   // speed
-                                               0.0,   // wagPhase
-                                              25.0,   // wagAmp_x
-                                              25.0,   // wagAmp_y
-                                               0.0,   // femurLength
-                                               0.0,   // tibiaLength
-                                              0.20};  // liftDuration
-
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-
-        evaluationTimeout = 1000;
-        evaluationDistance = 1000000.0;
-        std::string fitnessString;
-        std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
-                                                              gaitControllerStatus_client, trajectoryMessage_pub,
-                                                              get_gait_evaluation_client);
-        evaluationTimeout = 10;
-        evaluationDistance = 1500.0;
-        printf("%s\n", fitnessString.c_str());
-        printf("Returned fitness (%lu): ", fitnessResult.size());
-
-        for (int j = 0; j < fitnessResult.size(); j++) {
-          printf("%.2f ", fitnessResult[j]);
-        }
-
-        printf("\n");
-        break;
-      }
-       // Test small robot (small control):
-      case 't':
-      {
-        FILE * verifyLog = fopen("verifyLog.txt", "a");
-
-        std::vector<double> givenInd_phen = {185.0,   // stepLength
-                                              75.0,   // stepHeight
-                                              50.0,   // smoothing
-                                             0.275,   // frequency
-                                               NAN,   // speed
-                                               0.0,   // wagPhase
-                                              15.0,   // wagAmp_x
-                                              10.0,   // wagAmp_y
-                                               0.0,   // femurLength
-                                               0.0,   // tibiaLength
-                                              0.20};  // liftDuration
-
-        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
-        fprintf(verifyLog, "Original: \n");
-        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
-        fprintf(verifyLog, "Individual: ");
-        bool first = true;
-        for (int i = 0; i < givenInd_phen.size(); i++){
-          if (first == false) fprintf(verifyLog, ", ");
-          fprintf(verifyLog, "%f", givenInd_phen[i]);
-          if (first == true) first = false;
-        }
-        fclose(verifyLog);
-
-
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-
-        for (int i = 0; i < numberOfEvalsInTesting; i++) {
-
-          std::string fitnessString;
-          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
-                                                                gaitControllerStatus_client, trajectoryMessage_pub,
-                                                                get_gait_evaluation_client);
-          printf("%s\n", fitnessString.c_str());
-          printf("Returned fitness (%lu): ", fitnessResult.size());
-          FILE * verifyLog = fopen("verifyLog.txt", "a");
-          fprintf(verifyLog, "\n    ");
-          bool first = true;
-          for (int j = 0; j < fitnessResult.size(); j++) {
-            printf("%.2f ", fitnessResult[j]);
-
-            if (first == false) fprintf(verifyLog, ", ");
-            fprintf(verifyLog, "%f",fitnessResult[j]);
-            if (first == true) first = false;
-          }
-          fclose(verifyLog);
-          printf("\n");
-
-        }
-        break;
-      }
-
-      // Test large robot (large control):
-      case 'u':
-      {
-        FILE * verifyLog = fopen("verifyLog.txt", "a");
-
-        std::vector<double> givenInd_phen = {215.0,   // stepLength
-                                             75.0,   // stepHeight
-                                             50.0,   // smoothing
-                                             0.35,   // frequency
-                                             NAN,   // speed
-                                             0.0,   // wagPhase
-                                             15.0,   // wagAmp_x
-                                             10.0,   // wagAmp_y
-                                             25.0,   // femurLength
-                                             95.0,   // tibiaLength
-                                             0.20};  // liftDuration
-
-        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
-        fprintf(verifyLog, "Original: \n");
-        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
-        fprintf(verifyLog, "Individual: ");
-        bool first = true;
-        for (int i = 0; i < givenInd_phen.size(); i++){
-          if (first == false) fprintf(verifyLog, ", ");
-          fprintf(verifyLog, "%f", givenInd_phen[i]);
-          if (first == true) first = false;
-        }
-        fclose(verifyLog);
-
-
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-
-        for (int i = 0; i < numberOfEvalsInTesting; i++) {
-
-          std::string fitnessString;
-          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
-                                                                gaitControllerStatus_client, trajectoryMessage_pub,
-                                                                get_gait_evaluation_client);
-          printf("%s\n", fitnessString.c_str());
-          printf("Returned fitness (%lu): ", fitnessResult.size());
-          FILE * verifyLog = fopen("verifyLog.txt", "a");
-          fprintf(verifyLog, "\n    ");
-          bool first = true;
-          for (int j = 0; j < fitnessResult.size(); j++) {
-            printf("%.2f ", fitnessResult[j]);
-
-            if (first == false) fprintf(verifyLog, ", ");
-            fprintf(verifyLog, "%f",fitnessResult[j]);
-            if (first == true) first = false;
-          }
-          fclose(verifyLog);
-          printf("\n");
-
-        }
-        break;
-      }
-
-      // Test large robot (small control):
-      case 'y':
-      {
-        FILE * verifyLog = fopen("verifyLog.txt", "a");
-
-        std::vector<double> givenInd_phen = {185.0,   // stepLength
-                                              75.0,   // stepHeight
-                                              50.0,   // smoothing
-                                             0.275,   // frequency
-                                               NAN,   // speed
-                                               0.0,   // wagPhase
-                                              15.0,   // wagAmp_x
-                                              10.0,   // wagAmp_y
-                                              20.0,   // femurLength
-                                              76.0,   // tibiaLength
-                                              0.20};  // liftDuration
-
-        fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
-        fprintf(verifyLog, "Original: \n");
-        fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
-        fprintf(verifyLog, "Individual: ");
-        bool first = true;
-        for (int i = 0; i < givenInd_phen.size(); i++){
-          if (first == false) fprintf(verifyLog, ", ");
-          fprintf(verifyLog, "%f", givenInd_phen[i]);
-          if (first == true) first = false;
-        }
-
-        fprintf(verifyLog, "\n\n");
-        fclose(verifyLog);
-
-
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-
-        for (int i = 0; i < numberOfEvalsInTesting; i++) {
-
-          std::string fitnessString;
-          std::vector<float> fitnessResult = evaluateIndividual(givenInd_phen, &fitnessString, false,
-                                                                gaitControllerStatus_client, trajectoryMessage_pub,
-                                                                get_gait_evaluation_client);
-          printf("%s\n", fitnessString.c_str());
-          printf("Returned fitness (%lu): ", fitnessResult.size());
-          FILE * verifyLog = fopen("verifyLog.txt", "a");
-          fprintf(verifyLog, "\n    ");
-          bool first = true;
-          for (int j = 0; j < fitnessResult.size(); j++) {
-            printf("%.2f ", fitnessResult[j]);
-
-            if (first == false) fprintf(verifyLog, ", ");
-            fprintf(verifyLog, "%f",fitnessResult[j]);
-            if (first == true) first = false;
-          }
-          fclose(verifyLog);
-          printf("\n");
-
-        }
-        break;
-      }
 
       // Verify fitness:
       case 'v':
@@ -1238,106 +1258,6 @@ int main(int argc, char **argv){
         break;
       }
 
-      case 'q': {
-        printf("Testing inverse kinematics:\n");
-
-        std::vector<float> position;
-
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-        testLegPositionAll(std::vector<float>{80.0f,  0.0f, -450.0f}); // Test X
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f, 80.0f, -450.0f}); // Test Y
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -420.0f}); // Test Z
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-        setLegPositions(std::vector<float>{-50.0f,  50.0f, -450.0f,
-                                             0.0f,   0.0f, -450.0f,
-                                             0.0f,   0.0f, -450.0f,
-                                             0.0f,   0.0f, -450.0f});
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-        setLegPositions(std::vector<float>{  0.0f,   0.0f, -450.0f,
-                                            50.0f,  50.0f, -450.0f,
-                                             0.0f,   0.0f, -450.0f,
-                                             0.0f,   0.0f, -450.0f});
-        sleep(3);
-        testLegPositionAll(std::vector<float>{ 0.0f,  0.0f, -450.0f});
-        sleep(3);
-      }
-        break;
-
-      // Evo control - small:
-      case '1':
-        assert(individuals == 8);
-        evolveMorph = false; // Disable morphology evolution
-        morphology = "small";
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-
-      // Evo control - medium:
-      case '2':
-        assert(individuals == 8);
-        evolveMorph = false;
-        morphology = "medium";
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-
-      // Evo control - large:
-      case '3':
-        assert(individuals == 8);
-        evolveMorph = false;
-        morphology = "large";
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-
-      // CO-evo morph+cont without diversity:
-      case '4':
-        addDiversity = false;
-
-      // CO-evo morph+cont with diversity:
-      case '5':
-        evolveMorph = true;
-        currentIndividual = individuals-1;
-        fitnessFunctions.clear();
-        fitnessFunctions.emplace_back("MocapSpeed");
-        fitnessFunctions.emplace_back("Stability");
-        run_ea(argc, argv, ea, getEvoInfoString());
-        break;
-
-      // Enable instant fitness:
-      case 'i':
-        instantFitness = !instantFitness;
-
-        if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n"); else printf("Instant fitness evaluation now disabled!\n");
-        break;
-
-      // Reconnect to master:
-      case 'r':
-        printf("Reconnecting!\n");
-        rosConnect();
-        printf("Reconnected!\n");
-        break;
-
       // Test fitness noise:
       case 'n':
         {
@@ -1359,18 +1279,6 @@ int main(int argc, char **argv){
           break;
         }
 
-      // Enable servos:
-      case 'e':
-        enableServos();
-        printf("Servos enabled!\n");
-        break;
-
-      // Disable servos:
-      case 'd':
-        disableServos();
-        printf("Servos disabled!\n");
-        break;
-
       case '-':
         setLegLengths(0.0,0.0);
         printf("Shortest legs requested\n");
@@ -1381,14 +1289,7 @@ int main(int argc, char **argv){
         printf("Largest legs requested\n");
         break;
 
-      // Exit:
-      case '0':
-        printf("\tExiting program\n");
-        break;
-      default:
-        printf("\tUndefined choice\n");
-        break;
-    };
+
 
     printf("\n");
 
@@ -1397,6 +1298,6 @@ int main(int argc, char **argv){
   if (evoFitnessLog != NULL) fclose(evoFitnessLog);
   if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
   if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
-
+*/
   return 0;
 }
