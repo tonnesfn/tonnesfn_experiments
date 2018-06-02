@@ -13,9 +13,8 @@
 
 #include "dyret_common/Configuration.h"
 #include "dyret_common/Configure.h"
-#include "dyret_hardware/ActuatorBoardCommand.h"
-#include "dyret_hardware/ActuatorBoardState.h"
 #include "dyret_common/Pose.h"
+#include "dyret_common/State.h"
 
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
@@ -47,7 +46,7 @@ ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
 ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
-ros::Subscriber actuatorState_sub;
+ros::Subscriber dyretState_sub;
 ros::ServiceClient servoStatus_client;
 ros::Publisher actionMessages_pub;
 ros::Publisher positionCommand_pub;
@@ -55,8 +54,8 @@ ros::Publisher positionCommand_pub;
 FILE * evoFitnessLog;
 FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
-float currentFemurLength = 0.0;
-float currentTibiaLength = 0.0;
+double currentFemurLength = 0.0;
+double currentTibiaLength = 0.0;
 int evaluationTimeout = 10;
 float evaluationDistance = 1500.0;
 int currentIndividual;
@@ -332,19 +331,13 @@ void testLegPositionAll(std::vector<float> position){
   setLegPositions(positions);
 }
 
-void actuatorStateCallback(const dyret_hardware::ActuatorBoardState::ConstPtr& msg) {
-  if (msg->position.size() == !8){ ROS_ERROR("Distance array length is wrong, it is %lu!", msg->position.size()); }
-
-  currentFemurLength = (msg->position[0] + msg->position[2] + msg->position[4] + msg->position[6]) / 4.0;
-  currentTibiaLength = (msg->position[1] + msg->position[3] + msg->position[5] + msg->position[7]) / 4.0;
+void dyretStateCallback(const dyret_common::State::ConstPtr& msg) {
+  currentFemurLength = (msg->prismatic[0].position + msg->prismatic[2].position + msg->prismatic[4].position + msg->prismatic[6].position) / 4.0;
+  currentTibiaLength = (msg->prismatic[1].position + msg->prismatic[3].position + msg->prismatic[5].position + msg->prismatic[7].position) / 4.0;
 }
 
 bool legsAreLength(float femurLengths, float tibiaLengths){
-  if ( (fabs(femurLengths - currentFemurLength) < 0.5) && (fabs(tibiaLengths - currentTibiaLength) < 0.5) ){
-    return true;
-  } else {
-    return false;
-  }
+  return ( (fabs(femurLengths - currentFemurLength) < 3.0f) && (fabs(tibiaLengths - currentTibiaLength) < 3.0f) );
 }
 
 float getServoVoltage(){
@@ -609,7 +602,7 @@ void rosConnect(){
     gaitControllerStatus_client.shutdown();
     trajectoryMessage_pub.shutdown();
     poseCommand_pub.shutdown();
-    actuatorState_sub.shutdown();
+    dyretState_sub.shutdown();
   }
 
   rch = new rosConnectionHandler_t(argc, argv);
@@ -622,7 +615,7 @@ void rosConnect(){
   gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
   trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages", 1000);
   poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("/dyret/command", 10);
-  actuatorState_sub = rch->nodeHandle()->subscribe("/dyret/actuator_board/state", 1, actuatorStateCallback);
+  dyretState_sub = rch->nodeHandle()->subscribe("/dyret/state", 1, dyretStateCallback);
 
   waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
   waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
@@ -922,15 +915,18 @@ void run_individual(std::vector<double> givenIndividual){
 
 }
 
-void menu_walk(){
+void menu_demo(){
 
   std::string choice;
   for(;;) {
-    std::cout << "  Please choose one walk: (enter to go back)\n";
+    std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
     printf("    ss - Test small robot (small control)\n"
            "    ls - Test large robot (small control)\n"
-           "    ll - Test large robot (large control)\n");
+           "    ll - Test large robot (large control)\n"
+           "    ms - Request small morphology\n"
+           "    mm - Request medium morphology\n"
+           "    ml - Request large morphology\n");
     printf("\n> ");
 
     getline(std::cin, choice);
@@ -944,21 +940,117 @@ void menu_walk(){
         run_individual(individuals::largeRobotSmallControl);
       } else if (choice == "ll"){
         run_individual(individuals::largeRobotLargeControl);
+      } else if (choice == "ms"){
+        setLegLengths(0.0,0.0);
+        printf("Small morphology requested\n");
+      } else if (choice == "mm"){
+        setLegLengths(12.5,47.5);
+        printf("Medium morphology requested\n");
+      } else if (choice == "ml"){
+        setLegLengths(25.0,95.0);
+        printf("Large morphology requested\n");
       }
     }
   }
 };
 
-void evolve_control(std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
+void experiments_evolveControl(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
   assert(popSize == 8);
-  evolveMorph = evolveMorphology; // Disable morphology evolution
-  morphology = "givenMorphology";
+  addDiversity = givenAddDiversity;
+  evolveMorph = evolveMorphology;
+  morphology = givenMorphology;
   currentIndividual = popSize-1;
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
   fitnessFunctions.emplace_back("Stability");
   run_ea(argc_g, argv_g, expGui::ea, getEvoInfoString());
 };
+
+void experiments_verifyFitness(){
+  FILE * verifyLog = fopen("verifyLog.txt", "a");
+
+  std::vector<double> givenIndividual = {9.165965915e-01,
+                                         6.675732732e-01,
+                                         6.556332111e-01,
+                                         4.473016262e-01,
+                                         3.195006847e-01,
+                                         5.865598917e-01,
+                                         1.816536188e-01,
+                                         6.321113110e-01,
+                                         7.642766833e-01,
+                                         8.208969831e-01};
+
+  fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
+  fprintf(verifyLog, "Original: \n");
+  fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
+  fprintf(verifyLog, "Individual: ");
+  bool first = true;
+  for (int i = 0; i < givenIndividual.size(); i++){
+    if (first == false) fprintf(verifyLog, ", ");
+    fprintf(verifyLog, "%f", givenIndividual[i]);
+    if (first == true) first = false;
+  }
+  fclose(verifyLog);
+
+  std::vector<double> givenInd_phen = genToPhen(givenIndividual);
+  std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
+
+  printf("  GivenIndividual: ");
+  for (int i = 0; i < givenIndividual.size(); i++){
+    printf("%.4f, ", givenIndividual[i]);
+  }
+  printf("\n");
+
+  printf("  givenInd_phen: ");
+  for (int i = 0; i < givenInd_phen.size(); i++){
+    printf("%.4f, ", givenInd_phen[i]);
+  }
+  printf("\n");
+
+  fitnessFunctions.clear();
+  fitnessFunctions.emplace_back("MocapSpeed");
+  fitnessFunctions.emplace_back("Stability");
+
+  for (int i = 0; i < 5; i++) {
+
+    std::string fitnessString;
+    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
+                                                          gaitControllerStatus_client, trajectoryMessage_pub,
+                                                          get_gait_evaluation_client);
+    printf("%s\n", fitnessString.c_str());
+    printf("Returned fitness (%lu): ", fitnessResult.size());
+    FILE * verifyLog = fopen("verifyLog.txt", "a");
+    fprintf(verifyLog, "\n    ");
+    bool first = true;
+    for (int j = 0; j < fitnessResult.size(); j++) {
+      printf("%.2f ", fitnessResult[j]);
+
+      if (first == false) fprintf(verifyLog, ", ");
+      fprintf(verifyLog, "%f",fitnessResult[j]);
+      if (first == true) first = false;
+    }
+    fclose(verifyLog);
+    printf("\n");
+
+  }
+}
+
+void experiments_fitnessNoise(){
+  for (int i = 0; i < 100; i++){
+    resetGaitRecording(get_gait_evaluation_client);
+    startGaitRecording(get_gait_evaluation_client);
+
+    sleep(30);
+
+    std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client);
+    printf("\tRes: ");
+    for (int i = 0; i < gaitResults.size(); i++){
+      printf("%.5f", gaitResults[i]);
+      if (i != (gaitResults.size()-1)) printf(", "); else printf("\n");
+    }
+  }
+
+}
 
 void menu_experiments() {
   std::string choice;
@@ -969,7 +1061,9 @@ void menu_experiments() {
            "    cm - evolve control, medium morphology\n"
            "    cl - evolve control, large morphology\n"
            "    my - evolve cont+morph, with diversity\n"
-           "    mn - evolve cont+morph, w/o diversity\n");
+           "    mn - evolve cont+morph, w/o diversity\n"
+           "    vf - verify fitness on single individual\n"
+           "    vn - check noise in stability fitness\n");
     printf("\n> ");
 
     getline(std::cin, choice);
@@ -978,15 +1072,19 @@ void menu_experiments() {
       break;
     } else {
       if (choice == "cs") {
-        evolve_control("small", false, false);
+        experiments_evolveControl("small", false, false);
       } else if (choice == "cm") {
-        evolve_control("medium", false, false);
+        experiments_evolveControl("medium", false, false);
       } else if (choice == "cl") {
-        evolve_control("large", false, false);
+        experiments_evolveControl("large", false, false);
       } else if (choice == "my") {
-        evolve_control("", true, true);
+        experiments_evolveControl("", true, true);
       } else if (choice == "mn") {
-        evolve_control("", true, false);
+        experiments_evolveControl("", true, false);
+      } else if (choice == "vf"){
+        experiments_verifyFitness();
+      } else if (choice == "vn"){
+        experiments_fitnessNoise();
       }
     }
   }
@@ -998,6 +1096,7 @@ void menu_configure() {
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
     printf("    i - enable/disable instant fitness\n");
+    printf("    s - enable/disable stand testing\n");
     printf("    r - reconnect to ROS resources\n");
     printf("    e - enable servo torques\n");
     printf("    d - disable servo torques\n");
@@ -1013,6 +1112,15 @@ void menu_configure() {
         if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n");
         else
           printf("Instant fitness evaluation now disabled!\n");
+      } else if (choice == "s"){
+        if (robotOnStand == true){
+          printf("   RobotOnStand now disabled!\n");
+        } else {
+          printf("   RobotOnStand now enabled!\n");
+        }
+
+        robotOnStand = !robotOnStand;
+        break;
       } else if (choice == "r") {
         printf("Reconnecting!\n");
         rosConnect();
@@ -1113,8 +1221,11 @@ int main(int argc, char **argv){
   resetTrajectoryPos(trajectoryMessage_pub);
   resetGaitRecording(get_gait_evaluation_client);
 
+  addDiversity = true;
+  currentIndividual = popSize-1;
+
   std::map< std::string, boost::function<void()> > menu;
-  menu["walk"] = &menu_walk;
+  menu["demo"] = &menu_demo;
   menu["experiments"] = &menu_experiments;
   menu["configure"] = &menu_configure;
   menu["test"] = &menu_test;
@@ -1140,164 +1251,10 @@ int main(int argc, char **argv){
 
     menu[choice]();
   }
-/*
-
-  int inputChar;
-  do {
-    printf("1 - Evo control - small\n"                      // experiment
-           "2 - Evo control - medium\n"                     // experiment
-           "3 - Evo control - large\n"                      // experiment
-           "4 - CO-evo morph+cont (without diversity)\n"    // experiment
-           "5 - CO-evo morph+cont (with diversity)\n"       // experiment
-           "0 - Exit\n"                                     // exit (special)
-           "\n"
-           "q - Test inverse kinematics\n"                  // testing
-           "i - Enable/disable instant fitness\n"           // configure
-           "s - Enable/disable stand testing\n"             // configure
-           "m - Manual individual\n"                        // walk
-           "t - Test small robot (small control)\n"         // walk
-           "y - Test large robot (small control)\n"         // walk
-           "u - Test large robot (large control)\n"         // walk
-           "v - Verify fitness (gen)\n"                     // experiment
-           "- - Smallest legs\n"                            // joints
-           "+ - Largest legs\n"                             // joints
-           "n - Test fitness noise\n"                       // experiment
-           "e - Enable servos\n"                            // joints
-           "d - Disable servos\n"                           // joints
-           "r - Reconnect to master\n"                      // configure
-           "> ");
-
-    addDiversity = true;
-    currentIndividual = popSize-1;
-
-    inputChar = getchar();
-    std::cin.ignore(1000,'\n');
-
-    switch(inputChar){
-      // Enable/disable stand testing:
-      case 's':
-        if (robotOnStand == true){
-          printf("   RobotOnStand now disabled!\n");
-        } else {
-          printf("   RobotOnStand now enabled!\n");
-        }
-
-        robotOnStand = !robotOnStand;
-        break;
-
-
-      // Verify fitness:
-      case 'v':
-      {
-          FILE * verifyLog = fopen("verifyLog.txt", "a");
-
-          std::vector<double> givenIndividual = {9.165965915e-01,
-                                                 6.675732732e-01,
-                                                 6.556332111e-01,
-                                                 4.473016262e-01,
-                                                 3.195006847e-01,
-                                                 5.865598917e-01,
-                                                 1.816536188e-01,
-                                                 6.321113110e-01,
-                                                 7.642766833e-01,
-                                                 8.208969831e-01};
-
-          fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
-          fprintf(verifyLog, "Original: \n");
-          fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
-          fprintf(verifyLog, "Individual: ");
-          bool first = true;
-          for (int i = 0; i < givenIndividual.size(); i++){
-            if (first == false) fprintf(verifyLog, ", ");
-            fprintf(verifyLog, "%f", givenIndividual[i]);
-            if (first == true) first = false;
-          }
-          fclose(verifyLog);
-
-          std::vector<double> givenInd_phen = genToPhen(givenIndividual);
-          std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
-
-          printf("  GivenIndividual: ");
-          for (int i = 0; i < givenIndividual.size(); i++){
-            printf("%.4f, ", givenIndividual[i]);
-          }
-          printf("\n");
-
-          printf("  givenInd_phen: ");
-          for (int i = 0; i < givenInd_phen.size(); i++){
-            printf("%.4f, ", givenInd_phen[i]);
-          }
-          printf("\n");
-
-          fitnessFunctions.clear();
-          fitnessFunctions.emplace_back("MocapSpeed");
-          fitnessFunctions.emplace_back("Stability");
-
-          for (int i = 0; i < 5; i++) {
-
-            std::string fitnessString;
-            std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
-                                                                  gaitControllerStatus_client, trajectoryMessage_pub,
-                                                                  get_gait_evaluation_client);
-            printf("%s\n", fitnessString.c_str());
-            printf("Returned fitness (%lu): ", fitnessResult.size());
-            FILE * verifyLog = fopen("verifyLog.txt", "a");
-            fprintf(verifyLog, "\n    ");
-            bool first = true;
-            for (int j = 0; j < fitnessResult.size(); j++) {
-              printf("%.2f ", fitnessResult[j]);
-
-              if (first == false) fprintf(verifyLog, ", ");
-              fprintf(verifyLog, "%f",fitnessResult[j]);
-              if (first == true) first = false;
-            }
-            fclose(verifyLog);
-            printf("\n");
-
-          }
-        break;
-      }
-
-      // Test fitness noise:
-      case 'n':
-        {
-
-          for (int i = 0; i < 100; i++){
-              resetGaitRecording(get_gait_evaluation_client);
-              startGaitRecording(get_gait_evaluation_client);
-
-              sleep(30);
-
-              std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client);
-              printf("\tRes: ");
-              for (int i = 0; i < gaitResults.size(); i++){
-                  printf("%.5f", gaitResults[i]);
-                  if (i != (gaitResults.size()-1)) printf(", "); else printf("\n");
-              }
-          }
-
-          break;
-        }
-
-      case '-':
-        setLegLengths(0.0,0.0);
-        printf("Shortest legs requested\n");
-        break;
-
-      case '+':
-        setLegLengths(25.0,95.0);
-        printf("Largest legs requested\n");
-        break;
-
-
-
-    printf("\n");
-
-  } while (inputChar != '0');
 
   if (evoFitnessLog != NULL) fclose(evoFitnessLog);
   if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
   if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
-*/
+
   return 0;
 }
