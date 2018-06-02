@@ -53,13 +53,6 @@ target_link_libraries(expGui ${TBB_LIBRARIES})
 add_dependencies(expGui
   ${catkin_EXPORTED_TARGETS})
 
-add_executable(gazeboTest
-               src/gazeboTest.cpp
-              )
-target_link_libraries(gazeboTest ${catkin_LIBRARIES})
-add_dependencies(gazeboTest
-  ${catkin_EXPORTED_TARGETS})
-
 add_executable(hardwareTest
                src/hardwareTest.cpp
               )
