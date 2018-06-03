@@ -1,9 +1,10 @@
 #include <iostream>
-#include <stdio.h>
+#include <cstdio>
 #include <vector>
 #include <iostream>
 #include <algorithm>
 #include <iomanip>
+#include <chrono>
 
 #include "ros/ros.h"
 
@@ -56,7 +57,7 @@ FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 60;
+int evaluationTimeout = 250;
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
@@ -893,7 +894,7 @@ void resetEvoDir(){
   if(remove( "currentevodir" ) != 0) printf("Removed currentevodir file\n");
 }
 
-void run_individual(std::vector<double> givenIndividual){
+void run_individual(std::vector<double> givenPhenotype){
 
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
@@ -902,7 +903,7 @@ void run_individual(std::vector<double> givenIndividual){
   for (int i = 0; i < numberOfEvalsInTesting; i++) {
 
     std::string fitnessString;
-    std::vector<float> fitnessResult = evaluateIndividual(givenIndividual, &fitnessString, false,
+    std::vector<float> fitnessResult = evaluateIndividual(givenPhenotype, &fitnessString, false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
     printf("%s\n", fitnessString.c_str());
@@ -1058,6 +1059,66 @@ void experiments_fitnessNoise(){
       if (i != (gaitResults.size()-1)) printf(", "); else printf("\n");
     }
   }
+}
+
+void experiments_randomSearch(){
+
+  fitnessFunctions.clear();
+  fitnessFunctions.emplace_back("MocapSpeed");
+  fitnessFunctions.emplace_back("Stability");
+
+  time_t t = time(0);   // get time now
+  struct tm * now = localtime( & t );
+
+  char fileNameBuffer[120];
+  sprintf(fileNameBuffer,"%s/catkin_ws/customLogs/randomSearch/randomSearch_%04u%02u%02u%02u%02u%02u.csv", getenv("HOME"), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+
+  FILE * randomSearchLog = fopen(fileNameBuffer, "a");
+  if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+                         else fprintf(randomSearchLog, "Random search (hardware): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+  fclose(randomSearchLog);
+
+  for (int i = 0; i < 3; i++){
+
+    // Generate random individual:
+    std::vector<double> randomIndividual;
+    for (int j = 0; j < 10; j++) randomIndividual.emplace_back(static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+
+    // Log individual
+    randomSearchLog = fopen(fileNameBuffer, "a");
+    fprintf(randomSearchLog, "  Individual: ");
+    bool first = true;
+    for (int i = 0; i < randomIndividual.size(); i++){
+      if (first == false) fprintf(randomSearchLog, ", ");
+      fprintf(randomSearchLog, "%f", randomIndividual[i]);
+      if (first == true) first = false;
+    }
+
+    fclose(randomSearchLog);
+
+    std::string fitnessString;
+    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(randomIndividual), &fitnessString, false,
+                                                          gaitControllerStatus_client, trajectoryMessage_pub,
+                                                          get_gait_evaluation_client);
+
+    printf("%s\n", fitnessString.c_str());
+    printf("Returned fitness (%lu): ", fitnessResult.size());
+    randomSearchLog = fopen(fileNameBuffer, "a");
+    fprintf(randomSearchLog, "\n    Fitness: ");
+    first = true;
+    for (int j = 0; j < fitnessResult.size(); j++) {
+      printf("%.2f ", fitnessResult[j]);
+
+      if (first == false) fprintf(randomSearchLog, ", ");
+      fprintf(randomSearchLog, "%f",fitnessResult[j]);
+      if (first == true) first = false;
+    }
+    fprintf(randomSearchLog, "\n");
+    fclose(randomSearchLog);
+    printf("\n");
+
+  }
+
 
 }
 
@@ -1071,6 +1132,7 @@ void menu_experiments() {
            "    cl - evolve control, large morphology\n"
            "    my - evolve cont+morph, with diversity\n"
            "    mn - evolve cont+morph, w/o diversity\n"
+           "    ra - random search\n"
            "    vf - verify fitness on single individual\n"
            "    vn - check noise in stability fitness\n");
     printf("\n> ");
@@ -1094,6 +1156,8 @@ void menu_experiments() {
         experiments_verifyFitness();
       } else if (choice == "vn"){
         experiments_fitnessNoise();
+      } else if (choice ==  "ra"){
+        experiments_randomSearch();
       }
     }
   }
