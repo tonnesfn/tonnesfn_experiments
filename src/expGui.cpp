@@ -413,6 +413,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
 
+  // Code to stop for cooldown at the start of each new generation:
   if (currentIndividual == popSize){
     currentIndividual = 0;
     getMaxServoTemperature(true);
@@ -474,6 +475,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
 
   setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6], phenoType[7], phenoType[10]);
 
+  // Set leg lengths and wait until they reach the correct length
   setLegLengths(phenoType[8], phenoType[9]);
   int secPassed = 0;
   while (!legsAreLength(phenoType[8], phenoType[9])) {
@@ -513,7 +515,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
   }
 
-  trajectoryDistances[0] = evaluationDistance;
+  trajectoryDistances[0] = 0.0;
   trajectoryTimeouts[0] = evaluationTimeout;
 
   //resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
