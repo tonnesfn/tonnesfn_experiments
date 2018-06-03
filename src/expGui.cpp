@@ -413,34 +413,35 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
 
-  // Code to stop for cooldown at the start of each new generation:
-  if (currentIndividual == popSize){
-    currentIndividual = 0;
-    getMaxServoTemperature(true);
-    printf("Cooldown to 50C? (y/n) > ");
+  if (ros::Time::isSystemTime()) {
+    // Code to stop for cooldown at the start of each new generation:
+    if (currentIndividual == popSize) {
+      currentIndividual = 0;
+      getMaxServoTemperature(true);
+      printf("Cooldown to 50C? (y/n) > ");
 
-    char choice;
-    scanf(" %c", &choice);
+      char choice;
+      scanf(" %c", &choice);
 
-    if (choice == 'y'){
-      disableServos();
-      long long int currentTime = getMs();
-      printf("00.0 ");
-      while (getMaxServoTemperature(true) > 50){
-        sleep(10);
-        printf("%3.1f: ",((getMs() - currentTime)/1000.0)/60.0);
+      if (choice == 'y') {
+        disableServos();
+        long long int currentTime = getMs();
+        printf("00.0 ");
+        while (getMaxServoTemperature(true) > 50) {
+          sleep(10);
+          printf("%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
+        }
+
+        std::cout << "Press enter to enable servos";
+        std::cin.ignore();
+        std::cin.ignore();
+
+        enableServos();
+
+        std::cout << "Press enter to continue evolution";
+        std::cin.ignore();
       }
-
-      std::cout << "Press enter to enable servos";
-      std::cin.ignore();
-      std::cin.ignore();
-
-      enableServos();
-
-      std::cout << "Press enter to continue evolution";
-      std::cin.ignore();
     }
-
   }
 
   printf("%03u: Evaluating stepLength %.2f, "
@@ -467,10 +468,12 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
          phenoType[9],
          phenoType[10]);
 
-  // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
-  if (getMaxServoTemperature() > 70.0){
-    printf("  Temperature is too high at %.1f\n", getMaxServoTemperature());
-    return std::vector<float>();
+  if (ros::Time::isSystemTime()) { // Only check temperature in real world
+    // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
+    if (getMaxServoTemperature() > 70.0) {
+      printf("  Temperature is too high at %.1f\n", getMaxServoTemperature());
+      return std::vector<float>();
+    }
   }
 
   setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6], phenoType[7], phenoType[10]);
@@ -1227,6 +1230,12 @@ int main(int argc, char **argv){
 
   addDiversity = true;
   currentIndividual = popSize-1;
+
+  if (ros::Time::isSimTime()){
+    printf("Currently running in simulation mode\n");
+  } else {
+    printf("Currently running in hardware mode\n");
+  }
 
   std::map< std::string, boost::function<void()> > menu;
   menu["demo"] = &menu_demo;
