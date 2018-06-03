@@ -56,7 +56,7 @@ FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 10;
+int evaluationTimeout = 60;
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
@@ -495,6 +495,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > evaluationTimeout) {
+      printf("Timed out at first evaluation (%d seconds)\n", secPassed);
       return std::vector<float>();
     }
   }
@@ -523,7 +524,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > evaluationTimeout) return std::vector<float>();
+    if (secPassed++ > evaluationTimeout){
+      printf("Timed out at second evaluation (%d seconds)\n", secPassed);
+      return std::vector<float>();
+    }
   }
 
   std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
@@ -1204,8 +1208,6 @@ int main(int argc, char **argv){
 
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
-
-  evaluationTimeout = 10; // 10 seconds timeout
 
   evoFitnessLog = NULL;
   evoParamLog_gen = NULL;
