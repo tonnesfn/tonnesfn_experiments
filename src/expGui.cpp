@@ -976,69 +976,62 @@ void experiments_evolveControl(const std::string givenMorphology, bool evolveMor
   run_ea(argc_g, argv_g, expGui::ea, getEvoInfoString());
 };
 
+std::string createExperimentLogDirectory(std::string experimentName){
+  char customLogsPath[120];
+  sprintf(customLogsPath,"%s/catkin_ws/customLogs", getenv("HOME"));
+  mkdir(customLogsPath, 0700);
+  char experimentLogsPath[120];
+  sprintf(experimentLogsPath,"%s/catkin_ws/customLogs/%s", getenv("HOME"), experimentName.c_str());
+  mkdir(experimentLogsPath, 0700);
+
+  time_t t = time(0);   // get time now
+  struct tm * now = localtime( & t );
+
+  char logFilePath[120];
+  sprintf(logFilePath,"%s/%s_%04u%02u%02u%02u%02u%02u.csv", experimentLogsPath, experimentName.c_str(), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+
+  return std::string(logFilePath);
+}
+
 void experiments_verifyFitness(){
-  FILE * verifyLog = fopen("verifyLog.txt", "a");
+  currentIndividual = 0;
 
-  std::vector<double> givenIndividual = {9.165965915e-01,
-                                         6.675732732e-01,
-                                         6.556332111e-01,
-                                         4.473016262e-01,
-                                         3.195006847e-01,
-                                         5.865598917e-01,
-                                         1.816536188e-01,
-                                         6.321113110e-01,
-                                         7.642766833e-01,
-                                         8.208969831e-01};
+  std::cout << "How many individuals do you want to test? >";
 
-  fprintf(verifyLog, "Run: XXXXX, Percentile: XX%%\n");
-  fprintf(verifyLog, "Original: \n");
-  fprintf(verifyLog, "Voltage: %.10f\n", getServoVoltage());
-  fprintf(verifyLog, "Individual: ");
-  bool first = true;
-  for (int i = 0; i < givenIndividual.size(); i++){
-    if (first == false) fprintf(verifyLog, ", ");
-    fprintf(verifyLog, "%f", givenIndividual[i]);
-    if (first == true) first = false;
+  int numberOfTests;
+  std::cin >> numberOfTests;
+
+  std::string verifyLogPath = createExperimentLogDirectory("verifyFitness");
+
+  FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
+  if (verifyLog == NULL && errno == 2){
+    ROS_ERROR("randomSearchLog directory not found!\n");
   }
   fclose(verifyLog);
-
-  std::vector<double> givenInd_phen = genToPhen(givenIndividual);
-  std::vector<double> givenInd_gen = phenToGen(givenInd_phen);
-
-  printf("  GivenIndividual: ");
-  for (int i = 0; i < givenIndividual.size(); i++){
-    printf("%.4f, ", givenIndividual[i]);
-  }
-  printf("\n");
-
-  printf("  givenInd_phen: ");
-  for (int i = 0; i < givenInd_phen.size(); i++){
-    printf("%.4f, ", givenInd_phen[i]);
-  }
-  printf("\n");
 
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
   fitnessFunctions.emplace_back("Stability");
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < numberOfTests; i++) {
 
     std::string fitnessString;
-    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(givenIndividual), &fitnessString, false,
+    std::vector<float> fitnessResult = evaluateIndividual(individuals::smallRobotSmallControl, &fitnessString, false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
     printf("%s\n", fitnessString.c_str());
     printf("Returned fitness (%lu): ", fitnessResult.size());
-    FILE * verifyLog = fopen("verifyLog.txt", "a");
-    fprintf(verifyLog, "\n    ");
-    bool first = true;
+    FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
+
+    if (i > 0) fprintf(verifyLog, "\n");
+
     for (int j = 0; j < fitnessResult.size(); j++) {
       printf("%.2f ", fitnessResult[j]);
 
-      if (first == false) fprintf(verifyLog, ", ");
+      if (j > 0) fprintf(verifyLog, ", ");
       fprintf(verifyLog, "%f",fitnessResult[j]);
-      if (first == true) first = false;
     }
+
     fclose(verifyLog);
     printf("\n");
 
@@ -1061,21 +1054,16 @@ void experiments_fitnessNoise(){
   }
 }
 
-std::string createExperimentLogDirectory(std::string experimentName){
-  char customLogsPath[120];
-  sprintf(customLogsPath,"%s/catkin_ws/customLogs", getenv("HOME"));
-  mkdir(customLogsPath, 0700);
-  char experimentLogsPath[120];
-  sprintf(experimentLogsPath,"%s/catkin_ws/customLogs/%s", getenv("HOME"), experimentName.c_str());
-  mkdir(experimentLogsPath, 0700);
+std::vector<double> getRandomIndividual(){
+  std::vector<double> individual;
 
-  time_t t = time(0);   // get time now
-  struct tm * now = localtime( & t );
+  do{
+    for (int j = 0; j < 10; j++) individual.emplace_back(static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+  } while (((((individual[0]*300.0) * ((individual[6]*2.0)*60.0)) / 1000.0) > 10.0) // Speed has to be below 10m/min
+          || ((individual[0]*300.0) < 5.0) // StepLength has to be above 5mm
+          || ((individual[6]*2.0) < 0.1)); // Frequency has to be above 0.1
 
-  char logFilePath[120];
-  sprintf(logFilePath,"%s/%s_%04u%02u%02u%02u%02u%02u.csv", experimentLogsPath, experimentName.c_str(), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
-
-  return std::string(logFilePath);
+  return individual;
 }
 
 void experiments_randomSearch(){
@@ -1108,8 +1096,7 @@ void experiments_randomSearch(){
   for (int i = 0; i < numberOfTests; i++){
 
     // Generate random individual:
-    std::vector<double> randomIndividual;
-    for (int j = 0; j < 10; j++) randomIndividual.emplace_back(static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+    std::vector<double> randomIndividual = getRandomIndividual();
 
     // Log individual
     randomSearchLog = fopen(logFilePath.c_str(), "a");
@@ -1311,7 +1298,7 @@ int main(int argc, char **argv){
 
   rosConnect();
 
-  ros::AsyncSpinner spinner(2);
+  ros::AsyncSpinner spinner(1);
   spinner.start();
 
   std::string evoInfo = "testInfo";
