@@ -1,6 +1,9 @@
 <launch>
+
+  <arg name="realtime" default="false" />
+
   <include file="$(find dyret_gazebo)/launch/empty_world.launch">
-    <arg name="world" value="$(find tonnesfn_experiments)/world/fast.world" />
+    <arg name="world" value="$(find tonnesfn_experiments)/world/fast.world" unless="$(arg realtime)" />
   </include>
 
   <include file="$(find dyret_controller)/launch/fullController.launch" />
