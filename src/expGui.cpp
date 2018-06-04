@@ -57,7 +57,7 @@ FILE * evoParamLog_gen;
 FILE * evoParamLog_phen;
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 250;
+int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
@@ -500,7 +500,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > evaluationTimeout) {
+    if (secPassed++ > (evaluationTimeout + 60)) {
       printf("Timed out at first evaluation (%d seconds)\n", secPassed);
       return std::vector<float>();
     }
@@ -530,7 +530,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   secPassed = 0;
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
-    if (secPassed++ > evaluationTimeout){
+    if (secPassed++ > (evaluationTimeout + 60)) {
       printf("Timed out at second evaluation (%d seconds)\n", secPassed);
       return std::vector<float>();
     }
@@ -1061,7 +1061,31 @@ void experiments_fitnessNoise(){
   }
 }
 
+std::string createExperimentLogDirectory(std::string experimentName){
+  char customLogsPath[120];
+  sprintf(customLogsPath,"%s/catkin_ws/customLogs", getenv("HOME"));
+  mkdir(customLogsPath, 0700);
+  char experimentLogsPath[120];
+  sprintf(experimentLogsPath,"%s/catkin_ws/customLogs/%s", getenv("HOME"), experimentName.c_str());
+  mkdir(experimentLogsPath, 0700);
+
+  time_t t = time(0);   // get time now
+  struct tm * now = localtime( & t );
+
+  char logFilePath[120];
+  sprintf(logFilePath,"%s/%s_%04u%02u%02u%02u%02u%02u.csv", experimentLogsPath, experimentName.c_str(), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+
+  return std::string(logFilePath);
+}
+
 void experiments_randomSearch(){
+
+  currentIndividual = 0;
+
+  std::cout << "How many individuals do you want to test? >";
+
+  int numberOfTests;
+  std::cin >> numberOfTests;
 
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
@@ -1070,22 +1094,25 @@ void experiments_randomSearch(){
   time_t t = time(0);   // get time now
   struct tm * now = localtime( & t );
 
-  char fileNameBuffer[120];
-  sprintf(fileNameBuffer,"%s/catkin_ws/customLogs/randomSearch/randomSearch_%04u%02u%02u%02u%02u%02u.csv", getenv("HOME"), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+  std::string logFilePath = createExperimentLogDirectory("randomSearch");
 
-  FILE * randomSearchLog = fopen(fileNameBuffer, "a");
+  FILE * randomSearchLog = fopen(logFilePath.c_str(), "a");
+  if (randomSearchLog == NULL && errno == 2){
+    ROS_ERROR("randomSearchLog directory not found!\n");
+  }
+
   if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
                          else fprintf(randomSearchLog, "Random search (hardware): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
   fclose(randomSearchLog);
 
-  for (int i = 0; i < 3; i++){
+  for (int i = 0; i < numberOfTests; i++){
 
     // Generate random individual:
     std::vector<double> randomIndividual;
     for (int j = 0; j < 10; j++) randomIndividual.emplace_back(static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
 
     // Log individual
-    randomSearchLog = fopen(fileNameBuffer, "a");
+    randomSearchLog = fopen(logFilePath.c_str(), "a");
     fprintf(randomSearchLog, "  Individual: ");
     bool first = true;
     for (int i = 0; i < randomIndividual.size(); i++){
@@ -1103,7 +1130,7 @@ void experiments_randomSearch(){
 
     printf("%s\n", fitnessString.c_str());
     printf("Returned fitness (%lu): ", fitnessResult.size());
-    randomSearchLog = fopen(fileNameBuffer, "a");
+    randomSearchLog = fopen(logFilePath.c_str(), "a");
     fprintf(randomSearchLog, "\n    Fitness: ");
     first = true;
     for (int j = 0; j < fitnessResult.size(); j++) {
@@ -1319,7 +1346,11 @@ int main(int argc, char **argv){
     getline(std::cin, choice);
     std::cin.clear();
     if (choice.empty() == true){
+      spinner.stop();
       ros::shutdown();
+      if (evoFitnessLog != NULL) fclose(evoFitnessLog);
+      if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
+      if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
       exit(0);
     } else if(menu.find(choice) == menu.end()) {
       printf("Unknown choice!\n");
@@ -1329,9 +1360,4 @@ int main(int argc, char **argv){
     menu[choice]();
   }
 
-  if (evoFitnessLog != NULL) fclose(evoFitnessLog);
-  if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
-  if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
-
-  return 0;
 }
