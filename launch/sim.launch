@@ -1,4 +1,7 @@
 <launch>
-  <include file="$(find dyret_gazebo)/launch/empty_world.launch" />
+  <include file="$(find dyret_gazebo)/launch/empty_world.launch">
+    <arg name="world" value="$(find tonnesfn_experiments)/world/fast.world" />
+  </include>
+
   <include file="$(find dyret_controller)/launch/fullController.launch" />
 </launch>
