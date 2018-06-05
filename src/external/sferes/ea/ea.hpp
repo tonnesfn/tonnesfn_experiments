@@ -200,23 +200,6 @@ namespace sferes {
         _fit_proto = fit;
       }
 
-      void printEvoInfo(std::string evoInfo){
-        FILE * evoInfoFile;
-
-        std::string filePath = _res_dir;
-        filePath.append("/evoInfo.txt");
-
-        evoInfoFile = fopen(filePath.c_str(), "a");
-
-        auto time = std::chrono::system_clock::now();
-        std::time_t end_time = std::chrono::system_clock::to_time_t(time);
-
-        fprintf(evoInfoFile,"%s", std::ctime(&end_time));
-        fprintf(evoInfoFile, "%s", evoInfo.c_str());
-        fclose(evoInfoFile);
-
-      }
-
       void saveCurrentDir(){
         FILE * currentDirFile;
         currentDirFile = fopen("currentEvoDir", "w");
@@ -224,12 +207,16 @@ namespace sferes {
         fclose(currentDirFile);
       }
 
-      void run(std::string evoInfo, const std::string& exp_name = "") {
+      void run(std::string logPath, const std::string& exp_name = "") {
         dbg::trace trace("ea", DBG_HERE);
         _exp_name = exp_name;
         _make_res_dir();
-        saveCurrentDir();
-        printEvoInfo(evoInfo);
+        //saveCurrentDir();
+
+        FILE *fp = fopen("generation", "w");
+        fprintf(fp,"-1");
+        fclose(fp);
+
         _set_status("running");
         random_pop();
         update_stats();
@@ -244,7 +231,7 @@ namespace sferes {
       void resume(const std::string& fname) {
         dbg::trace trace("ea", DBG_HERE);
         _make_res_dir();
-        saveCurrentDir();
+        //saveCurrentDir();
         _set_status("resumed");
         if (boost::fusion::find<stat::State<Phen, Params> >(_stat) == boost::fusion::end(_stat)) {
           std::cout<<"WARNING: no State found in stat_t, cannot resume" << std::endl;

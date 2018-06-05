@@ -110,9 +110,9 @@ namespace sferes {
           this->_data[6] = misc::rand<float>();
         }
 
-        FILE *fp = fopen("random.csv", "a");
+        /*FILE *fp = fopen("random.csv", "a");
         fprintf(fp, "%.4f, %.4f\n", this->_data[0], this->_data[6]);
-        fclose(fp);
+        fclose(fp);*/
 
         _check_invariant();
       }

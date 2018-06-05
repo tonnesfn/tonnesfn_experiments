@@ -123,7 +123,7 @@ namespace sferes {
                      char **argv,
                      Ea& ea,
                      const typename Ea::phen_t::fit_t& fit_proto,
-                     std::string evoInfo,
+                     std::string logFilePath,
                      const boost::program_options::options_description& add_opts =
                        boost::program_options::options_description(),
                      bool init_rand = true) {
@@ -183,7 +183,7 @@ namespace sferes {
       ea.write();
       std::cout<<"final state written -- "<<ea.gen()<<std::endl;
     } else {
-      ea.run(evoInfo, argv[0]);
+      ea.run(logFilePath, argv[0]);
       ea.write();
       std::cout<<"final state written -- "<<ea.gen()<<std::endl;
     }
@@ -193,11 +193,11 @@ namespace sferes {
   static void run_ea(int argc,
                      char **argv,
                      Ea& ea,
-                     std::string evoInfo,
+                     std::string logFilePath,
                      const boost::program_options::options_description& add_opts =
                        boost::program_options::options_description(),
                      bool init_rand = true) {
-    run_ea(argc, argv, ea, typename Ea::phen_t::fit_t(), evoInfo, add_opts, init_rand);
+    run_ea(argc, argv, ea, typename Ea::phen_t::fit_t(), logFilePath, add_opts, init_rand);
   }
 
 }

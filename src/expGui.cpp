@@ -52,14 +52,13 @@ ros::ServiceClient servoStatus_client;
 ros::Publisher actionMessages_pub;
 ros::Publisher positionCommand_pub;
 
-FILE * evoFitnessLog;
-FILE * evoParamLog_gen;
-FILE * evoParamLog_phen;
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
 int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
+
+std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
 
@@ -82,31 +81,6 @@ int argc_g;
 char **argv_g;
 
 std::vector<std::string> fitnessFunctions;
-
-FILE* getEvoPathFileHandle(std::string fileName, std::string givenHeader = ""){
-  std::string line;
-  std::ifstream myfile ("currentEvoDir");
-  if (myfile.is_open()) {
-    getline (myfile,line);
-    myfile.close();
-  } else {
-      printf("Unable to open currentEvoDir file");
-      return fopen(fileName.c_str(), "w+");
-  }
-
-  line.append("/");
-  line.append(fileName.c_str());
-
-  std::ifstream infile(line.c_str());
-
-  FILE * handleToReturn = fopen(line.c_str(), "a+");
-
-  if (!infile.good() && !givenHeader.empty()){
-    fprintf(handleToReturn, "%s\n", givenHeader.c_str());
-  }
-
-  return handleToReturn;
-}
 
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
   if (givenServoConfigService.call(givenCall))  {
@@ -169,13 +143,13 @@ void disableServos(){
 void startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
   dyret_controller::GetGaitEvaluation srv;
   srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_start;
-  if (!get_gait_evaluation_client.call(srv)) printf("Error while calling GaitRecording service with t_start\n");
+  if (!get_gait_evaluation_client.call(srv)) ROS_ERROR("Error while calling GaitRecording service with t_start\n");
 }
 
 void resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
   dyret_controller::GetGaitEvaluation srv;
   srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_resetStatistics;
-  if (!get_gait_evaluation_client.call(srv)) printf("Error while calling GaitRecording service with t_resetStatistics\n");
+  if (!get_gait_evaluation_client.call(srv)) ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics\n");
 }
 
 std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
@@ -187,7 +161,7 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client)
   if (get_gait_evaluation_client.call(srv)) {
     vectorToReturn = srv.response.results;
   } else {
-      printf("Error while calling GaitRecording service with t_getResults!\n");
+    ROS_ERROR("Error while calling GaitRecording service with t_getResults!\n");
   }
 
   return vectorToReturn;
@@ -377,39 +351,13 @@ float getMaxServoTemperature(bool printAllTemperatures = false){
 }
 
 std::vector<float> evaluateIndividual(std::vector<double> phenoType,
-                                      std::string* fitnessString,
                                       bool speedAspectLocked,
                                       ros::ServiceClient gaitControllerStatus_client,
                                       ros::Publisher trajectoryMessage_pub,
                                       ros::ServiceClient get_gait_evaluation_client) {
 
-  currentIndividual++;
-
-  // (Return empty fitness to test)
+  // (Return random fitness to test)
   if (instantFitness == true) {
-    printf("%03u: Evaluating stepLength %.2f, "
-               "stepHeight %.2f, "
-               "smoothing %.2f, "
-               "frequency: %.2f, "
-               "speed: %.2f, "
-               "wagPhase: %.2f, "
-               "wagAmplitude_x: %.2f, "
-               "wagAmplitude_y: %.2f,"
-               "femurLength: %.2f,"
-               "tibiaLength: %.2f,"
-               "liftDuration: %.2f\n",
-           currentIndividual,
-           phenoType[0],
-           phenoType[1],
-           phenoType[2],
-           phenoType[3],
-           phenoType[4],
-           phenoType[5],
-           phenoType[6],
-           phenoType[7],
-           phenoType[8],
-           phenoType[9],
-           phenoType[10]);
     return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
@@ -442,6 +390,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
         std::cout << "Press enter to continue evolution";
         std::cin.ignore();
       }
+    }
+  } else {
+    if (currentIndividual++ == popSize){
+      currentIndividual = 0;
     }
   }
 
@@ -557,12 +509,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   float fitness_current = (gaitResultsForward[4] + gaitResultsReverse[4]) / 2.0;
   float fitness_stability = (gaitResultsForward[6] + gaitResultsReverse[6]) / 2.0;
   float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
-/*
-  float fitness_inferredSpeed = gaitResultsForward[0];
-  float fitness_current = gaitResultsForward[4];
-  float fitness_stability = gaitResultsForward[3] + (gaitResultsForward[2] / 50.0);
-  float fitness_mocapSpeed = gaitResultsForward[5];
-*/
 
   // Inferred speed:
   if (isFitnessObjective("InferredSpeed")) {
@@ -585,18 +531,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     currentFitnessIndex++;
   }
 
-  std::stringstream ss;
-
-  ss << currentIndividual << ",";
-
-  for (int i = 0; i < gaitResultsForward.size(); i++) {
-    ss << gaitResultsForward[i] << "," << gaitResultsReverse[i] << ",";
-    //ss << gaitResultsForward[i] << ",";
-  }
-
-  ss << fitness_mocapSpeed << "," << fitness_stability << "," << fitness_current;
-  *fitnessString = ss.str();
-
   return fitness;
 
 }
@@ -615,6 +549,10 @@ void rosConnect(){
     dyretState_sub.shutdown();
   }
 
+  // Reconnect at startup to ensure time to find simulation ros::Timer
+  rch = new rosConnectionHandler_t(argc, argv);
+  sleep(1);
+  delete rch;
   rch = new rosConnectionHandler_t(argc, argv);
 
   actionMessages_pub = rch->nodeHandle()->advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
@@ -731,19 +669,19 @@ public:
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
-    std::string fitnessDescription_gen  = "id,stepLength,stepHeight,smoothing,wagPhase,wagAmplitude_x,wagAmplitude_y,frequency,femurLength,tibiaLength,liftDuration";
-    std::string fitnessDescription_phen = "id,stepLength,stepHeight,smoothing,frequency,speed,wagPhase,wagAmplitude_x,wagAmplitude_y,femurLength,tibiaLength,liftDuration";
+    FILE * evoLog = fopen(evoLogPath.c_str(), "a");
+    if (evoLog == NULL){
+      ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
+    }
 
     bool validSolution;
     std::vector<float> fitnessResult;
 
-    std::string fitnessString;
-
     do{
         validSolution = true;
-        fitnessResult = evaluateIndividual(individualParameters, &fitnessString, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
+        fitnessResult = evaluateIndividual(individualParameters, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
 
-        printf("  Fitness received: ");
+        printf("    Fitness received: ");
         for (int i = 0; i < fitnessResult.size(); i++) printf("%.2f ", fitnessResult[i]);
         printf("\n");
 
@@ -800,45 +738,34 @@ public:
         this->_objs[i] = fitnessResult[i];
     }
 
-    // Do logging:
-    if (evoParamLog_gen == NULL){
-      evoParamLog_gen = getEvoPathFileHandle("evoParamLog_gen.csv", fitnessDescription_gen);
+    FILE * genFile = fopen("generation", "r");
+
+    int generation;
+    fscanf(genFile, "%d", &generation);
+    fclose(genFile);
+    fprintf(evoLog, "  Individual %d, Generation %d\n", currentIndividual, generation);
+
+    fprintf(evoLog, "    Genotype: ");
+    for (int i = 0; i < individualData.size(); i++){
+      if (i > 0) fprintf(evoLog, ", ");
+      fprintf(evoLog, "%.2f", individualData[i]);
     }
 
-    fprintf(evoParamLog_gen, "%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
-                currentIndividual,
-                ind.data(0), ind.data(1), ind.data(2), ind.data(3),
-                ind.data(4), ind.data(5), ind.data(6), ind.data(7),
-                ind.data(8), ind.data(9));
-    fflush(evoParamLog_gen);
-
-    if (evoParamLog_phen == NULL){
-        evoParamLog_phen = getEvoPathFileHandle("evoParamLog_phen.csv", fitnessDescription_phen);
+    fprintf(evoLog, "\n    Phenotype: ");
+    for (int i = 0; i < individualParameters.size(); i++){
+      if (i > 0) fprintf(evoLog, ", ");
+      fprintf(evoLog, "%.2f", individualParameters[i]);
     }
 
-    fprintf(evoParamLog_phen, "%d,", currentIndividual);
-    for (int i = 0; i < individualParameters.size(); i++) if(i != (individualParameters.size()-1)) fprintf(evoParamLog_phen, "%f,", individualParameters[i]); else fprintf(evoParamLog_phen, "%f\n", individualParameters[i]);
-    fflush(evoParamLog_phen);
-
-    std::string fitnessDescription = "Id,"
-                                     "Speed_I (F),Speed_I (R),"
-                                     "angVel (F),angVel (R),"
-                                     "linAcc (F),linAcc(R),"
-                                     "orientation (F),orientation(R),"
-                                     "efficiency (F),efficiency (R),"
-                                     "speed_m (F),speed_m (R),"
-                                     "stability (F),stability (R),"
-                                     "speed_m (T),"
-                                     "stability (T),"
-                                     "current (T)";
-    //std::string fitnessDescription = "Id, Speed_I, angVel, linAcc, stability, efficiency, speed_m, speed_m (T), stability (T), current (T)";
-
-    if (evoFitnessLog == NULL){
-        evoFitnessLog = getEvoPathFileHandle("evoFitnessLog.csv", fitnessDescription);
+    fprintf(evoLog, "\n    Fitness result: ");
+    for (int i = 0; i < fitnessResult.size(); i++){
+      if (i > 0) fprintf(evoLog, ", ");
+      fprintf(evoLog, "%.2f", fitnessResult[i]);
     }
+    fprintf(evoLog, "\n");
 
-    fprintf(evoFitnessLog, "%s\n", fitnessString.c_str());
-    fflush(evoFitnessLog);
+    fclose(evoLog);
+
   }
 };
 
@@ -890,10 +817,6 @@ std::string getEvoInfoString(){
   return stringStream.str();
 }
 
-void resetEvoDir(){
-  if(remove( "currentevodir" ) != 0) printf("Removed currentevodir file\n");
-}
-
 void run_individual(std::vector<double> givenPhenotype){
 
   fitnessFunctions.clear();
@@ -902,27 +825,11 @@ void run_individual(std::vector<double> givenPhenotype){
 
   for (int i = 0; i < numberOfEvalsInTesting; i++) {
 
-    std::string fitnessString;
-    std::vector<float> fitnessResult = evaluateIndividual(givenPhenotype, &fitnessString, false,
+    std::vector<float> fitnessResult = evaluateIndividual(givenPhenotype, false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
-    printf("%s\n", fitnessString.c_str());
     printf("Returned fitness (%lu): ", fitnessResult.size());
-    FILE * verifyLog = fopen("verifyLog.txt", "a");
-    fprintf(verifyLog, "\n    ");
-    bool first = true;
-    for (int j = 0; j < fitnessResult.size(); j++) {
-      printf("%.2f ", fitnessResult[j]);
-
-      if (first == false) fprintf(verifyLog, ", ");
-      fprintf(verifyLog, "%f",fitnessResult[j]);
-      if (first == true) first = false;
-    }
-    fclose(verifyLog);
-    printf("\n");
-
   }
-
 }
 
 void menu_demo(){
@@ -964,24 +871,12 @@ void menu_demo(){
   }
 };
 
-void experiments_evolveControl(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
-  assert(popSize == 8);
-  addDiversity = givenAddDiversity;
-  evolveMorph = evolveMorphology;
-  morphology = givenMorphology;
-  currentIndividual = popSize-1;
-  fitnessFunctions.clear();
-  fitnessFunctions.emplace_back("MocapSpeed");
-  fitnessFunctions.emplace_back("Stability");
-  run_ea(argc_g, argv_g, expGui::ea, getEvoInfoString());
-};
-
 std::string createExperimentLogDirectory(std::string experimentName){
-  char customLogsPath[120];
-  sprintf(customLogsPath,"%s/catkin_ws/customLogs", getenv("HOME"));
-  mkdir(customLogsPath, 0700);
+  char resultPath[120];
+  sprintf(resultPath,"%s/catkin_ws/experimentResults", getenv("HOME"));
+  mkdir(resultPath, 0700);
   char experimentLogsPath[120];
-  sprintf(experimentLogsPath,"%s/catkin_ws/customLogs/%s", getenv("HOME"), experimentName.c_str());
+  sprintf(experimentLogsPath,"%s/catkin_ws/experimentResults/%s", getenv("HOME"), experimentName.c_str());
   mkdir(experimentLogsPath, 0700);
 
   time_t t = time(0);   // get time now
@@ -992,6 +887,46 @@ std::string createExperimentLogDirectory(std::string experimentName){
 
   return std::string(logFilePath);
 }
+
+void experiments_evolve(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
+  assert(popSize == 8);
+  addDiversity = givenAddDiversity;
+  evolveMorph = evolveMorphology;
+  morphology = givenMorphology;
+  currentIndividual = -1;
+  fitnessFunctions.clear();
+  fitnessFunctions.emplace_back("MocapSpeed");
+  fitnessFunctions.emplace_back("Stability");
+
+  evoLogPath = createExperimentLogDirectory("evolutionaryRun");
+
+  FILE * evoLog = fopen(evoLogPath.c_str(), "a");
+  if (evoLog == NULL){
+    ROS_ERROR("evoLog could not be opened\n");
+  }
+
+  time_t t = time(0);   // get time now
+  struct tm * now = localtime( & t );
+
+  fprintf(evoLog, "Evolutionary run (%02d:%02d:%02d, %02d/%02d%04d)\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+  if (ros::Time::isSimTime()) fprintf(evoLog, "  Platform: Simulation\n"); else fprintf(evoLog, "  Platform: Hardware\n");
+  if (evolveMorphology) fprintf(evoLog, "  Morphology: *evolved*\n"); else fprintf(evoLog, "Morphology: %s\n", givenMorphology.c_str());
+  if (givenAddDiversity) fprintf(evoLog, "  Diversity is added to fitness\n"); else fprintf(evoLog, "  Diversity is NOT added to fitness\n");
+  fprintf(evoLog, "  Fitness functions: ");
+  for (int i = 0; i < fitnessFunctions.size(); i++){
+    if (i > 0) fprintf(evoLog, ", ");
+    fprintf(evoLog, "%s", fitnessFunctions[i].c_str());
+  }
+  fprintf(evoLog, "\n");
+
+
+  fprintf(evoLog, "\n");
+
+  fclose(evoLog);
+
+  run_ea(argc_g, argv_g, expGui::ea, evoLogPath);
+  evoLogPath.clear();
+};
 
 void experiments_verifyFitness(){
   currentIndividual = 0;
@@ -1004,8 +939,8 @@ void experiments_verifyFitness(){
   std::string verifyLogPath = createExperimentLogDirectory("verifyFitness");
 
   FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
-  if (verifyLog == NULL && errno == 2){
-    ROS_ERROR("randomSearchLog directory not found!\n");
+  if (verifyLog == NULL){
+    ROS_ERROR("verifyLog couldnt be opened (err%d)\n", errno);
   }
   fclose(verifyLog);
 
@@ -1015,11 +950,10 @@ void experiments_verifyFitness(){
 
   for (int i = 0; i < numberOfTests; i++) {
 
-    std::string fitnessString;
-    std::vector<float> fitnessResult = evaluateIndividual(individuals::smallRobotSmallControl, &fitnessString, false,
+        std::vector<float> fitnessResult = evaluateIndividual(individuals::smallRobotSmallControl, false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
-    printf("%s\n", fitnessString.c_str());
+
     printf("Returned fitness (%lu): ", fitnessResult.size());
     FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
 
@@ -1055,10 +989,10 @@ void experiments_fitnessNoise(){
 }
 
 std::vector<double> getRandomIndividual(){
-  std::vector<double> individual;
+  std::vector<double> individual(10);
 
   do{
-    for (int j = 0; j < 10; j++) individual.emplace_back(static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+    for (int j = 0; j < individual.size(); j++) individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
   } while (((((individual[0]*300.0) * ((individual[6]*2.0)*60.0)) / 1000.0) > 10.0) // Speed has to be below 10m/min
           || ((individual[0]*300.0) < 5.0) // StepLength has to be above 5mm
           || ((individual[6]*2.0) < 0.1)); // Frequency has to be above 0.1
@@ -1085,8 +1019,8 @@ void experiments_randomSearch(){
   std::string logFilePath = createExperimentLogDirectory("randomSearch");
 
   FILE * randomSearchLog = fopen(logFilePath.c_str(), "a");
-  if (randomSearchLog == NULL && errno == 2){
-    ROS_ERROR("randomSearchLog directory not found!\n");
+  if (randomSearchLog == NULL){
+    ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
   }
 
   if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
@@ -1110,12 +1044,10 @@ void experiments_randomSearch(){
 
     fclose(randomSearchLog);
 
-    std::string fitnessString;
-    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(randomIndividual), &fitnessString, false,
+    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(randomIndividual), false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
 
-    printf("%s\n", fitnessString.c_str());
     printf("Returned fitness (%lu): ", fitnessResult.size());
     randomSearchLog = fopen(logFilePath.c_str(), "a");
     fprintf(randomSearchLog, "\n    Fitness: ");
@@ -1157,15 +1089,15 @@ void menu_experiments() {
       break;
     } else {
       if (choice == "cs") {
-        experiments_evolveControl("small", false, false);
+        experiments_evolve("small", false, false);
       } else if (choice == "cm") {
-        experiments_evolveControl("medium", false, false);
+        experiments_evolve("medium", false, false);
       } else if (choice == "cl") {
-        experiments_evolveControl("large", false, false);
+        experiments_evolve("large", false, false);
       } else if (choice == "my") {
-        experiments_evolveControl("", true, true);
+        experiments_evolve("", true, true);
       } else if (choice == "mn") {
-        experiments_evolveControl("", true, false);
+        experiments_evolve("", true, false);
       } else if (choice == "vf"){
         experiments_verifyFitness();
       } else if (choice == "vn"){
@@ -1283,18 +1215,12 @@ int main(int argc, char **argv){
   argc_g = argc;
   argv_g = argv;
 
-  resetEvoDir();
-
   FILE *fp = fopen("generation", "w");
   fprintf(fp,"%d",0);
   fclose(fp);
 
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
-
-  evoFitnessLog = NULL;
-  evoParamLog_gen = NULL;
-  evoParamLog_phen = NULL;
 
   rosConnect();
 
@@ -1307,7 +1233,7 @@ int main(int argc, char **argv){
   resetGaitRecording(get_gait_evaluation_client);
 
   addDiversity = true;
-  currentIndividual = popSize-1;
+  currentIndividual = -1;
 
   if (ros::Time::isSimTime()){
     printf("Currently running in simulation mode\n");
@@ -1335,9 +1261,6 @@ int main(int argc, char **argv){
     if (choice.empty() == true){
       spinner.stop();
       ros::shutdown();
-      if (evoFitnessLog != NULL) fclose(evoFitnessLog);
-      if (evoParamLog_gen != NULL) fclose(evoParamLog_gen);
-      if (evoParamLog_phen != NULL) fclose(evoParamLog_phen);
       exit(0);
     } else if(menu.find(choice) == menu.end()) {
       printf("Unknown choice!\n");
