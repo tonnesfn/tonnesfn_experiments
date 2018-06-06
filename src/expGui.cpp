@@ -63,7 +63,7 @@ std::string evoLogPath;
 const int numberOfEvalsInTesting = 1;
 
 const int popSize =  8;
-const int generations = 18;
+const int generations = 8;
 constexpr float phen_maxStepLength = 300.0;
 constexpr float phen_maxFrequency  = 2.0;
 
@@ -356,8 +356,11 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
                                       ros::Publisher trajectoryMessage_pub,
                                       ros::ServiceClient get_gait_evaluation_client) {
 
+  currentIndividual++;
+
   // (Return random fitness to test)
   if (instantFitness == true) {
+    usleep(30000);
     return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
@@ -390,10 +393,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
         std::cout << "Press enter to continue evolution";
         std::cin.ignore();
       }
-    }
-  } else {
-    if (currentIndividual++ == popSize){
-      currentIndividual = 0;
     }
   }
 
@@ -779,41 +778,6 @@ namespace expGui {
 
 }
 
-std::string getEvoInfoString(){
-
-  std::ostringstream stringStream;
-  stringStream.precision(2);
-
-  stringStream << ("  Fitness: ");
-  for (int i = 0; i < fitnessFunctions.size(); i++) stringStream << fitnessFunctions[i].c_str() << " ";
-  stringStream << "\n";
-
-  if (addDiversity == true){
-    stringStream << "    Adding diversity fitness\n";
-  } else {
-    stringStream << "    Not adding diversity fitness\n";
-  }
-
-  if (evolveMorph == false){
-    stringStream << "  Only evolving control\n";
-    stringStream << "      morphology: " << morphology.c_str() << "\n";
-  } else stringStream << "  Evolving morphology\n";
-
-  stringStream << "  Evolutionary parameters:\n";
-  stringStream << "    Pop: " << Params::pop::size << "\n    Gen: " << Params::pop::nb_gen << "\n";
-
-  if (Params::evo_float::mutation_type == gaussian) stringStream << "  Mutation type: Gaussian\n"; else stringStream << "Mutation type: Unknown\n";
-  stringStream << "      Mut_p: " <<  Params::evo_float::mutation_rate << ", Mut_a: " << Params::evo_float::sigma << "\n";
-  if (Params::evo_float::cross_over_type == recombination) stringStream << "  Crossover type: Recombination\n"; else stringStream << "Crossover type: Unknown\n";
-  stringStream << "      C_p: " << Params::evo_float::cross_rate << "\n";
-
-  stringStream << "  Voltage: " << std::setprecision(4) << getServoVoltage() << "\n\n";
-
-  printf("%s", stringStream.str().c_str());
-
-  return stringStream.str();
-}
-
 void run_individual(std::vector<double> givenPhenotype){
 
   fitnessFunctions.clear();
@@ -868,7 +832,29 @@ void menu_demo(){
   }
 };
 
-std::string createExperimentLogDirectory(std::string experimentName){
+std::string createExperimentDirectory(std::string prefix, struct tm * givenTime){
+  std::stringstream ss;
+  ss << getenv("HOME") << "/catkin_ws/experimentResults/";
+  mkdir(ss.str().c_str(), 0700);
+  ss.str(std::string());
+
+  ss << getenv("HOME")
+     << "/catkin_ws/experimentResults/"
+     << givenTime->tm_year+1900
+     << std::setw(2) << std::setfill('0') << givenTime->tm_mon+1
+     << std::setw(2) << std::setfill('0') << givenTime->tm_mday
+     << std::setw(2) << std::setfill('0') << givenTime->tm_hour
+     << std::setw(2) << std::setfill('0') << givenTime->tm_min
+     << std::setw(2) << std::setfill('0') << givenTime->tm_sec
+     << "_"
+     << prefix
+     << "/";
+
+  mkdir(ss.str().c_str(), 0700);
+  return ss.str();
+}
+
+/*std::string createExperimentLogDirectory(std::string experimentName, struct tm * givenTime){
   char resultPath[120];
   sprintf(resultPath,"%s/catkin_ws/experimentResults", getenv("HOME"));
   mkdir(resultPath, 0700);
@@ -876,14 +862,11 @@ std::string createExperimentLogDirectory(std::string experimentName){
   sprintf(experimentLogsPath,"%s/catkin_ws/experimentResults/%s", getenv("HOME"), experimentName.c_str());
   mkdir(experimentLogsPath, 0700);
 
-  time_t t = time(0);   // get time now
-  struct tm * now = localtime( & t );
-
   char logFilePath[120];
-  sprintf(logFilePath,"%s/%s_%04u%02u%02u%02u%02u%02u.csv", experimentLogsPath, experimentName.c_str(), now->tm_year+1900, now->tm_mon+1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec);
+  sprintf(logFilePath,"%s/%04u%02u%02u%02u%02u%02u_%s.csv", experimentLogsPath, givenTime->tm_year+1900, givenTime->tm_mon+1, givenTime->tm_mday, givenTime->tm_hour, givenTime->tm_min, givenTime->tm_sec, experimentName.c_str());
 
   return std::string(logFilePath);
-}
+}*/
 
 void experiments_evolve(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
   assert(popSize == 8);
@@ -895,34 +878,62 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
   fitnessFunctions.emplace_back("MocapSpeed");
   fitnessFunctions.emplace_back("Stability");
 
-  evoLogPath = createExperimentLogDirectory("evolutionaryRun");
+  std::cout << "How many runs do you want to do? >";
 
-  FILE * evoLog = fopen(evoLogPath.c_str(), "a");
-  if (evoLog == NULL){
-    ROS_ERROR("evoLog could not be opened\n");
+  int numberOfTests;
+  std::cin >> numberOfTests;
+
+  for (int i = 0; i < numberOfTests; i++){
+    time_t t = time(0);   // get time now
+    struct tm * now = localtime( & t );
+
+    std::string experimentDirectory = createExperimentDirectory("evo", now);
+
+    fprintf(stderr, "expDir: %s\n", experimentDirectory.c_str());
+
+    std::stringstream ss;
+    ss << experimentDirectory.c_str() << "evo_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+    evoLogPath = ss.str();
+
+    fprintf(stderr, "%s\n", evoLogPath.c_str());
+
+    FILE * evoLog = fopen(evoLogPath.c_str(), "a");
+    if (evoLog == NULL){
+      ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
+    }
+
+    fprintf(evoLog, "Evolutionary run (%02d:%02d:%02d, %02d/%02d-%04d)\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+    if (ros::Time::isSimTime()) fprintf(evoLog, "  Platform: Simulation\n"); else fprintf(evoLog, "  Platform: Hardware\n");
+    fprintf(evoLog, "  Generations: %d, Population size: %d\n", generations, popSize);
+    if (evolveMorphology) fprintf(evoLog, "  Morphology: *evolved*\n"); else fprintf(evoLog, "Morphology: %s\n", givenMorphology.c_str());
+    fprintf(evoLog, "  Fitness functions: ");
+    for (int i = 0; i < fitnessFunctions.size(); i++){
+      if (i > 0) fprintf(evoLog, ", ");
+      fprintf(evoLog, "%s", fitnessFunctions[i].c_str());
+    }
+    if (givenAddDiversity) fprintf(evoLog, ", Diversity\n");
+    fprintf(evoLog, "\n");
+
+
+    fprintf(evoLog, "\n");
+
+    fclose(evoLog);
+
+    // Add directory command to argc and argv going into sferes:
+    int argc_tmp = argc_g + 1;
+    char *argv_tmp[argc_tmp];
+    for(int j = 0; j<argc_g; j++) argv_tmp[j] = argv_g[j];
+
+    mkdir(std::string(experimentDirectory + "/sferes").c_str(), 0700);
+
+    std::string commString = "-d" + experimentDirectory + "/sferes";
+    const char *sferesCommand = commString.c_str();
+    argv_tmp[argc_g] = const_cast<char*>(sferesCommand);
+
+    run_ea(argc_tmp, argv_tmp, expGui::ea, evoLogPath);
+    evoLogPath.clear();
   }
 
-  time_t t = time(0);   // get time now
-  struct tm * now = localtime( & t );
-
-  fprintf(evoLog, "Evolutionary run (%02d:%02d:%02d, %02d/%02d%04d)\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
-  if (ros::Time::isSimTime()) fprintf(evoLog, "  Platform: Simulation\n"); else fprintf(evoLog, "  Platform: Hardware\n");
-  if (evolveMorphology) fprintf(evoLog, "  Morphology: *evolved*\n"); else fprintf(evoLog, "Morphology: %s\n", givenMorphology.c_str());
-  if (givenAddDiversity) fprintf(evoLog, "  Diversity is added to fitness\n"); else fprintf(evoLog, "  Diversity is NOT added to fitness\n");
-  fprintf(evoLog, "  Fitness functions: ");
-  for (int i = 0; i < fitnessFunctions.size(); i++){
-    if (i > 0) fprintf(evoLog, ", ");
-    fprintf(evoLog, "%s", fitnessFunctions[i].c_str());
-  }
-  fprintf(evoLog, "\n");
-
-
-  fprintf(evoLog, "\n");
-
-  fclose(evoLog);
-
-  run_ea(argc_g, argv_g, expGui::ea, evoLogPath);
-  evoLogPath.clear();
 };
 
 void experiments_verifyFitness(){
@@ -933,7 +944,15 @@ void experiments_verifyFitness(){
   int numberOfTests;
   std::cin >> numberOfTests;
 
-  std::string verifyLogPath = createExperimentLogDirectory("verifyFitness");
+  time_t t = time(0);   // get time now
+  struct tm * now = localtime( & t );
+
+  std::string logDirectory = createExperimentDirectory("ver",now);
+
+  std::stringstream ss;
+  ss << logDirectory << "ver_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+
+  std::string verifyLogPath = ss.str();
 
   FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
   if (verifyLog == NULL){
@@ -1013,9 +1032,12 @@ void experiments_randomSearch(){
   time_t t = time(0);   // get time now
   struct tm * now = localtime( & t );
 
-  std::string logFilePath = createExperimentLogDirectory("randomSearch");
+  std::string logDirectory = createExperimentDirectory("rand", now);
 
-  FILE * randomSearchLog = fopen(logFilePath.c_str(), "a");
+  std::stringstream ss;
+  ss << logDirectory << "rand_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+
+  FILE * randomSearchLog = fopen(ss.str().c_str(), "a");
   if (randomSearchLog == NULL){
     ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
   }
@@ -1030,7 +1052,7 @@ void experiments_randomSearch(){
     std::vector<double> randomIndividual = getRandomIndividual();
 
     // Log individual
-    randomSearchLog = fopen(logFilePath.c_str(), "a");
+    randomSearchLog = fopen(ss.str().c_str(), "a");
     fprintf(randomSearchLog, "  Individual: ");
     bool first = true;
     for (int i = 0; i < randomIndividual.size(); i++){
@@ -1046,7 +1068,7 @@ void experiments_randomSearch(){
                                                           get_gait_evaluation_client);
 
     printf("Returned fitness (%lu): ", fitnessResult.size());
-    randomSearchLog = fopen(logFilePath.c_str(), "a");
+    randomSearchLog = fopen(ss.str().c_str(), "a");
     fprintf(randomSearchLog, "\n    Fitness: ");
     first = true;
     for (int j = 0; j < fitnessResult.size(); j++) {
