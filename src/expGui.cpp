@@ -551,9 +551,6 @@ void rosConnect(){
 
   // Reconnect at startup to ensure time to find simulation ros::Timer
   rch = new rosConnectionHandler_t(argc, argv);
-  sleep(1);
-  delete rch;
-  rch = new rosConnectionHandler_t(argc, argv);
 
   actionMessages_pub = rch->nodeHandle()->advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
   positionCommand_pub = rch->nodeHandle()->advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
