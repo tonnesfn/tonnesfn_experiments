@@ -832,41 +832,31 @@ void menu_demo(){
   }
 };
 
+std::string getDateString(struct tm * givenTime){
+  std::stringstream ss;
+
+  ss << givenTime->tm_year+1900
+     << std::setw(2) << std::setfill('0') << givenTime->tm_mon+1
+     << std::setw(2) << std::setfill('0') << givenTime->tm_mday
+     << std::setw(2) << std::setfill('0') << givenTime->tm_hour
+     << std::setw(2) << std::setfill('0') << givenTime->tm_min
+     << std::setw(2) << std::setfill('0') << givenTime->tm_sec;
+
+  return ss.str();
+
+}
+
 std::string createExperimentDirectory(std::string prefix, struct tm * givenTime){
   std::stringstream ss;
   ss << getenv("HOME") << "/catkin_ws/experimentResults/";
   mkdir(ss.str().c_str(), 0700);
   ss.str(std::string());
 
-  ss << getenv("HOME")
-     << "/catkin_ws/experimentResults/"
-     << givenTime->tm_year+1900
-     << std::setw(2) << std::setfill('0') << givenTime->tm_mon+1
-     << std::setw(2) << std::setfill('0') << givenTime->tm_mday
-     << std::setw(2) << std::setfill('0') << givenTime->tm_hour
-     << std::setw(2) << std::setfill('0') << givenTime->tm_min
-     << std::setw(2) << std::setfill('0') << givenTime->tm_sec
-     << "_"
-     << prefix
-     << "/";
+  ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "/";
 
   mkdir(ss.str().c_str(), 0700);
   return ss.str();
 }
-
-/*std::string createExperimentLogDirectory(std::string experimentName, struct tm * givenTime){
-  char resultPath[120];
-  sprintf(resultPath,"%s/catkin_ws/experimentResults", getenv("HOME"));
-  mkdir(resultPath, 0700);
-  char experimentLogsPath[120];
-  sprintf(experimentLogsPath,"%s/catkin_ws/experimentResults/%s", getenv("HOME"), experimentName.c_str());
-  mkdir(experimentLogsPath, 0700);
-
-  char logFilePath[120];
-  sprintf(logFilePath,"%s/%04u%02u%02u%02u%02u%02u_%s.csv", experimentLogsPath, givenTime->tm_year+1900, givenTime->tm_mon+1, givenTime->tm_mday, givenTime->tm_hour, givenTime->tm_min, givenTime->tm_sec, experimentName.c_str());
-
-  return std::string(logFilePath);
-}*/
 
 void experiments_evolve(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
   assert(popSize == 8);
@@ -892,7 +882,8 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     fprintf(stderr, "expDir: %s\n", experimentDirectory.c_str());
 
     std::stringstream ss;
-    ss << experimentDirectory.c_str() << "evo_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+    ss << experimentDirectory.c_str() << getDateString(now) << "_evo.txt";
+
     evoLogPath = ss.str();
 
     fprintf(stderr, "%s\n", evoLogPath.c_str());
@@ -902,7 +893,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
       ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
     }
 
-    fprintf(evoLog, "Evolutionary run (%02d:%02d:%02d, %02d/%02d-%04d)\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+    fprintf(evoLog, "Evolutionary run (%s)\n", getDateString(now).c_str());
     if (ros::Time::isSimTime()) fprintf(evoLog, "  Platform: Simulation\n"); else fprintf(evoLog, "  Platform: Hardware\n");
     fprintf(evoLog, "  Generations: %d, Population size: %d\n", generations, popSize);
     if (evolveMorphology) fprintf(evoLog, "  Morphology: *evolved*\n"); else fprintf(evoLog, "Morphology: %s\n", givenMorphology.c_str());
@@ -950,7 +941,7 @@ void experiments_verifyFitness(){
   std::string logDirectory = createExperimentDirectory("ver",now);
 
   std::stringstream ss;
-  ss << logDirectory << "ver_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+  ss << logDirectory << getDateString(now) << "_ver.txt";
 
   std::string verifyLogPath = ss.str();
 
@@ -1035,16 +1026,19 @@ void experiments_randomSearch(){
   std::string logDirectory = createExperimentDirectory("rand", now);
 
   std::stringstream ss;
-  ss << logDirectory << "rand_" << now->tm_year+1900 << now->tm_mon+1 << now->tm_mday << now->tm_hour << now->tm_min << now->tm_sec << ".txt";
+  ss << logDirectory << getDateString(now) << "_rand.txt";
 
   FILE * randomSearchLog = fopen(ss.str().c_str(), "a");
   if (randomSearchLog == NULL){
     ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
   }
 
-  if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
-                         else fprintf(randomSearchLog, "Random search (hardware): %02u:%02u:%02u, %02u/%02u-%04u\n", now->tm_hour, now->tm_min, now->tm_sec, now->tm_mday, now->tm_mon+1, now->tm_year+1900);
+  if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %s\n", getDateString(now).c_str());
+                         else fprintf(randomSearchLog, "Random search (hardware): %s\n", getDateString(now).c_str());
+  fprintf(randomSearchLog, "\n");
   fclose(randomSearchLog);
+
+  currentIndividual = 0;
 
   for (int i = 0; i < numberOfTests; i++){
 
@@ -1053,11 +1047,22 @@ void experiments_randomSearch(){
 
     // Log individual
     randomSearchLog = fopen(ss.str().c_str(), "a");
-    fprintf(randomSearchLog, "  Individual: ");
+    fprintf(randomSearchLog, "  Individual %d\n", currentIndividual);
+
+    fprintf(randomSearchLog, "    Genotype: ");
     bool first = true;
-    for (int i = 0; i < randomIndividual.size(); i++){
+    for (int j = 0; j < randomIndividual.size(); j++){
       if (first == false) fprintf(randomSearchLog, ", ");
-      fprintf(randomSearchLog, "%f", randomIndividual[i]);
+      fprintf(randomSearchLog, "%f", randomIndividual[j]);
+      if (first == true) first = false;
+    }
+
+    std::vector<double> individualParameters = genToPhen(randomIndividual);
+    fprintf(randomSearchLog, "\n    Phenotype: ");
+    first = true;
+    for (int j = 0; j < individualParameters.size(); j++){
+      if (first == false) fprintf(randomSearchLog, ", ");
+      fprintf(randomSearchLog, "%f", individualParameters[j]);
       if (first == true) first = false;
     }
 
