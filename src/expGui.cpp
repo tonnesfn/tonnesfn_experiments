@@ -874,6 +874,8 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
   std::cin >> numberOfTests;
 
   for (int i = 0; i < numberOfTests; i++){
+    currentIndividual = -1;
+
     time_t t = time(0);   // get time now
     struct tm * now = localtime( & t );
 
@@ -915,9 +917,9 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     char *argv_tmp[argc_tmp];
     for(int j = 0; j<argc_g; j++) argv_tmp[j] = argv_g[j];
 
-    mkdir(std::string(experimentDirectory + "/sferes").c_str(), 0700);
+    mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
 
-    std::string commString = "-d" + experimentDirectory + "/sferes";
+    std::string commString = "-d" + experimentDirectory + "sferes";
     const char *sferesCommand = commString.c_str();
     argv_tmp[argc_g] = const_cast<char*>(sferesCommand);
 
@@ -1011,7 +1013,7 @@ void experiments_randomSearch(){
 
   currentIndividual = 0;
 
-  std::cout << "How many individuals do you want to test? >";
+  std::cout << "How many runs do you want to do? >";
 
   int numberOfTests;
   std::cin >> numberOfTests;
@@ -1020,73 +1022,75 @@ void experiments_randomSearch(){
   fitnessFunctions.emplace_back("MocapSpeed");
   fitnessFunctions.emplace_back("Stability");
 
-  time_t t = time(0);   // get time now
-  struct tm * now = localtime( & t );
-
-  std::string logDirectory = createExperimentDirectory("rand", now);
-
-  std::stringstream ss;
-  ss << logDirectory << getDateString(now) << "_rand.txt";
-
-  FILE * randomSearchLog = fopen(ss.str().c_str(), "a");
-  if (randomSearchLog == NULL){
-    ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
-  }
-
-  if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %s\n", getDateString(now).c_str());
-                         else fprintf(randomSearchLog, "Random search (hardware): %s\n", getDateString(now).c_str());
-  fprintf(randomSearchLog, "\n");
-  fclose(randomSearchLog);
-
-  currentIndividual = 0;
-
   for (int i = 0; i < numberOfTests; i++){
 
-    // Generate random individual:
-    std::vector<double> randomIndividual = getRandomIndividual();
+    time_t t = time(0);   // get time now
+    struct tm * now = localtime( & t );
 
-    // Log individual
-    randomSearchLog = fopen(ss.str().c_str(), "a");
-    fprintf(randomSearchLog, "  Individual %d\n", currentIndividual);
+    std::string logDirectory = createExperimentDirectory("rand", now);
 
-    fprintf(randomSearchLog, "    Genotype: ");
-    bool first = true;
-    for (int j = 0; j < randomIndividual.size(); j++){
-      if (first == false) fprintf(randomSearchLog, ", ");
-      fprintf(randomSearchLog, "%f", randomIndividual[j]);
-      if (first == true) first = false;
+    std::stringstream ss;
+    ss << logDirectory << getDateString(now) << "_rand.txt";
+
+    FILE * randomSearchLog = fopen(ss.str().c_str(), "a");
+    if (randomSearchLog == NULL){
+      ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
     }
 
-    std::vector<double> individualParameters = genToPhen(randomIndividual);
-    fprintf(randomSearchLog, "\n    Phenotype: ");
-    first = true;
-    for (int j = 0; j < individualParameters.size(); j++){
-      if (first == false) fprintf(randomSearchLog, ", ");
-      fprintf(randomSearchLog, "%f", individualParameters[j]);
-      if (first == true) first = false;
-    }
-
-    fclose(randomSearchLog);
-
-    std::vector<float> fitnessResult = evaluateIndividual(genToPhen(randomIndividual), false,
-                                                          gaitControllerStatus_client, trajectoryMessage_pub,
-                                                          get_gait_evaluation_client);
-
-    printf("Returned fitness (%lu): ", fitnessResult.size());
-    randomSearchLog = fopen(ss.str().c_str(), "a");
-    fprintf(randomSearchLog, "\n    Fitness: ");
-    first = true;
-    for (int j = 0; j < fitnessResult.size(); j++) {
-      printf("%.2f ", fitnessResult[j]);
-
-      if (first == false) fprintf(randomSearchLog, ", ");
-      fprintf(randomSearchLog, "%f",fitnessResult[j]);
-      if (first == true) first = false;
-    }
+    if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %s\n", getDateString(now).c_str());
+                           else fprintf(randomSearchLog, "Random search (hardware): %s\n", getDateString(now).c_str());
     fprintf(randomSearchLog, "\n");
     fclose(randomSearchLog);
-    printf("\n");
 
+    currentIndividual = 0;
+
+    for (int j = 0; j < popSize*(generations+1); j++) {
+
+      // Generate random individual:
+      std::vector<double> randomIndividual = getRandomIndividual();
+
+      // Log individual
+      randomSearchLog = fopen(ss.str().c_str(), "a");
+      fprintf(randomSearchLog, "  Individual %d\n", currentIndividual);
+
+      fprintf(randomSearchLog, "    Genotype: ");
+      bool first = true;
+      for (int k = 0; k < randomIndividual.size(); k++) {
+        if (first == false) fprintf(randomSearchLog, ", ");
+        fprintf(randomSearchLog, "%f", randomIndividual[k]);
+        if (first == true) first = false;
+      }
+
+      std::vector<double> individualParameters = genToPhen(randomIndividual);
+      fprintf(randomSearchLog, "\n    Phenotype: ");
+      first = true;
+      for (int k = 0; k < individualParameters.size(); k++) {
+        if (first == false) fprintf(randomSearchLog, ", ");
+        fprintf(randomSearchLog, "%f", individualParameters[k]);
+        if (first == true) first = false;
+      }
+
+      fclose(randomSearchLog);
+
+      std::vector<float> fitnessResult = evaluateIndividual(genToPhen(randomIndividual), false,
+                                                            gaitControllerStatus_client, trajectoryMessage_pub,
+                                                            get_gait_evaluation_client);
+
+      printf("Returned fitness (%lu): ", fitnessResult.size());
+      randomSearchLog = fopen(ss.str().c_str(), "a");
+      fprintf(randomSearchLog, "\n    Fitness: ");
+      first = true;
+      for (int k = 0; k < fitnessResult.size(); k++) {
+        printf("%.2f ", fitnessResult[j]);
+
+        if (first == false) fprintf(randomSearchLog, ", ");
+        fprintf(randomSearchLog, "%f", fitnessResult[k]);
+        if (first == true) first = false;
+      }
+      fprintf(randomSearchLog, "\n");
+      fclose(randomSearchLog);
+      printf("\n");
+    }
   }
 
 
