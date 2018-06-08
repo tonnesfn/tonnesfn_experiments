@@ -665,11 +665,6 @@ public:
 
     std::vector<double> individualParameters = genToPhen(individualData);
 
-    FILE * evoLog = fopen(evoLogPath.c_str(), "a");
-    if (evoLog == NULL){
-      ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
-    }
-
     bool validSolution;
     std::vector<float> fitnessResult;
 
@@ -736,29 +731,51 @@ public:
 
     FILE * genFile = fopen("generation", "r");
 
-    int generation;
-    fscanf(genFile, "%d", &generation);
+    FILE * evoLog = fopen(evoLogPath.c_str(), "a");
+    if (evoLog == NULL){
+      ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
+    }
+
+    int currentGeneration;
+    fscanf(genFile, "%d", &currentGeneration);
     fclose(genFile);
-    fprintf(evoLog, "  Individual %d, Generation %d\n", currentIndividual, generation);
+    fprintf(evoLog, "    {\n");
+    fprintf(evoLog, "      \"id\": %d,\n", currentIndividual);
+    fprintf(evoLog, "      \"generation\": %d,\n", currentGeneration);
 
-    fprintf(evoLog, "    Genotype: ");
+    fprintf(evoLog, "      \"genotype\": [\n");
     for (int i = 0; i < individualData.size(); i++){
-      if (i > 0) fprintf(evoLog, ", ");
-      fprintf(evoLog, "%.2f", individualData[i]);
+      fprintf(evoLog, "        %.2f", individualData[i]);
+      if (i != individualData.size()-1) fprintf(evoLog, ",");
+      fprintf(evoLog, "  \n");
     }
+    fprintf(evoLog, "      ],\n");
 
-    fprintf(evoLog, "\n    Phenotype: ");
+    fprintf(evoLog, "      \"phenotype\": [\n");
     for (int i = 0; i < individualParameters.size(); i++){
-      if (i > 0) fprintf(evoLog, ", ");
-      fprintf(evoLog, "%.2f", individualParameters[i]);
-    }
+      if (isnan(individualParameters[i])) fprintf(evoLog, "        \"NaN\""); else fprintf(evoLog, "        %.2f", individualParameters[i]);
 
-    fprintf(evoLog, "\n    Fitness result: ");
-    for (int i = 0; i < fitnessResult.size(); i++){
-      if (i > 0) fprintf(evoLog, ", ");
-      fprintf(evoLog, "%.2f", fitnessResult[i]);
+      if (i != individualParameters.size()-1) fprintf(evoLog, ",");
+      fprintf(evoLog, "  \n");
     }
-    fprintf(evoLog, "\n");
+    fprintf(evoLog, "      ],\n");
+
+    fprintf(evoLog, "      \"fitness\": {\n");
+    for (int i = 0; i < fitnessResult.size(); i++){
+      fprintf(evoLog, "        \"%s\": %.2f", fitnessFunctions[i].c_str(), fitnessResult[i]);
+      if (i != fitnessResult.size()-1) fprintf(evoLog, ",");
+      fprintf(evoLog, "  \n");
+    }
+    fprintf(evoLog, "      }\n");
+    fprintf(evoLog, "    }");
+
+    if (currentIndividual == ((generations+1)*popSize)-1){ // If last individual
+      fprintf(evoLog, "\n");
+      fprintf(evoLog, "  ]\n");
+      fprintf(evoLog, "}");
+    } else {
+      fprintf(evoLog, ",\n");
+    }
 
     fclose(evoLog);
 
@@ -881,8 +898,6 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
 
     std::string experimentDirectory = createExperimentDirectory("evo", now);
 
-    fprintf(stderr, "expDir: %s\n", experimentDirectory.c_str());
-
     std::stringstream ss;
     ss << experimentDirectory.c_str() << getDateString(now) << "_evo.txt";
 
@@ -895,20 +910,29 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
       ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
     }
 
-    fprintf(evoLog, "Evolutionary run (%s)\n", getDateString(now).c_str());
-    if (ros::Time::isSimTime()) fprintf(evoLog, "  Platform: Simulation\n"); else fprintf(evoLog, "  Platform: Hardware\n");
-    fprintf(evoLog, "  Generations: %d, Population size: %d\n", generations, popSize);
-    if (evolveMorphology) fprintf(evoLog, "  Morphology: *evolved*\n"); else fprintf(evoLog, "Morphology: %s\n", givenMorphology.c_str());
-    fprintf(evoLog, "  Fitness functions: ");
+    fprintf(evoLog, "{\n");
+    fprintf(evoLog, "  \"experiment_info\": {\n");
+    fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
+    fprintf(evoLog, "    \"type\": \"evolution\",\n");
+
+    if (ros::Time::isSimTime()) fprintf(evoLog, "    \"platform\": \"simulation\",\n"); else fprintf(evoLog, "    \"platform\": \"hardware\",\n");
+    fprintf(evoLog, "    \"generations\": %d,\n", generations);
+    fprintf(evoLog, "    \"population\": %d,\n", popSize);
+
+    if (evolveMorphology) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n"); else fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
+
+    fprintf(evoLog, "    \"fitness\": [\n");
     for (int i = 0; i < fitnessFunctions.size(); i++){
-      if (i > 0) fprintf(evoLog, ", ");
-      fprintf(evoLog, "%s", fitnessFunctions[i].c_str());
+      fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
+      if (i != fitnessFunctions.size()-1) fprintf(evoLog, ",\n");
     }
-    if (givenAddDiversity) fprintf(evoLog, ", Diversity\n");
+    if (givenAddDiversity) fprintf(evoLog, ", \"Diversity\"\n");
     fprintf(evoLog, "\n");
+    fprintf(evoLog, "    ]\n");
 
+    fprintf(evoLog, "  },\n");
 
-    fprintf(evoLog, "\n");
+    fprintf(evoLog, "  \"individuals\": [\n");
 
     fclose(evoLog);
 
