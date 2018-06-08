@@ -58,6 +58,8 @@ int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
+std::vector<std::string> commandQueue;
+
 std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
@@ -813,38 +815,41 @@ void run_individual(std::vector<double> givenPhenotype){
 void menu_demo(){
 
   std::string choice;
-  for(;;) {
-    std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-    printf("    ss - Test small robot (small control)\n"
-           "    ls - Test large robot (small control)\n"
-           "    ll - Test large robot (large control)\n"
-           "    ms - Request small morphology\n"
-           "    mm - Request medium morphology\n"
-           "    ml - Request large morphology\n");
-    printf("\n> ");
+  std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
+  printf("    ss - Test small robot (small control)\n"
+         "    ls - Test large robot (small control)\n"
+         "    ll - Test large robot (large control)\n"
+         "    ms - Request small morphology\n"
+         "    mm - Request medium morphology\n"
+         "    ml - Request large morphology\n");
+  printf("\n> ");
+
+  if (commandQueue.empty()) {
     getline(std::cin, choice);
-    std::cin.clear();
-    if (choice.empty() == true){
-      break;
-    } else {
-      if (choice == "ss"){
-        run_individual(individuals::smallRobotSmallControl);
-      } else if (choice == "ls"){
-        run_individual(individuals::largeRobotSmallControl);
-      } else if (choice == "ll"){
-        run_individual(individuals::largeRobotLargeControl);
-      } else if (choice == "ms"){
-        setLegLengths(0.0,0.0);
-        printf("Small morphology requested\n");
-      } else if (choice == "mm"){
-        setLegLengths(12.5,47.5);
-        printf("Medium morphology requested\n");
-      } else if (choice == "ml"){
-        setLegLengths(25.0,95.0);
-        printf("Large morphology requested\n");
-      }
+  } else {
+    choice = commandQueue[0];
+    printf("*%s*\n", choice.c_str());
+    commandQueue.erase(commandQueue.begin());
+  }
+
+  if (choice.empty() == true){
+    if (choice == "ss"){
+      run_individual(individuals::smallRobotSmallControl);
+    } else if (choice == "ls"){
+      run_individual(individuals::largeRobotSmallControl);
+    } else if (choice == "ll"){
+      run_individual(individuals::largeRobotLargeControl);
+    } else if (choice == "ms"){
+      setLegLengths(0.0,0.0);
+      printf("Small morphology requested\n");
+    } else if (choice == "mm"){
+      setLegLengths(12.5,47.5);
+      printf("Medium morphology requested\n");
+    } else if (choice == "ml"){
+      setLegLengths(25.0,95.0);
+      printf("Large morphology requested\n");
     }
   }
 };
@@ -888,7 +893,15 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
   std::cout << "How many runs do you want to do? >";
 
   int numberOfTests;
-  std::cin >> numberOfTests;
+
+  if (commandQueue.empty()) {
+    std::cin >> numberOfTests;
+    std::cin.ignore(10000, '\n');
+  } else {
+    numberOfTests = std::stoi(commandQueue[0]);
+    printf("*%d*\n", numberOfTests);
+    commandQueue.erase(commandQueue.begin());
+  }
 
   for (int i = 0; i < numberOfTests; i++){
     currentIndividual = -1;
@@ -937,15 +950,18 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     fclose(evoLog);
 
     // Add directory command to argc and argv going into sferes:
-    int argc_tmp = argc_g + 1;
-    char *argv_tmp[argc_tmp];
-    for(int j = 0; j<argc_g; j++) argv_tmp[j] = argv_g[j];
+    int argc_tmp = 2;
+    char *argv_tmp[3];
+    argv_tmp[0] = argv_g[0]; // Copy the first reference
+    argv_tmp[2] = 0;
 
     mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
 
     std::string commString = "-d" + experimentDirectory + "sferes";
     const char *sferesCommand = commString.c_str();
-    argv_tmp[argc_g] = const_cast<char*>(sferesCommand);
+    argv_tmp[1] = const_cast<char*>(sferesCommand);
+
+    printf("%s, %s\n", argv_tmp[0], argv_tmp[1]);
 
     run_ea(argc_tmp, argv_tmp, expGui::ea, evoLogPath);
     evoLogPath.clear();
@@ -960,6 +976,7 @@ void experiments_verifyFitness(){
 
   int numberOfTests;
   std::cin >> numberOfTests;
+  std::cin.ignore(10000, '\n');
 
   time_t t = time(0);   // get time now
   struct tm * now = localtime( & t );
@@ -1041,6 +1058,7 @@ void experiments_randomSearch(){
 
   int numberOfTests;
   std::cin >> numberOfTests;
+  std::cin.ignore(10000, '\n');
 
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
@@ -1122,89 +1140,95 @@ void experiments_randomSearch(){
 
 void menu_experiments() {
   std::string choice;
-  for (;;) {
-    std::cout << "  Please choose one experiment: (enter to go back)\n";
 
-    printf("    cs - evolve control, small morphology\n"
-           "    cm - evolve control, medium morphology\n"
-           "    cl - evolve control, large morphology\n"
-           "    my - evolve cont+morph, with diversity\n"
-           "    mn - evolve cont+morph, w/o diversity\n"
-           "    ra - random search\n"
-           "    vf - verify fitness on single individual\n"
-           "    vn - check noise in stability fitness\n");
-    printf("\n> ");
+  std::cout << "  Please choose one experiment: (enter to go back)\n";
 
+  printf("    cs - evolve control, small morphology\n"
+         "    cm - evolve control, medium morphology\n"
+         "    cl - evolve control, large morphology\n"
+         "    my - evolve cont+morph, with diversity\n"
+         "    mn - evolve cont+morph, w/o diversity\n"
+         "    ra - random search\n"
+         "    vf - verify fitness on single individual\n"
+         "    vn - check noise in stability fitness\n");
+  printf("\n> ");
+
+  if (commandQueue.empty()) {
     getline(std::cin, choice);
-    std::cin.clear();
-    if (choice.empty() == true) {
-      break;
-    } else {
-      if (choice == "cs") {
-        experiments_evolve("small", false, false);
-      } else if (choice == "cm") {
-        experiments_evolve("medium", false, false);
-      } else if (choice == "cl") {
-        experiments_evolve("large", false, false);
-      } else if (choice == "my") {
-        experiments_evolve("", true, true);
-      } else if (choice == "mn") {
-        experiments_evolve("", true, false);
-      } else if (choice == "vf"){
-        experiments_verifyFitness();
-      } else if (choice == "vn"){
-        experiments_fitnessNoise();
-      } else if (choice ==  "ra"){
-        experiments_randomSearch();
-      }
+  } else {
+    choice = commandQueue[0];
+    printf("*%s*\n", choice.c_str());
+    commandQueue.erase(commandQueue.begin());
+  }
+
+  if (choice.empty() != true){
+    if (choice == "cs") {
+      experiments_evolve("small", false, false);
+    } else if (choice == "cm") {
+      experiments_evolve("medium", false, false);
+    } else if (choice == "cl") {
+      experiments_evolve("large", false, false);
+    } else if (choice == "my") {
+      experiments_evolve("", true, true);
+    } else if (choice == "mn") {
+      experiments_evolve("", true, false);
+    } else if (choice == "vf"){
+      experiments_verifyFitness();
+    } else if (choice == "vn"){
+      experiments_fitnessNoise();
+    } else if (choice ==  "ra"){
+      experiments_randomSearch();
     }
   }
 }
 
 void menu_configure() {
   std::string choice;
-  for (;;) {
-    std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
-    printf("    i - enable/disable instant fitness\n");
-    printf("    s - enable/disable stand testing\n");
-    printf("    r - reconnect to ROS resources\n");
-    printf("    e - enable servo torques\n");
-    printf("    d - disable servo torques\n");
-    printf("\n> ");
+  std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
+  printf("    i - enable/disable instant fitness\n");
+  printf("    s - enable/disable stand testing\n");
+  printf("    r - reconnect to ROS resources\n");
+  printf("    e - enable servo torques\n");
+  printf("    d - disable servo torques\n");
+  printf("\n> ");
+
+  if (commandQueue.empty()) {
     getline(std::cin, choice);
-    std::cin.clear();
-    if (choice.empty() == true) {
-      break;
-    } else {
-      if (choice == "i") {
-        instantFitness = !instantFitness;
-        if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n");
-        else
-          printf("Instant fitness evaluation now disabled!\n");
-      } else if (choice == "s"){
-        if (robotOnStand == true){
-          printf("   RobotOnStand now disabled!\n");
-        } else {
-          printf("   RobotOnStand now enabled!\n");
-        }
+  } else {
+    choice = commandQueue[0];
+    printf("*%s*\n", choice.c_str());
+    commandQueue.erase(commandQueue.begin());
+  }
 
-        robotOnStand = !robotOnStand;
-        break;
-      } else if (choice == "r") {
-        printf("Reconnecting!\n");
-        rosConnect();
-        printf("Reconnected!\n");
-      } else if (choice == "e"){
-        enableServos();
-        printf("Servos enabled!\n");
-      } else if (choice == "d"){
-        disableServos();
-        printf("Servos disabled!\n");
+  if (choice.empty() != true) {
+    if (choice == "i") {
+      instantFitness = !instantFitness;
+      if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n");
+      else
+        printf("Instant fitness evaluation now disabled!\n");
+    } else if (choice == "s"){
+      if (robotOnStand == true){
+        printf("   RobotOnStand now disabled!\n");
+      } else {
+        printf("   RobotOnStand now enabled!\n");
       }
+
+      robotOnStand = !robotOnStand;
+    } else if (choice == "r") {
+      printf("Reconnecting!\n");
+      rosConnect();
+      printf("Reconnected!\n");
+    } else if (choice == "e"){
+      enableServos();
+      printf("Servos enabled!\n");
+    } else if (choice == "d"){
+      disableServos();
+      printf("Servos disabled!\n");
     }
-  };
+  }
+  printf("\n");
 }
 
 void testInverseKinematics(){
@@ -1250,8 +1274,14 @@ void menu_test(){
     printf("    inv - test inverseKinematics\n");
     printf("\n> ");
 
-    getline(std::cin, choice);
-    std::cin.clear();
+    if (commandQueue.empty()) {
+      getline(std::cin, choice);
+    } else {
+      choice = commandQueue[0];
+      printf("*%s*\n", choice.c_str());
+      commandQueue.erase(commandQueue.begin());
+    }
+
     if (choice.empty() == true){
       break;
     } else {
@@ -1266,6 +1296,12 @@ int main(int argc, char **argv){
 
   argc_g = argc;
   argv_g = argv;
+
+  if (argc > 1){
+    for (int i = 1; i < argc; i++) {
+      commandQueue.emplace_back(argv[i]);
+    }
+  }
 
   FILE *fp = fopen("generation", "w");
   fprintf(fp,"%d",0);
@@ -1308,8 +1344,14 @@ int main(int argc, char **argv){
     }
     printf("\n> ");
 
-    getline(std::cin, choice);
-    std::cin.clear();
+    if (commandQueue.empty()) {
+      getline(std::cin, choice);
+    } else {
+      choice = commandQueue[0];
+      printf("*%s*\n", choice.c_str());
+      commandQueue.erase(commandQueue.begin());
+    }
+
     if (choice.empty() == true){
       spinner.stop();
       ros::shutdown();
