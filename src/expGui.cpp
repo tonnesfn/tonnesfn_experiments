@@ -872,7 +872,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     std::string experimentDirectory = createExperimentDirectory("evo", now);
 
     std::stringstream ss;
-    ss << experimentDirectory.c_str() << getDateString(now) << "_evo.txt";
+    ss << experimentDirectory.c_str() << getDateString(now) << "_evo.json";
 
     evoLogPath = ss.str();
 
@@ -923,6 +923,8 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
 
     run_ea(argc_tmp, argv_tmp, expGui::ea, evoLogPath);
     evoLogPath.clear();
+
+    printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
   }
 
 };

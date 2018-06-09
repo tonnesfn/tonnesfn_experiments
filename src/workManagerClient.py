@@ -1,16 +1,67 @@
 #!/usr/bin/env python3
 import pika
+import subprocess
+import platform
+
+import string
+
 import amqpurl # A file that contains "url = '$URL'" for your amqp account
 
 
 def callback(ch, method, properties, body):
     print("Received message: {}".format(body))
 
+    # Building
+    print("Building tonnesfn_experiments:")
+    result = subprocess.run(['catkin', 'build', 'tonnesfn_experiments'], stdout=subprocess.PIPE)
+    result_str = result.stdout.decode('utf-8')
+
+    if "packages succeeded!" in result_str:
+        print("  Compilation successful")
+    else:
+        print("  Compilation failed")
+        channel.basic_publish(exchange='', routing_key='results', body='Compilation failed: {}'.format(result_str))
+        return
+
+    # Executing the program:
+    # Executing the program:
+    processCommand = ['rosrun', 'tonnesfn_experiments', 'expGui']
+    processCommand.extend(body.decode('utf-8').split())
+    console_output = subprocess.run(processCommand, stdout=subprocess.PIPE)
+    console_output_str = console_output.stdout.decode('utf-8')
+    console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
+
+    returnMessage = '{\n'
+    returnMessage += "  \"node\": \"{}\",\n".format(platform.node())
+    returnMessage += "  \"consoleOutput\": \n"
+    returnMessage += "    \"{}\"\n".format(console_output_str.replace("\n", "\\n"))
+    returnMessage += ","
+
+    logFiles = []
+
+    for line in console_output_str.splitlines():
+        if ".json" in line:
+            logFiles.append(line.strip())
+
+    for file in logFiles:
+        with open(file, 'r') as logFile:
+            returnMessage += '\n"logFile" : {{\n  "name": \"{}\",\n  "contents": {}\n}}'.format(file, logFile.read())
+
+    returnMessage += "\n}"
+
+    channel.basic_publish(exchange='', routing_key='results', body=returnMessage)
+
+    print("Done!")
+
 
 if __name__ == '__main__':
     params = pika.URLParameters(amqpurl.url)
     connection = pika.BlockingConnection(params)
+
     channel = connection.channel()
+
+    # Create testing channel:
+
     channel.queue_declare(queue='hello')
 
     channel.basic_consume(callback, queue='hello', no_ack=True)
