@@ -75,8 +75,6 @@ bool instantFitness = false;
 
 std::string morphology;
 
-rosConnectionHandler_t* rch;
-
 bool robotOnStand = false;
 
 int argc_g;
@@ -536,40 +534,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
 
 }
 
-void rosConnect(){
-  int argc = 0;
-  char **argv;
-
-  if (rch != NULL) {
-    delete rch;
-
-    get_gait_evaluation_client.shutdown();
-    gaitControllerStatus_client.shutdown();
-    trajectoryMessage_pub.shutdown();
-    poseCommand_pub.shutdown();
-    dyretState_sub.shutdown();
-  }
-
-  // Reconnect at startup to ensure time to find simulation ros::Timer
-  rch = new rosConnectionHandler_t(argc, argv);
-
-  actionMessages_pub = rch->nodeHandle()->advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
-  positionCommand_pub = rch->nodeHandle()->advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
-
-  servoConfigClient = rch->nodeHandle()->serviceClient<dyret_common::Configure>("/dyret/configuration");
-  get_gait_evaluation_client = rch->nodeHandle()->serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
-  gaitControllerStatus_client = rch->nodeHandle()->serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
-  trajectoryMessage_pub = rch->nodeHandle()->advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages", 1000);
-  poseCommand_pub = rch->nodeHandle()->advertise<dyret_common::Pose>("/dyret/command", 10);
-  dyretState_sub = rch->nodeHandle()->subscribe("/dyret/state", 1, dyretStateCallback);
-
-  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
-  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-  waitForRosInit(trajectoryMessage_pub, "/dyret/dyret_controller/trajectoryMessage");
-
-}
-
-
 using namespace sferes;
 using namespace sferes::gen::evo_float;
 
@@ -699,11 +663,7 @@ public:
               printf("Discarding\n");
               validSolution = true;
           } else if (choice == 'e'){
-            rosConnect();
-            printf("Reconnected and retrying\n");
-            sleep(3);
-            currentIndividual--;
-            validSolution = false;
+            ROS_ERROR("Not implemented!");
           } else if (choice == 'c'){
             disableServos();
             printf("Servos disabled\n");
@@ -915,8 +875,6 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     ss << experimentDirectory.c_str() << getDateString(now) << "_evo.txt";
 
     evoLogPath = ss.str();
-
-    fprintf(stderr, "%s\n", evoLogPath.c_str());
 
     FILE * evoLog = fopen(evoLogPath.c_str(), "a");
     if (evoLog == NULL){
@@ -1218,7 +1176,7 @@ void menu_configure() {
       robotOnStand = !robotOnStand;
     } else if (choice == "r") {
       printf("Reconnecting!\n");
-      rosConnect();
+      ROS_ERROR("Rosconnect not implemented!");
       printf("Reconnected!\n");
     } else if (choice == "e"){
       enableServos();
@@ -1310,7 +1268,22 @@ int main(int argc, char **argv){
   fitnessFunctions.emplace_back("Speed");
   fitnessFunctions.emplace_back("Efficiency");
 
-  rosConnect();
+  ros::init(argc, argv, "exp2Gui");
+  ros::NodeHandle rch;
+
+  actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
+  positionCommand_pub = rch.advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
+
+  servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
+  get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
+  gaitControllerStatus_client = rch.serviceClient<dyret_controller::GetGaitControllerStatus>("get_gait_controller_status");
+  trajectoryMessage_pub = rch.advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages", 1000);
+  poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
+  dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
+
+  waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
+  waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
+  waitForRosInit(trajectoryMessage_pub, "/dyret/dyret_controller/trajectoryMessage");
 
   ros::AsyncSpinner spinner(1);
   spinner.start();
@@ -1352,7 +1325,7 @@ int main(int argc, char **argv){
       commandQueue.erase(commandQueue.begin());
     }
 
-    if (choice.empty() == true){
+    if (choice.empty() == true || choice == "exit"){
       spinner.stop();
       ros::shutdown();
       exit(0);
