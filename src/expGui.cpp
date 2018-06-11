@@ -58,8 +58,6 @@ int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
-std::vector<std::string> commandQueue;
-
 std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
@@ -77,10 +75,11 @@ std::string morphology;
 
 bool robotOnStand = false;
 
-int argc_g;
 char **argv_g;
 
-std::vector<std::string> fitnessFunctions;
+std::vector<std::string> rawFitnesses; // Used to store raw fitness string until log writing
+std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
+std::vector<std::string> commandQueue; // Used to store commands from the arguments
 
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
   if (givenServoConfigService.call(givenCall))  {
@@ -159,6 +158,24 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client)
   srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getResults;
 
   if (get_gait_evaluation_client.call(srv)) {
+    if (srv.response.descriptors.size() != srv.response.results.size()){
+      ROS_ERROR("Result and descriptor sizes not equal. Cannot process results!");
+      return std::vector<float>();
+    }
+
+
+    std::stringstream ss;
+
+    ss  << "        {\n";
+    for (int i = 0; i < srv.response.descriptors.size(); i++){
+      ss <<  "          \"" << srv.response.descriptors[i] << "\": " << std::setprecision(4) << srv.response.results[i];
+      if (i == srv.response.descriptors.size()-1) ss << "\n"; else ss << ",\n";
+    }
+
+    ss << "        }";
+
+    rawFitnesses.push_back(ss.str());
+
     vectorToReturn = srv.response.results;
   } else {
     ROS_ERROR("Error while calling GaitRecording service with t_getResults!\n");
@@ -500,7 +517,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
   }
 
-
   std::vector<float> fitness(fitnessFunctions.size());
   int currentFitnessIndex = 0;
 
@@ -599,6 +615,8 @@ public:
   FitExp2MO()  {}
   template<typename Indiv>
   void eval(Indiv& ind) {
+
+    rawFitnesses.clear(); // Clear any residual fitness strings from earlier experiments
 
     // Only add diversity if we are evolving morphology
     if (evolveMorph == true && addDiversity) {
@@ -728,7 +746,16 @@ public:
       if (i != fitnessResult.size()-1) fprintf(evoLog, ",");
       fprintf(evoLog, "  \n");
     }
-    fprintf(evoLog, "      }\n");
+    fprintf(evoLog, "      },\n");
+
+    fprintf(evoLog, "      \"raw_fitness\": [\n");
+    for (int i = 0; i < rawFitnesses.size(); i++){
+      fprintf(evoLog, "%s", rawFitnesses[i].c_str());
+      if (i == rawFitnesses.size()-1) fprintf(evoLog, "\n"); else fprintf(evoLog, ",\n");
+    }
+
+    fprintf(evoLog, "      ]\n");
+
     fprintf(evoLog, "    }");
 
     if (currentIndividual == ((generations+1)*popSize)-1){ // If last individual
@@ -1254,7 +1281,6 @@ void menu_test(){
 
 int main(int argc, char **argv){
 
-  argc_g = argc;
   argv_g = argv;
 
   if (argc > 1){
