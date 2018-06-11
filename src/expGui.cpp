@@ -821,7 +821,7 @@ void menu_demo(){
     commandQueue.erase(commandQueue.begin());
   }
 
-  if (choice.empty() == true){
+  if (choice.empty() == false){
     if (choice == "ss"){
       run_individual(individuals::smallRobotSmallControl);
     } else if (choice == "ls"){
