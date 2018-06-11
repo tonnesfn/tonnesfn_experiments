@@ -2,11 +2,11 @@
 import pika
 import subprocess
 import platform
+import time
 
 import string
 
 import amqpurl # A file that contains "url = '$URL'" for your amqp account
-
 
 def callback(ch, method, properties, body):
     print("Received message: {}".format(body))
@@ -27,8 +27,13 @@ def callback(ch, method, properties, body):
     # Executing the program:
     processCommand = ['rosrun', 'tonnesfn_experiments', 'expGui']
     processCommand.extend(body.decode('utf-8').split())
-    console_output = subprocess.run(processCommand, stdout=subprocess.PIPE)
-    console_output_str = console_output.stdout.decode('utf-8')
+    console_output = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
+
+    while console_output.poll() is None:
+        connection.process_data_events()
+        time.sleep(3)
+
+    console_output_str = console_output.stdout.read().decode('utf-8')
     console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
     returnMessage = '{\n'

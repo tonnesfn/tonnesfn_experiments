@@ -20,7 +20,7 @@ if __name__ == '__main__':
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
 
-    channel.basic_publish(exchange='', routing_key='hello', body='configure i experiments mn 1 exit')
+    channel.basic_publish(exchange='', routing_key='hello', body='experiments mn 1 exit')
 
 
     channel.queue_declare(queue='results')
