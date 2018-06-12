@@ -920,10 +920,12 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     if (evolveMorphology) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n"); else fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
 
     fprintf(evoLog, "    \"fitness\": [\n");
-    for (int i = 0; i < fitnessFunctions.size(); i++){
-      fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
-      if (i != fitnessFunctions.size()-1) fprintf(evoLog, ",\n");
-    }
+    if (instantFitness == false) {
+      for (int i = 0; i < fitnessFunctions.size(); i++) {
+        fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
+        if (i != fitnessFunctions.size() - 1) fprintf(evoLog, ",\n");
+      }
+    } else fprintf(evoLog, "      \"*INSTANT*\"");
     if (givenAddDiversity) fprintf(evoLog, ", \"Diversity\"\n");
     fprintf(evoLog, "\n");
     fprintf(evoLog, "    ]\n");
