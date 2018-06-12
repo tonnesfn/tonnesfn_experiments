@@ -1046,8 +1046,15 @@ void experiments_randomSearch(){
   std::cout << "How many runs do you want to do? >";
 
   int numberOfTests;
-  std::cin >> numberOfTests;
-  std::cin.ignore(10000, '\n');
+
+  if (commandQueue.empty()) {
+    std::cin >> numberOfTests;
+    std::cin.ignore(10000, '\n');
+  } else {
+    numberOfTests = std::stoi(commandQueue[0]);
+    printf("*%d*\n", numberOfTests);
+    commandQueue.erase(commandQueue.begin());
+  }
 
   fitnessFunctions.clear();
   fitnessFunctions.emplace_back("MocapSpeed");
@@ -1061,16 +1068,35 @@ void experiments_randomSearch(){
     std::string logDirectory = createExperimentDirectory("rand", now);
 
     std::stringstream ss;
-    ss << logDirectory << getDateString(now) << "_rand.txt";
+    ss << logDirectory << getDateString(now) << "_rand.json";
 
     FILE * randomSearchLog = fopen(ss.str().c_str(), "a");
     if (randomSearchLog == NULL){
       ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
     }
 
-    if (ros::Time::isSimTime()) fprintf(randomSearchLog, "Random search (simulation): %s\n", getDateString(now).c_str());
-                           else fprintf(randomSearchLog, "Random search (hardware): %s\n", getDateString(now).c_str());
+    fprintf(randomSearchLog, "{\n");
+    fprintf(randomSearchLog, "  \"experiment_info\": {\n");
+    fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
+    fprintf(randomSearchLog, "    \"type\": \"random\",\n");
+    if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n"); else fprintf(randomSearchLog, "    \"platform\": \"hardware\",\n");
+    fprintf(randomSearchLog, "    \"generations\": %d,\n", generations);
+    fprintf(randomSearchLog, "    \"population\": %d,\n", popSize);
+
+    fprintf(randomSearchLog, "    \"fitness\": [\n");
+    if (instantFitness == false) {
+      for (int i = 0; i < fitnessFunctions.size(); i++) {
+        fprintf(randomSearchLog, "      \"%s\"", fitnessFunctions[i].c_str());
+        if (i != fitnessFunctions.size() - 1) fprintf(randomSearchLog, ",\n");
+      }
+    } else fprintf(randomSearchLog, "      \"*INSTANT*\"");
     fprintf(randomSearchLog, "\n");
+    fprintf(randomSearchLog, "    ]\n");
+
+    fprintf(randomSearchLog, "  },\n");
+
+    fprintf(randomSearchLog, "  \"individuals\": [\n");
+
     fclose(randomSearchLog);
 
     currentIndividual = 0;
@@ -1082,24 +1108,23 @@ void experiments_randomSearch(){
 
       // Log individual
       randomSearchLog = fopen(ss.str().c_str(), "a");
-      fprintf(randomSearchLog, "  Individual %d\n", currentIndividual);
+      fprintf(randomSearchLog, "    {\n");
+      fprintf(randomSearchLog, "      \"id\": %d,\n", currentIndividual);
 
-      fprintf(randomSearchLog, "    Genotype: ");
-      bool first = true;
+      fprintf(randomSearchLog, "      \"genotype\": [\n");
       for (int k = 0; k < randomIndividual.size(); k++) {
-        if (first == false) fprintf(randomSearchLog, ", ");
-        fprintf(randomSearchLog, "%f", randomIndividual[k]);
-        if (first == true) first = false;
+        fprintf(randomSearchLog, "        %f", randomIndividual[k]);
+        if (k == randomIndividual.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
       }
+      fprintf(randomSearchLog, "      ],\n");
 
       std::vector<double> individualParameters = genToPhen(randomIndividual);
-      fprintf(randomSearchLog, "\n    Phenotype: ");
-      first = true;
+      fprintf(randomSearchLog, "      \"phenotype\": [\n");
       for (int k = 0; k < individualParameters.size(); k++) {
-        if (first == false) fprintf(randomSearchLog, ", ");
-        fprintf(randomSearchLog, "%f", individualParameters[k]);
-        if (first == true) first = false;
+        if (isnan(individualParameters[i])) fprintf(randomSearchLog, "        \"NaN\""); else fprintf(randomSearchLog, "        %.2f", individualParameters[i]);
+        if (k == individualParameters.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
       }
+      fprintf(randomSearchLog, "      ],\n");
 
       fclose(randomSearchLog);
 
@@ -1108,23 +1133,29 @@ void experiments_randomSearch(){
                                                             get_gait_evaluation_client);
 
       printf("Returned fitness (%lu): ", fitnessResult.size());
-      randomSearchLog = fopen(ss.str().c_str(), "a");
-      fprintf(randomSearchLog, "\n    Fitness: ");
-      first = true;
-      for (int k = 0; k < fitnessResult.size(); k++) {
-        printf("%.2f ", fitnessResult[j]);
 
-        if (first == false) fprintf(randomSearchLog, ", ");
-        fprintf(randomSearchLog, "%f", fitnessResult[k]);
-        if (first == true) first = false;
+      randomSearchLog = fopen(ss.str().c_str(), "a");
+      fprintf(randomSearchLog, "      \"fitness\": {\n");
+
+      for (int k = 0; k < fitnessResult.size(); k++) {
+        fprintf(randomSearchLog, "        \"%s\": %.3f ", fitnessFunctions[k].c_str(), fitnessResult[k]);
+        if (k == fitnessResult.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
+
       }
-      fprintf(randomSearchLog, "\n");
+
+      fprintf(randomSearchLog, "      }\n");
+
+      if (currentIndividual == ((generations+1)*popSize)){ // If last individual
+        fprintf(randomSearchLog, "    }\n");
+        fprintf(randomSearchLog, "  ]\n");
+        fprintf(randomSearchLog, "}");
+      } else {
+        fprintf(randomSearchLog, "    },\n");
+      }
+
       fclose(randomSearchLog);
-      printf("\n");
     }
   }
-
-
 }
 
 void menu_experiments() {
