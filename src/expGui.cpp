@@ -163,7 +163,6 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client)
       return std::vector<float>();
     }
 
-
     std::stringstream ss;
 
     ss  << "        {\n";
@@ -378,6 +377,33 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   // (Return random fitness to test)
   if (instantFitness == true) {
     usleep(30000);
+
+    rawFitnesses.clear();
+
+    std::stringstream ss1;
+
+    ss1  << "        {\n";
+    for (int i = 0; i < 7; i++){
+      ss1 <<  "          \"rawFitness_" << i << "\": " << std::setprecision(4) << (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+      if (i == 6) ss1 << "\n"; else ss1 << ",\n";
+    }
+
+    ss1 << "        }";
+
+    rawFitnesses.push_back(ss1.str());
+
+    std::stringstream ss2;
+
+    ss2  << "        {\n";
+    for (int i = 0; i < 7; i++){
+      ss2 <<  "          \"rawFitness_" << i << "\": " << std::setprecision(4) << (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+      if (i == 6) ss2 << "\n"; else ss2 << ",\n";
+    }
+
+    ss2 << "        }";
+
+    rawFitnesses.push_back(ss2.str());
+
     return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
                               static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
@@ -1102,6 +1128,7 @@ void experiments_randomSearch(){
     currentIndividual = 0;
 
     for (int j = 0; j < popSize*(generations+1); j++) {
+      rawFitnesses.clear();
 
       // Generate random individual:
       std::vector<double> randomIndividual = getRandomIndividual();
@@ -1121,7 +1148,7 @@ void experiments_randomSearch(){
       std::vector<double> individualParameters = genToPhen(randomIndividual);
       fprintf(randomSearchLog, "      \"phenotype\": [\n");
       for (int k = 0; k < individualParameters.size(); k++) {
-        if (isnan(individualParameters[i])) fprintf(randomSearchLog, "        \"NaN\""); else fprintf(randomSearchLog, "        %.2f", individualParameters[i]);
+        if (isnan(individualParameters[k])) fprintf(randomSearchLog, "        \"NaN\""); else fprintf(randomSearchLog, "        %.2f", individualParameters[k]);
         if (k == individualParameters.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
       }
       fprintf(randomSearchLog, "      ],\n");
@@ -1138,12 +1165,24 @@ void experiments_randomSearch(){
       fprintf(randomSearchLog, "      \"fitness\": {\n");
 
       for (int k = 0; k < fitnessResult.size(); k++) {
-        fprintf(randomSearchLog, "        \"%s\": %.3f ", fitnessFunctions[k].c_str(), fitnessResult[k]);
+        fprintf(randomSearchLog, "        \"%s\": %.3f", fitnessFunctions[k].c_str(), fitnessResult[k]);
+        if (k == fitnessResult.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
+
+        printf("%.2f ",fitnessResult[k]);
+
+      }
+      printf("\n");
+
+      fprintf(randomSearchLog, "      },\n");
+
+      fprintf(randomSearchLog, "      \"raw_fitness\": [\n");
+
+      for (int k = 0; k < rawFitnesses.size(); k++) {
+        fprintf(randomSearchLog, "%s", rawFitnesses[k].c_str());
         if (k == fitnessResult.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
 
       }
-
-      fprintf(randomSearchLog, "      }\n");
+      fprintf(randomSearchLog, "      ]\n");
 
       if (currentIndividual == ((generations+1)*popSize)){ // If last individual
         fprintf(randomSearchLog, "    }\n");
