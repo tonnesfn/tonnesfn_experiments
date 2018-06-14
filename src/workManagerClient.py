@@ -30,8 +30,10 @@ def callback(ch, method, properties, body):
     console_output = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
 
     while console_output.poll() is None:
-        connection.process_data_events()
+        #connection.process_data_events()
+        #channel.basic_ack(delivery_tag = method.delivery_tag)
         time.sleep(3)
+        
 
     console_output_str = console_output.stdout.read().decode('utf-8')
     console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
@@ -56,6 +58,8 @@ def callback(ch, method, properties, body):
 
     channel.basic_publish(exchange='', routing_key='results', body=returnMessage)
 
+    channel.basic_ack(delivery_tag = method.delivery_tag)
+
     print("Done!")
 
 
@@ -64,11 +68,10 @@ if __name__ == '__main__':
     connection = pika.BlockingConnection(params)
 
     channel = connection.channel()
+    channel.basic_qos(prefetch_count=1)
 
-    # Create testing channel:
+    channel.queue_declare(queue='commands')
 
-    channel.queue_declare(queue='hello')
-
-    channel.basic_consume(callback, queue='hello', no_ack=True)
+    channel.basic_consume(callback, queue='commands')
 
     channel.start_consuming()
