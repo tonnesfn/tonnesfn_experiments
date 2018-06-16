@@ -198,9 +198,9 @@ namespace sferes {
               if (ev.data(6) < 0.0f) ev.data(6, -ev.data(6));
             }
 
-            FILE *fp = fopen("mutate.csv", "a");
+            /*FILE *fp = fopen("mutate.csv", "a");
             fprintf(fp, "%.4f, %.4f\n", ev.data(0), ev.data(6));
-            fclose(fp);
+            fclose(fp);*/
           }
         }
       };
