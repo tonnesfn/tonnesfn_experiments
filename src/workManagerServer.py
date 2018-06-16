@@ -15,13 +15,18 @@ if __name__ == '__main__':
         print("  evo - run evolutionary experiments")
         print("  rand - run random search experiments")
         print("  file - run commands from file")
+        print()
+        print("  purge - purge command queue")
         print("  exit - exit the program")
         print();
 
         choice = input(">")
 
-        if choice == "exit":
+        if choice == "exit" or choice == "":
             break;
+        elif choice == "purge":
+            channel.queue_purge(queue="commands")
+            print("  Commands queue purged\n")
         elif choice == "evo":
             experimentNumber = int(input("  How many experiments do you want to run? >"))
             for i in range(experimentNumber):
@@ -48,4 +53,4 @@ if __name__ == '__main__':
 
             print("      Commands sent successfully\n")
         else:
-            print("Unknown")
+            print("Unknown command\n")
