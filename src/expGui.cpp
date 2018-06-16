@@ -77,7 +77,14 @@ char **argv_g;
 
 std::vector<std::string> rawFitnesses; // Used to store raw fitness string until log writing
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
-std::vector<std::string> commandQueue; // Used to store commands from the arguments
+std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
+std::string fullCommand; // Used to store commands from the arguments permanently
+
+std::string trim(std::string& str){
+  size_t first = str.find_first_not_of(' ');
+  size_t last = str.find_last_not_of(' ');
+  return str.substr(first, (last-first+1));
+}
 
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
   if (givenServoConfigService.call(givenCall))  {
@@ -933,6 +940,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     fprintf(evoLog, "{\n");
     fprintf(evoLog, "  \"experiment_info\": {\n");
     fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
+    fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(evoLog, "    \"type\": \"evolution\",\n");
 
     if (ros::Time::isSimTime()) fprintf(evoLog, "    \"platform\": \"simulation\",\n"); else fprintf(evoLog, "    \"platform\": \"hardware\",\n");
@@ -1100,6 +1108,7 @@ void experiments_randomSearch(){
     fprintf(randomSearchLog, "{\n");
     fprintf(randomSearchLog, "  \"experiment_info\": {\n");
     fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
+    fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(randomSearchLog, "    \"type\": \"random\",\n");
     if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n"); else fprintf(randomSearchLog, "    \"platform\": \"hardware\",\n");
     fprintf(randomSearchLog, "    \"generations\": %d,\n", generations);
@@ -1188,8 +1197,12 @@ void experiments_randomSearch(){
         fprintf(randomSearchLog, "    },\n");
       }
 
+
+
       fclose(randomSearchLog);
     }
+
+    printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
   }
 }
 
@@ -1346,9 +1359,12 @@ int main(int argc, char **argv){
 
   argv_g = argv;
 
+  fullCommand = "";
   if (argc > 1){
     for (int i = 1; i < argc; i++) {
       commandQueue.emplace_back(argv[i]);
+      fullCommand.append(argv[i]);
+      fullCommand.append(" ");
     }
   }
 
