@@ -35,8 +35,6 @@
 #include "external/sferes/run.hpp"
 #include <boost/program_options.hpp>
 
-#include "rosConnection.h"
-
 #include <sstream>
 #include <iostream>
 
@@ -695,7 +693,7 @@ public:
         if (fitnessResult.size() == 0) validSolution = false;
 
         if ((validSolution == false) || (fitnessResult.size() == 0)){
-          printf("Got invalid fitness: choose action ((r)etry/(d)iscard/r(e)connect/(c)ooldown): ");
+          printf("Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
 
           char choice;
           scanf(" %c", &choice);
@@ -706,8 +704,6 @@ public:
 
               printf("Discarding\n");
               validSolution = true;
-          } else if (choice == 'e'){
-            ROS_ERROR("Not implemented!");
           } else if (choice == 'c'){
             disableServos();
             printf("Servos disabled\n");
@@ -1248,7 +1244,6 @@ void menu_configure() {
 
   printf("    i - enable/disable instant fitness\n");
   printf("    s - enable/disable stand testing\n");
-  printf("    r - reconnect to ROS resources\n");
   printf("    e - enable servo torques\n");
   printf("    d - disable servo torques\n");
   printf("\n> ");
@@ -1275,10 +1270,6 @@ void menu_configure() {
       }
 
       robotOnStand = !robotOnStand;
-    } else if (choice == "r") {
-      printf("Reconnecting!\n");
-      ROS_ERROR("Rosconnect not implemented!");
-      printf("Reconnected!\n");
     } else if (choice == "e"){
       enableServos();
       printf("Servos enabled!\n");
