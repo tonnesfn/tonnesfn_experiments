@@ -3,15 +3,25 @@ import pika
 import subprocess
 import platform
 import time
-
+import json
 import string
+import os
 
 import amqpurl # A file that contains "url = '$URL'" for your amqp account
+
 
 def callback(ch, method, properties, body):
     print("Received message: {}".format(body))
 
-    # Building
+    # Extract message and settings:
+    message = json.loads(body.decode('utf-8'))
+
+    # Write settings file:
+    print(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'))
+    with open(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'), "w") as evo_settings_file:
+        evo_settings_file.write("const int popSize =  {};\nconst int generations = {};\n".format(message['settings']['individuals'], message['settings']['generations']))
+
+    # Building the project:
     print("Building tonnesfn_experiments:")
     result = subprocess.run(['catkin', 'build', 'tonnesfn_experiments'], stdout=subprocess.PIPE)
     result_str = result.stdout.decode('utf-8')
@@ -24,16 +34,13 @@ def callback(ch, method, properties, body):
         return
 
     # Executing the program:
-    # Executing the program:
     processCommand = ['rosrun', 'tonnesfn_experiments', 'expGui']
-    processCommand.extend(body.decode('utf-8').split())
+    processCommand.extend(message['command'].split())
     console_output = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
 
     while console_output.poll() is None:
-        #connection.process_data_events()
-        #channel.basic_ack(delivery_tag = method.delivery_tag)
-        time.sleep(3)
-        
+        connection.process_data_events()
+        time.sleep(1)
 
     console_output_str = console_output.stdout.read().decode('utf-8')
     console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
@@ -70,8 +77,8 @@ if __name__ == '__main__':
     channel = connection.channel()
     channel.basic_qos(prefetch_count=1)
 
-    channel.queue_declare(queue='commands')
+    channel.queue_declare(queue='jobs')
 
-    channel.basic_consume(callback, queue='commands')
+    channel.basic_consume(callback, queue='jobs')
 
     channel.start_consuming()

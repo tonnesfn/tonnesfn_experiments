@@ -40,6 +40,8 @@
 
 #include "individuals.h"
 
+#include "evoSettings.h"
+
 ros::ServiceClient servoConfigClient;
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher trajectoryMessage_pub;
@@ -60,8 +62,6 @@ std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
 
-const int popSize =  8;
-const int generations = 8;
 constexpr float phen_maxStepLength = 300.0;
 constexpr float phen_maxFrequency  = 2.0;
 
