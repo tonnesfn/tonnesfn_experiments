@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <chrono>
+#include <chrono>
+#include <unistd.h>
 
 #include "ros/ros.h"
 
@@ -937,11 +939,16 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
       ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
     }
 
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
     fprintf(evoLog, "{\n");
     fprintf(evoLog, "  \"experiment_info\": {\n");
     fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
     fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(evoLog, "    \"type\": \"evolution\",\n");
+    fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
+    fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
 
     if (ros::Time::isSimTime()) fprintf(evoLog, "    \"platform\": \"simulation\",\n"); else fprintf(evoLog, "    \"platform\": \"hardware\",\n");
     fprintf(evoLog, "    \"generations\": %d,\n", generations);
@@ -1105,11 +1112,16 @@ void experiments_randomSearch(){
       ROS_ERROR("randomSearchLog couldnt be opened (err%d)\n", errno);
     }
 
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
     fprintf(randomSearchLog, "{\n");
     fprintf(randomSearchLog, "  \"experiment_info\": {\n");
     fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
     fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(randomSearchLog, "    \"type\": \"random\",\n");
+    fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
+    fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
     if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n"); else fprintf(randomSearchLog, "    \"platform\": \"hardware\",\n");
     fprintf(randomSearchLog, "    \"generations\": %d,\n", generations);
     fprintf(randomSearchLog, "    \"population\": %d,\n", popSize);
