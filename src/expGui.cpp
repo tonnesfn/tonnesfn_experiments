@@ -514,7 +514,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     return gaitResultsForward;
   }
 
-  printf("\tRes F: ");
+  printf("  Res F: ");
   for (int i = 0; i < gaitResultsForward.size(); i++) {
     printf("%.5f", gaitResultsForward[i]);
     if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
@@ -544,7 +544,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     return gaitResultsReverse;
   }
 
-  printf("\tRes R: ");
+  printf("  Res R: ");
   for (int i = 0; i < gaitResultsReverse.size(); i++) {
     printf("%.5f", gaitResultsReverse[i]);
     if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
@@ -1056,7 +1056,7 @@ void experiments_fitnessNoise(){
     sleep(30);
 
     std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client);
-    printf("\tRes: ");
+    printf("  Res: ");
     for (int i = 0; i < gaitResults.size(); i++){
       printf("%.5f", gaitResults[i]);
       if (i != (gaitResults.size()-1)) printf(", "); else printf("\n");
