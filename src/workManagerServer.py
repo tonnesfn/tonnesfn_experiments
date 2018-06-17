@@ -30,13 +30,17 @@ if __name__ == '__main__':
             print("  Job queue purged\n")
         elif choice == "evo":
             experimentNumber = int(input("  How many experiments do you want to run? >"))
+            generations = int(input("  How many generations? >"))
+            individuals = int(input("  How many individuals? >"))
             for i in range(experimentNumber):
-                channel.basic_publish(exchange='', routing_key='jobs', body='experiments mn 1 exit')
+                channel.basic_publish(exchange='', routing_key='jobs', body='{{"command": "experiments mn 1 exit", "settings": {{"generations": {}, "individuals": {}}}}}'.format(generations, individuals))
             print("  Sent {} evolutionary search jobs to the queue.\n".format(experimentNumber))
         elif choice == "rand":
             experimentNumber = int(input("  How many experiments do you want to run? >"))
+            generations = int(input("  How many generations? >"))
+            individuals = int(input("  How many individuals? >"))
             for i in range(experimentNumber):
-                channel.basic_publish(exchange='', routing_key='jobs', body='experiments ra 1 exit')
+                channel.basic_publish(exchange='', routing_key='jobs', body='{{"command": "experiments ra 1 exit", "settings": {{"generations": {}, "individuals": {}}}}}'.format(generations, individuals))
             print("  Sent {} random search jobs to the queue.\n".format(experimentNumber))
         elif choice == "file":
             print("    read - read jobs from file")
