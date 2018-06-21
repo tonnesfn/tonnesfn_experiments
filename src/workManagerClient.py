@@ -36,13 +36,20 @@ def callback(ch, method, properties, body):
     # Executing the program:
     processCommand = ['rosrun', 'tonnesfn_experiments', 'expGui']
     processCommand.extend(message['command'].split())
-    console_output = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
+    console_process = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
 
-    while console_output.poll() is None:
-        connection.process_data_events()
-        time.sleep(1)
+    try:
 
-    console_output_str = console_output.stdout.read().decode('utf-8')
+        while console_process.poll() is None:
+            connection.process_data_events()
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received. Killing process!")
+        console_process.kill()
+        exit()
+
+    console_output_str = console_process.stdout.read().decode('utf-8')
     console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
     returnMessage = '{\n'
