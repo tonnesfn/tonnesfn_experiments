@@ -899,7 +899,7 @@ std::string createExperimentDirectory(std::string prefix, struct tm * givenTime)
 }
 
 void experiments_evolve(const std::string givenMorphology, bool evolveMorphology, bool givenAddDiversity){
-  assert(popSize == 8);
+  //assert(popSize == 8);
   addDiversity = givenAddDiversity;
   evolveMorph = evolveMorphology;
   morphology = givenMorphology;
@@ -945,7 +945,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     fprintf(evoLog, "{\n");
     fprintf(evoLog, "  \"experiment_info\": {\n");
     fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
-    fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    if (fullCommand.size() != 0) fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(evoLog, "    \"type\": \"evolution\",\n");
     fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
     fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
@@ -1118,7 +1118,7 @@ void experiments_randomSearch(){
     fprintf(randomSearchLog, "{\n");
     fprintf(randomSearchLog, "  \"experiment_info\": {\n");
     fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
-    fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    if (fullCommand.size() != 0) fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(randomSearchLog, "    \"type\": \"random\",\n");
     fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
     fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
