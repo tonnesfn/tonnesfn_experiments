@@ -152,16 +152,27 @@ void disableServos(){
   sendServoTorqueMessage(0);
 }
 
-void startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
+bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
   dyret_controller::GetGaitEvaluation srv;
   srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_start;
-  if (!get_gait_evaluation_client.call(srv)) ROS_ERROR("Error while calling GaitRecording service with t_start\n");
+  if (!get_gait_evaluation_client.call(srv)){
+    ROS_ERROR("Error while calling GaitRecording service with t_start\n");
+    return false;
+  }
+
+  return true;
 }
 
-void resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
+bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
   dyret_controller::GetGaitEvaluation srv;
   srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_resetStatistics;
-  if (!get_gait_evaluation_client.call(srv)) ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics\n");
+  if (!get_gait_evaluation_client.call(srv)){
+    ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics\n");
+    return false;
+  }
+
+  return true;
+
 }
 
 std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
@@ -1431,7 +1442,11 @@ int main(int argc, char **argv){
   std::string evoInfo = "testInfo";
 
   resetTrajectoryPos(trajectoryMessage_pub);
-  resetGaitRecording(get_gait_evaluation_client);
+  if (resetGaitRecording(get_gait_evaluation_client) == false){
+      spinner.stop();
+      ros::shutdown();
+      exit(0);
+  }
 
   addDiversity = true;
   currentIndividual = -1;
