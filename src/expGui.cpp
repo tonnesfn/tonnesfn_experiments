@@ -54,6 +54,8 @@ ros::ServiceClient servoStatus_client;
 ros::Publisher actionMessages_pub;
 ros::Publisher positionCommand_pub;
 
+FILE* logOutput = stdout;
+
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
 int evaluationTimeout = 15; // 15 sec max each direction
@@ -81,6 +83,10 @@ std::vector<std::string> rawFitnesses; // Used to store raw fitness string until
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
 std::string fullCommand; // Used to store commands from the arguments permanently
+
+bool automatedRun(){
+  return !fullCommand.empty();
+}
 
 std::string trim(std::string& str){
   size_t first = str.find_first_not_of(' ');
@@ -420,7 +426,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     if (currentIndividual == popSize) {
       currentIndividual = 0;
       getMaxServoTemperature(true);
-      printf("Cooldown to 50C? (y/n) > ");
+      fprintf(logOutput, "Cooldown to 50C? (y/n) > ");
 
       char choice;
       scanf(" %c", &choice);
@@ -428,10 +434,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
       if (choice == 'y') {
         disableServos();
         long long int currentTime = getMs();
-        printf("00.0 ");
+        fprintf(logOutput, "00.0 ");
         while (getMaxServoTemperature(true) > 50) {
           sleep(10);
-          printf("%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
+          fprintf(logOutput, "%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
         }
 
         std::cout << "Press enter to enable servos";
@@ -446,7 +452,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     }
   }
 
-  printf("%03u: Evaluating stepLength %.2f, "
+  fprintf(logOutput, "%03u: Evaluating stepLength %.2f, "
              "stepHeight %.2f, "
              "smoothing %.2f, "
              "frequency: %.2f, "
@@ -473,7 +479,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   if (ros::Time::isSystemTime()) { // Only check temperature in real world
     // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
     if (getMaxServoTemperature() > 70.0) {
-      printf("  Temperature is too high at %.1f\n", getMaxServoTemperature());
+      fprintf(logOutput, "  Temperature is too high at %.1f\n", getMaxServoTemperature());
       return std::vector<float>();
     }
   }
@@ -502,7 +508,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > (evaluationTimeout + 60)) {
-      printf("Timed out at first evaluation (%d seconds)\n", secPassed);
+      fprintf(logOutput, "Timed out at first evaluation (%d seconds)\n", secPassed);
       return std::vector<float>();
     }
   }
@@ -514,10 +520,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     return gaitResultsForward;
   }
 
-  printf("  Res F: ");
+  fprintf(logOutput, "  Res F: ");
   for (int i = 0; i < gaitResultsForward.size(); i++) {
-    printf("%.5f", gaitResultsForward[i]);
-    if (i != (gaitResultsForward.size() - 1)) printf(", "); else printf("\n");
+    fprintf(logOutput, "%.5f", gaitResultsForward[i]);
+    if (i != (gaitResultsForward.size() - 1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
   }
 
   trajectoryDistances[0] = 0.0;
@@ -532,7 +538,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   while (gaitControllerDone(gaitControllerStatus_client) == false) {
     sleep(1);
     if (secPassed++ > (evaluationTimeout + 60)) {
-      printf("Timed out at second evaluation (%d seconds)\n", secPassed);
+      fprintf(logOutput, "Timed out at second evaluation (%d seconds)\n", secPassed);
       return std::vector<float>();
     }
   }
@@ -544,10 +550,10 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
     return gaitResultsReverse;
   }
 
-  printf("  Res R: ");
+  fprintf(logOutput, "  Res R: ");
   for (int i = 0; i < gaitResultsReverse.size(); i++) {
-    printf("%.5f", gaitResultsReverse[i]);
-    if (i != (gaitResultsReverse.size() - 1)) printf(", "); else printf("\n");
+    fprintf(logOutput, "%.5f", gaitResultsReverse[i]);
+    if (i != (gaitResultsReverse.size() - 1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
   }
 
   std::vector<float> fitness(fitnessFunctions.size());
@@ -685,13 +691,15 @@ public:
     bool validSolution;
     std::vector<float> fitnessResult;
 
+    int retryCounter = 0;
+
     do{
         validSolution = true;
         fitnessResult = evaluateIndividual(individualParameters, false, gaitControllerStatus_client, trajectoryMessage_pub, get_gait_evaluation_client);
 
-        printf("    Fitness received: ");
-        for (int i = 0; i < fitnessResult.size(); i++) printf("%.2f ", fitnessResult[i]);
-        printf("\n");
+        fprintf(logOutput, "    Fitness received: ");
+        for (int i = 0; i < fitnessResult.size(); i++) fprintf(logOutput, "%.2f ", fitnessResult[i]);
+        fprintf(logOutput, "\n");
 
         for (int i = 0; i < fitnessResult.size(); i++){
             if (std::isnan(fitnessResult[i]) == true){
@@ -701,36 +709,49 @@ public:
 
         if (fitnessResult.size() == 0) validSolution = false;
 
+        // A valid solution could not be found:
         if ((validSolution == false) || (fitnessResult.size() == 0)){
-          printf("Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
+          if (automatedRun){
+            if (retryCounter < 3){
+              fprintf(logOutput, "Retrying\n");
+              retryCounter += 1;
+              currentIndividual--;
+              validSolution = false;
+            } else {
+              fprintf(logOutput, "ABORT - after three retries without results\n");
+              exit(-1);
+            }
+          } else {
+            fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
 
-          char choice;
-          scanf(" %c", &choice);
+            char choice;
+            scanf(" %c", &choice);
 
-          if (choice == 'd'){ // Discard
+            if (choice == 'd') { // Discard
               fitnessResult.resize(fitnessFunctions.size());
               for (int i = 0; i < fitnessResult.size(); i++) fitnessResult[i] = -1000;
 
-              printf("Discarding\n");
+              fprintf(logOutput, "Discarding\n");
               validSolution = true;
-          } else if (choice == 'c'){
-            disableServos();
-            printf("Servos disabled\n");
+            } else if (choice == 'c') {
+              disableServos();
+              fprintf(logOutput, "Servos disabled\n");
 
-            while (getMaxServoTemperature(true) > 50){ sleep(15); }
+              while (getMaxServoTemperature(true) > 50) { sleep(15); }
 
-            enableServos();
+              enableServos();
 
-            std::cout << "Press enter to continue evolution";
-            std::cin.ignore();
-            std::cin.ignore();
+              std::cout << "Press enter to continue evolution";
+              std::cin.ignore();
+              std::cin.ignore();
 
-            currentIndividual--;
-            validSolution = false;
-          } else {
-              printf("Retrying\n");
               currentIndividual--;
               validSolution = false;
+            } else {
+              fprintf(logOutput, "Retrying\n");
+              currentIndividual--;
+              validSolution = false;
+            }
           }
         }
 
@@ -826,7 +847,7 @@ void run_individual(std::vector<double> givenPhenotype){
     std::vector<float> fitnessResult = evaluateIndividual(givenPhenotype, false,
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
-    printf("Returned fitness (%lu): ", fitnessResult.size());
+    fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
   }
 }
 
@@ -836,19 +857,19 @@ void menu_demo(){
 
   std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-  printf("    ss - Test small robot (small control)\n"
+  fprintf(logOutput, "    ss - Test small robot (small control)\n"
          "    ls - Test large robot (small control)\n"
          "    ll - Test large robot (large control)\n"
          "    ms - Request small morphology\n"
          "    mm - Request medium morphology\n"
          "    ml - Request large morphology\n");
-  printf("\n> ");
+  fprintf(logOutput, "\n> ");
 
   if (commandQueue.empty()) {
     getline(std::cin, choice);
   } else {
     choice = commandQueue[0];
-    printf("*%s*\n", choice.c_str());
+    fprintf(logOutput, "*%s*\n", choice.c_str());
     commandQueue.erase(commandQueue.begin());
   }
 
@@ -861,13 +882,13 @@ void menu_demo(){
       run_individual(individuals::largeRobotLargeControl);
     } else if (choice == "ms"){
       setLegLengths(0.0,0.0);
-      printf("Small morphology requested\n");
+      fprintf(logOutput, "Small morphology requested\n");
     } else if (choice == "mm"){
       setLegLengths(12.5,47.5);
-      printf("Medium morphology requested\n");
+      fprintf(logOutput, "Medium morphology requested\n");
     } else if (choice == "ml"){
       setLegLengths(25.0,95.0);
-      printf("Large morphology requested\n");
+      fprintf(logOutput, "Large morphology requested\n");
     }
   }
 };
@@ -917,7 +938,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     std::cin.ignore(10000, '\n');
   } else {
     numberOfTests = std::stoi(commandQueue[0]);
-    printf("*%d*\n", numberOfTests);
+    fprintf(logOutput, "*%d*\n", numberOfTests);
     commandQueue.erase(commandQueue.begin());
   }
 
@@ -985,12 +1006,12 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     const char *sferesCommand = commString.c_str();
     argv_tmp[1] = const_cast<char*>(sferesCommand);
 
-    printf("%s, %s\n", argv_tmp[0], argv_tmp[1]);
+    fprintf(logOutput, "%s, %s\n", argv_tmp[0], argv_tmp[1]);
 
     run_ea(argc_tmp, argv_tmp, expGui::ea, evoLogPath);
     evoLogPath.clear();
 
-    printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
+    fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
   }
 
 };
@@ -1030,20 +1051,20 @@ void experiments_verifyFitness(){
                                                           gaitControllerStatus_client, trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
 
-    printf("Returned fitness (%lu): ", fitnessResult.size());
+    fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
     FILE * verifyLog = fopen(verifyLogPath.c_str(), "a");
 
     if (i > 0) fprintf(verifyLog, "\n");
 
     for (int j = 0; j < fitnessResult.size(); j++) {
-      printf("%.2f ", fitnessResult[j]);
+      fprintf(logOutput, "%.2f ", fitnessResult[j]);
 
       if (j > 0) fprintf(verifyLog, ", ");
       fprintf(verifyLog, "%f",fitnessResult[j]);
     }
 
     fclose(verifyLog);
-    printf("\n");
+    fprintf(logOutput, "\n");
 
   }
 }
@@ -1056,10 +1077,10 @@ void experiments_fitnessNoise(){
     sleep(30);
 
     std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client);
-    printf("  Res: ");
+    fprintf(logOutput, "  Res: ");
     for (int i = 0; i < gaitResults.size(); i++){
-      printf("%.5f", gaitResults[i]);
-      if (i != (gaitResults.size()-1)) printf(", "); else printf("\n");
+      fprintf(logOutput, "%.5f", gaitResults[i]);
+      if (i != (gaitResults.size()-1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
     }
   }
 }
@@ -1089,7 +1110,7 @@ void experiments_randomSearch(){
     std::cin.ignore(10000, '\n');
   } else {
     numberOfTests = std::stoi(commandQueue[0]);
-    printf("*%d*\n", numberOfTests);
+    fprintf(logOutput, "*%d*\n", numberOfTests);
     commandQueue.erase(commandQueue.begin());
   }
 
@@ -1118,7 +1139,7 @@ void experiments_randomSearch(){
     fprintf(randomSearchLog, "{\n");
     fprintf(randomSearchLog, "  \"experiment_info\": {\n");
     fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
-    if (fullCommand.size() != 0) fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(randomSearchLog, "    \"type\": \"random\",\n");
     fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
     fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
@@ -1176,7 +1197,7 @@ void experiments_randomSearch(){
                                                             gaitControllerStatus_client, trajectoryMessage_pub,
                                                             get_gait_evaluation_client);
 
-      printf("Returned fitness (%lu): ", fitnessResult.size());
+      fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
 
       randomSearchLog = fopen(ss.str().c_str(), "a");
       fprintf(randomSearchLog, "      \"fitness\": {\n");
@@ -1185,10 +1206,10 @@ void experiments_randomSearch(){
         fprintf(randomSearchLog, "        \"%s\": %.3f", fitnessFunctions[k].c_str(), fitnessResult[k]);
         if (k == fitnessResult.size()-1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
 
-        printf("%.2f ",fitnessResult[k]);
+        fprintf(logOutput, "%.2f ",fitnessResult[k]);
 
       }
-      printf("\n");
+      fprintf(logOutput, "\n");
 
       fprintf(randomSearchLog, "      },\n");
 
@@ -1214,7 +1235,7 @@ void experiments_randomSearch(){
       fclose(randomSearchLog);
     }
 
-    printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
+    fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
   }
 }
 
@@ -1223,7 +1244,7 @@ void menu_experiments() {
 
   std::cout << "  Please choose one experiment: (enter to go back)\n";
 
-  printf("    cs - evolve control, small morphology\n"
+  fprintf(logOutput, "    cs - evolve control, small morphology\n"
          "    cm - evolve control, medium morphology\n"
          "    cl - evolve control, large morphology\n"
          "    my - evolve cont+morph, with diversity\n"
@@ -1231,13 +1252,13 @@ void menu_experiments() {
          "    ra - random search\n"
          "    vf - verify fitness on single individual\n"
          "    vn - check noise in stability fitness\n");
-  printf("\n> ");
+  fprintf(logOutput, "\n> ");
 
   if (commandQueue.empty()) {
     getline(std::cin, choice);
   } else {
     choice = commandQueue[0];
-    printf("*%s*\n", choice.c_str());
+    fprintf(logOutput, "*%s*\n", choice.c_str());
     commandQueue.erase(commandQueue.begin());
   }
 
@@ -1267,47 +1288,47 @@ void menu_configure() {
 
   std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
-  printf("    i - enable/disable instant fitness\n");
-  printf("    s - enable/disable stand testing\n");
-  printf("    e - enable servo torques\n");
-  printf("    d - disable servo torques\n");
-  printf("\n> ");
+  fprintf(logOutput, "    i - enable/disable instant fitness\n");
+  fprintf(logOutput, "    s - enable/disable stand testing\n");
+  fprintf(logOutput, "    e - enable servo torques\n");
+  fprintf(logOutput, "    d - disable servo torques\n");
+  fprintf(logOutput, "\n> ");
 
   if (commandQueue.empty()) {
     getline(std::cin, choice);
   } else {
     choice = commandQueue[0];
-    printf("*%s*\n", choice.c_str());
+    fprintf(logOutput, "*%s*\n", choice.c_str());
     commandQueue.erase(commandQueue.begin());
   }
 
   if (choice.empty() != true) {
     if (choice == "i") {
       instantFitness = !instantFitness;
-      if (instantFitness == true) printf("Instant fitness evaluation now enabled!\n");
+      if (instantFitness == true) fprintf(logOutput, "Instant fitness evaluation now enabled!\n");
       else
-        printf("Instant fitness evaluation now disabled!\n");
+        fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
     } else if (choice == "s"){
       if (robotOnStand == true){
-        printf("   RobotOnStand now disabled!\n");
+        fprintf(logOutput, "   RobotOnStand now disabled!\n");
       } else {
-        printf("   RobotOnStand now enabled!\n");
+        fprintf(logOutput, "   RobotOnStand now enabled!\n");
       }
 
       robotOnStand = !robotOnStand;
     } else if (choice == "e"){
       enableServos();
-      printf("Servos enabled!\n");
+      fprintf(logOutput, "Servos enabled!\n");
     } else if (choice == "d"){
       disableServos();
-      printf("Servos disabled!\n");
+      fprintf(logOutput, "Servos disabled!\n");
     }
   }
-  printf("\n");
+  fprintf(logOutput, "\n");
 }
 
 void testInverseKinematics(){
-  printf("Testing inverse kinematics:\n");
+  fprintf(logOutput, "Testing inverse kinematics:\n");
 
   std::vector<float> position;
 
@@ -1346,14 +1367,14 @@ void menu_test(){
   for(;;) {
     std::cout << "  Please choose one test: (enter to go back)\n";
 
-    printf("    inv - test inverseKinematics\n");
-    printf("\n> ");
+    fprintf(logOutput, "    inv - test inverseKinematics\n");
+    fprintf(logOutput, "\n> ");
 
     if (commandQueue.empty()) {
       getline(std::cin, choice);
     } else {
       choice = commandQueue[0];
-      printf("*%s*\n", choice.c_str());
+      fprintf(logOutput, "*%s*\n", choice.c_str());
       commandQueue.erase(commandQueue.begin());
     }
 
@@ -1416,9 +1437,9 @@ int main(int argc, char **argv){
   currentIndividual = -1;
 
   if (ros::Time::isSimTime()){
-    printf("Currently running in simulation mode\n");
+    fprintf(logOutput, "Currently running in simulation mode\n");
   } else {
-    printf("Currently running in hardware mode\n");
+    fprintf(logOutput, "Currently running in hardware mode\n");
   }
 
   std::map< std::string, boost::function<void()> > menu;
@@ -1434,13 +1455,13 @@ int main(int argc, char **argv){
     while(it != menu.end()) {
       std::cout << "  " << (it++)->first << std::endl;
     }
-    printf("\n> ");
+    fprintf(logOutput, "\n> ");
 
     if (commandQueue.empty()) {
       getline(std::cin, choice);
     } else {
       choice = commandQueue[0];
-      printf("*%s*\n", choice.c_str());
+      fprintf(logOutput, "*%s*\n", choice.c_str());
       commandQueue.erase(commandQueue.begin());
     }
 
@@ -1449,7 +1470,7 @@ int main(int argc, char **argv){
       ros::shutdown();
       exit(0);
     } else if(menu.find(choice) == menu.end()) {
-      printf("Unknown choice!\n");
+      fprintf(logOutput, "Unknown choice!\n");
       continue;
     }
 

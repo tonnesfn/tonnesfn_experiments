@@ -52,6 +52,10 @@ def callback(ch, method, properties, body):
     console_output_str = console_process.stdout.read().decode('utf-8')
     console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
+    if "ABORT" in console_output_str:
+        print("Experiment aborted.")
+        return
+
     returnMessage = '{\n'
     returnMessage += "  \"node\": \"{}\",\n".format(platform.node())
     returnMessage += "  \"consoleOutput\": \n"
