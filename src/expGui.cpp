@@ -1457,8 +1457,10 @@ int main(int argc, char **argv){
     }
     fprintf(logOutput, "\n> ");
 
-    if (commandQueue.empty()) {
+    if (commandQueue.empty() && !automatedRun()) {
       getline(std::cin, choice);
+    } else if (commandQueue.empty() && automatedRun) {
+      choice = "exit";
     } else {
       choice = commandQueue[0];
       fprintf(logOutput, "*%s*\n", choice.c_str());
