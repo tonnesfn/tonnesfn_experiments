@@ -613,7 +613,7 @@ struct Params {
   };
   struct pop {
     SFERES_CONST unsigned size     =   popSize;  // Population size
-    SFERES_CONST unsigned nb_gen   =   generations;  // Number of generations
+    SFERES_CONST unsigned nb_gen   =   generations-1;  // Number of generations
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
   };
@@ -821,7 +821,7 @@ public:
 
     fprintf(evoLog, "    }");
 
-    if (currentIndividual == ((generations+1)*popSize)-1){ // If last individual
+    if (currentIndividual == ((generations)*popSize)-1){ // If last individual
       fprintf(evoLog, "\n");
       fprintf(evoLog, "  ]\n");
       fprintf(evoLog, "}");
@@ -1176,7 +1176,7 @@ void experiments_randomSearch(){
 
     currentIndividual = 0;
 
-    for (int j = 0; j < popSize*(generations+1); j++) {
+    for (int j = 0; j < popSize*(generations); j++) {
       rawFitnesses.clear();
 
       // Generate random individual:
@@ -1233,7 +1233,7 @@ void experiments_randomSearch(){
       }
       fprintf(randomSearchLog, "      ]\n");
 
-      if (currentIndividual == ((generations+1)*popSize)){ // If last individual
+      if (currentIndividual == ((generations)*popSize)){ // If last individual
         fprintf(randomSearchLog, "    }\n");
         fprintf(randomSearchLog, "  ]\n");
         fprintf(randomSearchLog, "}");
