@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find dyret_controller)/launch/fullController.launch" />
+  <include file="$(find dyret_hardware)/launch/labSetup.launch" />
+</launch>
