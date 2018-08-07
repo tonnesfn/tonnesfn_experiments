@@ -575,25 +575,12 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
   float fitness_stability = (gaitResultsForward[6] + gaitResultsReverse[6]) / 2.0;
   float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
 
-  // Inferred speed:
-  if (isFitnessObjective("InferredSpeed")) {
-    fitness[currentFitnessIndex] = fitness_inferredSpeed;
-    currentFitnessIndex++;
-  }
-
-  if (isFitnessObjective("Current")) {
-    fitness[currentFitnessIndex] = fitness_current;
-    currentFitnessIndex++;
-  }
-
-  if (isFitnessObjective("Stability")) {
-    fitness[currentFitnessIndex] = fitness_stability;
-    currentFitnessIndex++;
-  }
-
-  if (isFitnessObjective("MocapSpeed")) {
-    fitness[currentFitnessIndex] = fitness_mocapSpeed;
-    currentFitnessIndex++;
+  for (int i = 0; i < fitnessFunctions.size(); i++){
+      fitness[i] = -1;
+      if (fitnessFunctions[i] == "InferredSpeed") fitness[i] = fitness_inferredSpeed;
+      if (fitnessFunctions[i] == "Current") fitness[i] = fitness_current;
+      if (fitnessFunctions[i] == "Stability") fitness[i] = fitness_stability;
+      if (fitnessFunctions[i] == "MocapSpeed") fitness[i] = fitness_mocapSpeed;
   }
 
   return fitness;
