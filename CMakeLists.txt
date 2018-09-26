@@ -54,6 +54,15 @@ target_link_libraries(expGui ${TBB_LIBRARIES})
 add_dependencies(expGui
   ${catkin_EXPORTED_TARGETS})
 
+add_executable(mapGui
+               src/mapGui.cpp
+              )
+target_link_libraries(mapGui ${catkin_LIBRARIES})
+target_link_libraries(mapGui ${Boost_LIBRARIES})
+target_link_libraries(mapGui ${TBB_LIBRARIES})
+add_dependencies(mapGui
+  ${catkin_EXPORTED_TARGETS})
+
 add_executable(hardwareTest
                src/hardwareTest.cpp
               )
