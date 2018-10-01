@@ -184,6 +184,33 @@ bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
 
 }
 
+void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client){
+  dyret_controller::GetGaitEvaluation srv;
+  std::vector<std::string> descriptorsToReturn;
+
+  srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getDescriptors;
+
+  if (get_gait_evaluation_client.call(srv)) {
+
+    std::stringstream ss;
+
+    ss  << "        {\n";
+    for (int i = 0; i < srv.response.descriptors.size(); i++){
+      float randNumber = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+      ss <<  "          \"" << srv.response.descriptors[i] << "\": " << randNumber;
+      if (i == srv.response.descriptors.size()-1) ss << "\n"; else ss << ",\n";
+    }
+
+    ss << "        }";
+
+    rawFitnesses.push_back(ss.str());
+
+  } else {
+    ROS_ERROR("Error while calling GaitRecording service with t_getDescriptors!\n");
+  }
+
+}
+
 std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
   dyret_controller::GetGaitEvaluation srv;
   std::vector<float> vectorToReturn;
@@ -200,7 +227,7 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client)
 
     ss  << "        {\n";
     for (int i = 0; i < srv.response.descriptors.size(); i++){
-      ss <<  "          \"" << srv.response.descriptors[i] << "\": " << std::setprecision(4) << srv.response.results[i];
+      ss <<  "          \"" << srv.response.descriptors[i] << "\": " << srv.response.results[i];
       if (i == srv.response.descriptors.size()-1) ss << "\n"; else ss << ",\n";
     }
 
@@ -413,31 +440,7 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
 
     rawFitnesses.clear();
 
-    std::stringstream ss1;
-
-    ss1  << "        {\n";
-    for (int i = 0; i < 7; i++){
-      ss1 <<  "          \"rawFitness_" << i << "\": " << std::setprecision(4) << (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
-      if (i == 6) ss1 << "\n"; else ss1 << ",\n";
-    }
-
-    ss1 << "        }";
-
-    rawFitnesses.push_back(ss1.str());
-
-    std::stringstream ss2;
-
-    ss2  << "        {\n";
-    for (int i = 0; i < 7; i++){
-      ss2 <<  "          \"rawFitness_" << i << "\": " << std::setprecision(4) << (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
-      if (i == 6) ss2 << "\n"; else ss2 << ",\n";
-    }
-
-    ss2 << "        }";
-
-    rawFitnesses.push_back(ss2.str());
-
-    currentSpeed = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    for (int i = 0; i < 2; i++) setRandomRawFitness(get_gait_evaluation_client);
 
     return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
   }
@@ -593,7 +596,6 @@ std::vector<float> evaluateIndividual(std::vector<double> phenoType,
       if (fitnessFunctions[i] == "MocapSpeed") fitness[i] = fitness_mocapSpeed;
   }
 
-  fprintf(stderr, "Setting currentSpeed to fitness_mocapSpeed (%f)\n", fitness_mocapSpeed);
   currentSpeed = fitness_mocapSpeed;
 
   return fitness;
@@ -793,7 +795,7 @@ public:
 
     fprintf(evoLog, "      \"genotype\": [\n");
     for (int i = 0; i < individualData.size(); i++){
-      fprintf(evoLog, "        %.2f", individualData[i]);
+      fprintf(evoLog, "        %f", individualData[i]);
       if (i != individualData.size()-1) fprintf(evoLog, ",");
       fprintf(evoLog, "  \n");
     }
@@ -801,7 +803,7 @@ public:
 
     fprintf(evoLog, "      \"phenotype\": [\n");
     for (int i = 0; i < individualParameters.size(); i++){
-      if (isnan(individualParameters[i])) fprintf(evoLog, "        \"NaN\""); else fprintf(evoLog, "        %.2f", individualParameters[i]);
+      if (isnan(individualParameters[i])) fprintf(evoLog, "        \"NaN\""); else fprintf(evoLog, "        %f", individualParameters[i]);
 
       if (i != individualParameters.size()-1) fprintf(evoLog, ",");
       fprintf(evoLog, "  \n");
@@ -810,7 +812,7 @@ public:
 
     fprintf(evoLog, "      \"fitness\": {\n");
     for (int i = 0; i < fitnessResult.size(); i++){
-      fprintf(evoLog, "        \"%s\": %.2f", fitnessFunctions[i].c_str(), fitnessResult[i]);
+      fprintf(evoLog, "        \"%s\": %f", fitnessFunctions[i].c_str(), fitnessResult[i]);
       if (i != fitnessResult.size()-1) fprintf(evoLog, ",");
       fprintf(evoLog, "  \n");
     }
@@ -835,8 +837,6 @@ public:
     }
 
     fclose(evoLog);
-
-    fprintf(stderr, "currentSpeed is now %f\n", currentSpeed);
 
     std::vector<float> data;
     data.push_back(fmin(currentSpeed/10.0f, 1.0));
