@@ -21,6 +21,11 @@ def callback(ch, method, properties, body):
     with open(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'), "w") as evo_settings_file:
         evo_settings_file.write("const int popSize =  {};\nconst int generations = {};\n".format(message['settings']['individuals'], message['settings']['generations']))
 
+    if (message['node'] != 'expGui') and (message['node'] != 'mapGui'):
+        print("  Invalid node: {}".format(message['node']))
+        channel.basic_publish(exchange='', routing_key='results', body='Invalid node: {}'.format(message['node']))
+        return
+
     # Building the project:
     print("Building tonnesfn_experiments:")
     result = subprocess.run(['catkin', 'build', 'tonnesfn_experiments'], stdout=subprocess.PIPE)
@@ -34,7 +39,7 @@ def callback(ch, method, properties, body):
         return
 
     # Executing the program:
-    processCommand = ['rosrun', 'tonnesfn_experiments', 'expGui']
+    processCommand = ['rosrun', 'tonnesfn_experiments', message['node']]
     processCommand.extend(message['command'].split())
     console_process = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
 

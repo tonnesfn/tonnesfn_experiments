@@ -63,7 +63,7 @@ if __name__ == '__main__':
                 filename = input("        Filename? >")
                 file = open(filename, "w")
 
-                file.write("[\n  {\n    \"command\": \"firstCommand\",\n    \"settings\": {\n      \"generations\": 8, \n      \"individuals\": 8\n    }\n  },\n  {\n    \"command\": \"secondCommand\",\n    \"settings\": {\n      \"generations\": 8, \n      \"individuals\": 8\n    }\n  }\n]")
+                file.write("[\n  {\n    \"node\": \"expGui\",\n    \"command\": \"experiments mn 1\",\n    \"settings\": {\n      \"generations\": 8, \n      \"individuals\": 8\n    }\n  },\n  {\n    \"node\": \"expGui\",\n    \"command\": \"secondCommand\",\n    \"settings\": {\n      \"generations\": 8, \n      \"individuals\": 8\n    }\n  }\n]")
                 file.close()
 
             else:
