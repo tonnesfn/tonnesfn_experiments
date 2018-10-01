@@ -619,8 +619,8 @@ struct Params {
   };
   struct pop {
     SFERES_CONST size_t init_size = popSize; // number of initial random points
-    SFERES_CONST unsigned size     =   popSize;  // Population size
-    SFERES_CONST unsigned nb_gen   =   generations-1;  // Number of generations
+    SFERES_CONST unsigned size     =   popSize/2;  // Batch size
+    SFERES_CONST unsigned nb_gen   =   generations-1;  // Number of batches
     SFERES_CONST int dump_period   =    1;  // How often to save
     SFERES_CONST int initial_aleat =    1;  // Individuals to be created during random generation process
   };
@@ -979,10 +979,10 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     time_t t = time(0);   // get time now
     struct tm * now = localtime( & t );
 
-    std::string experimentDirectory = createExperimentDirectory("evo", now);
+    std::string experimentDirectory = createExperimentDirectory("map", now);
 
     std::stringstream ss;
-    ss << experimentDirectory.c_str() << getDateString(now) << "_evo.json";
+    ss << experimentDirectory.c_str() << getDateString(now) << "_map.json";
 
     evoLogPath = ss.str();
 
@@ -999,6 +999,7 @@ void experiments_evolve(const std::string givenMorphology, bool evolveMorphology
     fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
     if (fullCommand.size() != 0) fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(evoLog, "    \"type\": \"evolution\",\n");
+    fprintf(evoLog, "    \"algorithm\": \"map-elites\",\n");
     fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
     fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
 
@@ -1280,14 +1281,8 @@ void menu_experiments() {
 
   std::cout << "  Please choose one experiment: (enter to go back)\n";
 
-  fprintf(logOutput, "    cs - evolve control, small morphology\n"
-         "    cm - evolve control, medium morphology\n"
-         "    cl - evolve control, large morphology\n"
-         "    my - evolve cont+morph, with diversity\n"
-         "    mn - evolve cont+morph, w/o diversity\n"
-         "    ra - random search\n"
-         "    vf - verify fitness on single individual\n"
-         "    vn - check noise in stability fitness\n");
+  fprintf(logOutput,
+         "    me - evolve cont+morph, mapElites\n");
   fprintf(logOutput, "\n> ");
 
   if (commandQueue.empty()) {
@@ -1299,22 +1294,8 @@ void menu_experiments() {
   }
 
   if (choice.empty() != true){
-    if (choice == "cs") {
-      experiments_evolve("small", false, false);
-    } else if (choice == "cm") {
-      experiments_evolve("medium", false, false);
-    } else if (choice == "cl") {
-      experiments_evolve("large", false, false);
-    } else if (choice == "my") {
-      experiments_evolve("", true, true);
-    } else if (choice == "mn") {
+    if (choice == "me") {
       experiments_evolve("", true, false);
-    } else if (choice == "vf"){
-      experiments_verifyFitness();
-    } else if (choice == "vn"){
-      experiments_fitnessNoise();
-    } else if (choice ==  "ra"){
-      experiments_randomSearch();
     }
   }
 }
