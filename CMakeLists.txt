@@ -47,6 +47,7 @@ include_directories(include
 
 add_executable(expGui
                src/expGui.cpp
+	       src/expFunctions.cpp
               )
 target_link_libraries(expGui ${catkin_LIBRARIES})
 target_link_libraries(expGui ${Boost_LIBRARIES})
@@ -56,6 +57,7 @@ add_dependencies(expGui
 
 add_executable(mapGui
                src/mapGui.cpp
+	       src/expFunctions.cpp
               )
 target_link_libraries(mapGui ${catkin_LIBRARIES})
 target_link_libraries(mapGui ${Boost_LIBRARIES})

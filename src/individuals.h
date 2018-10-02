@@ -1,6 +1,9 @@
 #ifndef TONNESFN_EXPERIMENTS_INDIVIDUALS_H
 #define TONNESFN_EXPERIMENTS_INDIVIDUALS_H
 
+#include <vector>
+#include <cmath>
+
 namespace individuals{
 
 
