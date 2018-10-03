@@ -85,3 +85,12 @@ bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
     return true;
 
 }
+
+void sendRestPoseMessage(ros::Publisher givenActionMessages_pub){
+    dyret_controller::ActionMessage actionMessage;
+    actionMessage.configuration = dyret_controller::ActionMessage::t_mammal;
+    actionMessage.actionType = dyret_controller::ActionMessage::t_restPose;
+    actionMessage.speed = 0.0;
+    actionMessage.direction = 0.0;
+    givenActionMessages_pub.publish(actionMessage);
+}

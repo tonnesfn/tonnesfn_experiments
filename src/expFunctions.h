@@ -27,4 +27,6 @@ void disableServos(ros::ServiceClient givenServoConfigClient, ros::Publisher giv
 bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 
+void sendRestPoseMessage(ros::Publisher givenActionMessages_pub);
+
 #endif
