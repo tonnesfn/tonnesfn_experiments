@@ -11,7 +11,6 @@
 
 #include "dyret_controller/PositionCommand.h"
 #include "dyret_controller/ActionMessage.h"
-#include "dyret_controller/Trajectory.h"
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
 
@@ -28,5 +27,7 @@ bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 
 void sendRestPoseMessage(ros::Publisher givenActionMessages_pub);
+void sendIdleMessage(ros::Publisher givenActionMessages_pub);
+void sendContGaitMessage(double givenDirection, ros::Publisher givenActionMessages_pub);
 
 #endif

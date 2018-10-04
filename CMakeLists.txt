@@ -55,10 +55,3 @@ target_link_libraries(expGui ${TBB_LIBRARIES})
 add_dependencies(expGui
   ${catkin_EXPORTED_TARGETS})
 
-add_executable(hardwareTest
-               src/hardwareTest.cpp
-              )
-target_link_libraries(hardwareTest ${catkin_LIBRARIES})
-add_dependencies(hardwareTest
-  ${catkin_EXPORTED_TARGETS})
-

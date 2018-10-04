@@ -24,9 +24,10 @@
 
 #include "dyret_controller/PositionCommand.h"
 #include "dyret_controller/ActionMessage.h"
-#include "dyret_controller/Trajectory.h"
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
+#include "dyret_controller/GaitConfiguration.h"
+#include "dyret_controller/DistAngMeasurement.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -55,13 +56,14 @@
 
 ros::ServiceClient servoConfigClient;
 ros::ServiceClient get_gait_evaluation_client;
-ros::Publisher trajectoryMessage_pub;
 ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::ServiceClient servoStatus_client;
 ros::Subscriber dyretState_sub;
+ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
 ros::Publisher positionCommand_pub;
+ros::Publisher gaitConfiguration_pub;
 
 FILE *logOutput = stdout;
 
@@ -70,6 +72,8 @@ double currentTibiaLength = 0.0;
 int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
+
+float gaitInferredPos = 0.0f;
 
 std::string evoLogPath;
 
@@ -135,7 +139,22 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client,
     if (get_gait_evaluation_client.call(srv)) {
         if (srv.response.descriptors.size() != srv.response.results.size()) {
             ROS_ERROR("Result and descriptor sizes not equal. Cannot process results!");
+            fprintf(stderr, "Desc len: %lu, Res len: %lu\n", srv.response.descriptors.size(), srv.response.results.size());
+
+            for (int i  = 0; i < srv.response.descriptors.size(); i++){
+                fprintf(stderr, "%s\n", srv.response.descriptors[i].c_str());
+            }
+
+            for (int i  = 0; i < srv.response.results.size(); i++){
+                fprintf(stderr, "%.2f\n", srv.response.results[i]);
+            }
+
+
             return std::vector<float>();
+        }
+
+        for (int i  = 0; i < srv.response.descriptors.size(); i++){
+            printf("    %s: %.2f\n", srv.response.descriptors[i].c_str(), srv.response.results[i]);
         }
 
         std::stringstream ss;
@@ -157,7 +176,7 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client,
 
     return vectorToReturn;
 }
-
+/*
 void setGaitParams(double givenStepLength,
                    double givenStepHeight,
                    double givenSmoothing,
@@ -227,6 +246,44 @@ void setGaitParams(double givenStepLength,
     srv_req.config = conf;
 
     ros::service::call("/gaitController/set_parameters", srv_req, srv_resp);
+}*/
+
+void setHighLevelSplineGaitParams(float givenStepLength,
+                                  float givenStepHeight,
+                                  float givenSmoothing,
+                                  float givenGaitFrequency,
+                                  float givenGaitSpeed,
+                                  float givenWagPhaseOffset,
+                                  float givenWagAmplitude_x,
+                                  float givenWagAmplitude_y,
+                                  float givenLiftDuration) {
+
+    dyret_controller::GaitConfiguration msg;
+
+    msg.gaitName = "highLevelSplineGait";
+
+    msg.parameterName = {"stepLength",
+                         "stepHeight",
+                         "smoothing",
+                         "frequency",
+                         "speed",
+                         "wagPhase",
+                         "wagAmplitude_x",
+                         "wagAmplitude_y",
+                         "liftDuration"};
+
+    msg.parameterValue = {givenStepLength,
+                          givenStepHeight,
+                          givenSmoothing,
+                          givenGaitFrequency,
+                          givenGaitSpeed,
+                          givenWagPhaseOffset,
+                          givenWagAmplitude_x,
+                          givenWagAmplitude_y,
+                          givenLiftDuration};
+
+    gaitConfiguration_pub.publish(msg);
+
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -237,32 +294,6 @@ bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
     }
 
     return false;
-}
-
-void resetTrajectoryPos(ros::Publisher givenTrajectoryMsgPublisher) {
-    dyret_controller::Trajectory msg;
-    msg.command = msg.t_resetPosition;
-    givenTrajectoryMsgPublisher.publish(msg);
-}
-
-void sendTrajectories(std::vector<float> givenTrajectoryDistances,
-                      std::vector<float> givenTrajectoryAngles,
-                      std::vector<int> givenTrajectoryTimeouts,
-                      ros::Publisher givenTrajectoryMsgPublisher,
-                      bool givenReturnToRest) {
-    dyret_controller::Trajectory msg;
-
-    msg.trajectorySegments.resize(givenTrajectoryDistances.size());
-    for (int i = 0; i < givenTrajectoryDistances.size(); i++) {
-        msg.trajectorySegments[i].distance = givenTrajectoryDistances[i];
-        msg.trajectorySegments[i].angle = givenTrajectoryAngles[i];
-        msg.trajectorySegments[i].timeoutInSec = givenTrajectoryTimeouts[i];
-    }
-
-    msg.returnToRest = givenReturnToRest;
-
-    givenTrajectoryMsgPublisher.publish(msg);
-
 }
 
 void setLegLengths(float femurLengths, float tibiaLengths) {
@@ -281,6 +312,10 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
                           msg->prismatic[6].position) / 4.0;
     currentTibiaLength = (msg->prismatic[1].position + msg->prismatic[3].position + msg->prismatic[5].position +
                           msg->prismatic[7].position) / 4.0;
+}
+
+void gaitInferredPosCallback(const dyret_controller::DistAngMeasurement::ConstPtr &msg) {
+    gaitInferredPos = msg->distance;
 }
 
 bool legsAreLength(float femurLengths, float tibiaLengths) {
@@ -324,8 +359,6 @@ float getMaxServoTemperature(bool printAllTemperatures = false) {
 
 std::vector<float> getFitness(std::vector<double> phenoType,
                               std::vector<std::string> &rawFitness,
-                              ros::ServiceClient gaitControllerStatus_client,
-                              ros::Publisher trajectoryMessage_pub,
                               ros::ServiceClient get_gait_evaluation_client) {
 
     currentIndividual++;
@@ -341,8 +374,6 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
                                   static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
     }
-
-    fprintf(stderr, "2");
 
     if (ros::Time::isSystemTime()) {
         // Code to stop for cooldown at the start of each new generation:
@@ -375,8 +406,6 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         }
     }
 
-    fprintf(stderr, "3");
-
     fprintf(logOutput, "%03u: Evaluating stepLength %.2f, "
                        "stepHeight %.2f, "
                        "smoothing %.2f, "
@@ -401,8 +430,6 @@ std::vector<float> getFitness(std::vector<double> phenoType,
             phenoType[9],
             phenoType[10]);
 
-    fprintf(stderr, "4");
-
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
         // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
         if (getMaxServoTemperature() > 70.0) {
@@ -411,12 +438,9 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         }
     }
 
-    fprintf(stderr, "5");
-
-    setGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6],
+    // Set gait parameters
+    setHighLevelSplineGaitParams(phenoType[0], phenoType[1], phenoType[2], phenoType[3], phenoType[4], phenoType[5], phenoType[6],
                   phenoType[7], phenoType[10]);
-
-    fprintf(stderr, "6");
 
     // Set leg lengths and wait until they reach the correct length
     setLegLengths(phenoType[8], phenoType[9]);
@@ -426,20 +450,15 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         if (secPassed++ > 60) return std::vector<float>(); // 1 min timeout
     }
 
-    fprintf(stderr, "7");
-
-    std::vector<float> trajectoryAngles(1);
-    std::vector<float> trajectoryDistances(1);
-    std::vector<int> trajectoryTimeouts(1);
-    trajectoryDistances[0] = evaluationDistance;
-    trajectoryTimeouts[0] = evaluationTimeout;
-    resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
+    // Start the gait and wait for it to finish
     resetGaitRecording(get_gait_evaluation_client);
-    sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub, false);
-    sleep(5);
+    sendContGaitMessage(0.0, actionMessages_pub);
 
+    sleep(1);
+
+    // Wait until the robot is done walking
     secPassed = 0;
-    while (gaitControllerDone(gaitControllerStatus_client) == false) {
+    while (gaitInferredPos < evaluationDistance) {
         sleep(1);
         if (secPassed++ > (evaluationTimeout + 60)) {
             fprintf(logOutput, "Timed out at first evaluation (%d seconds)\n", secPassed);
@@ -447,6 +466,10 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         }
     }
 
+    sendIdleMessage(actionMessages_pub);
+    sleep(1);
+
+    fprintf(logOutput, "  Res F:\n");
     std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client, rawFitnessVector);
 
     if (gaitResultsForward.size() == 0) {
@@ -454,22 +477,12 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         return gaitResultsForward;
     }
 
-    fprintf(logOutput, "  Res F: ");
-    for (int i = 0; i < gaitResultsForward.size(); i++) {
-        fprintf(logOutput, "%.5f", gaitResultsForward[i]);
-        if (i != (gaitResultsForward.size() - 1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
-    }
-
-    trajectoryDistances[0] = 0.0;
-    trajectoryTimeouts[0] = evaluationTimeout;
-
-    //resetTrajectoryPos(trajectoryMessage_pub); // Reset position before starting
     resetGaitRecording(get_gait_evaluation_client);
-    sendTrajectories(trajectoryDistances, trajectoryAngles, trajectoryTimeouts, trajectoryMessage_pub, false);
+    sendContGaitMessage(M_PI, actionMessages_pub);
     sleep(5);
 
     secPassed = 0;
-    while (gaitControllerDone(gaitControllerStatus_client) == false) {
+    while (gaitInferredPos > -evaluationDistance) { // Now walking backwards - negate evaluation distance
         sleep(1);
         if (secPassed++ > (evaluationTimeout + 60)) {
             fprintf(logOutput, "Timed out at second evaluation (%d seconds)\n", secPassed);
@@ -477,6 +490,10 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         }
     }
 
+    sendRestPoseMessage(actionMessages_pub);
+    sleep(1);
+
+    fprintf(logOutput, "  Res R:\n");
     std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client, rawFitnessVector);
 
     if (gaitResultsReverse.size() == 0) {
@@ -484,14 +501,7 @@ std::vector<float> getFitness(std::vector<double> phenoType,
         return gaitResultsReverse;
     }
 
-    fprintf(logOutput, "  Res R: ");
-    for (int i = 0; i < gaitResultsReverse.size(); i++) {
-        fprintf(logOutput, "%.5f", gaitResultsReverse[i]);
-        if (i != (gaitResultsReverse.size() - 1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
-    }
-
     std::vector<float> fitness(fitnessFunctions.size());
-    int currentFitnessIndex = 0;
 
     float fitness_inferredSpeed = (gaitResultsForward[0] + gaitResultsReverse[0]) / 2.0;
     float fitness_current = (gaitResultsForward[4] + gaitResultsReverse[4]) / 2.0;
@@ -507,6 +517,13 @@ std::vector<float> getFitness(std::vector<double> phenoType,
     }
 
     currentSpeed = fitness_mocapSpeed;
+
+    fprintf(logOutput, "  Res total: ");
+    for (int i = 0; i < fitnessFunctions.size(); i++){
+        fprintf(logOutput, "%s: %.2f", fitnessFunctions[i].c_str(), fitness[i]);
+        if (i < fitnessFunctions.size() - 1) fprintf(logOutput, ", ");
+    }
+    fprintf(logOutput, "\n");
 
     return fitness;
 
@@ -576,12 +593,7 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
 
     do {
         validSolution = true;
-        fitnessResult = getFitness(individualParameters, rawFitnessVector, gaitControllerStatus_client, trajectoryMessage_pub,
-                                   get_gait_evaluation_client);
-
-        fprintf(logOutput, "    Fitness received: ");
-        for (int i = 0; i < fitnessResult.size(); i++) fprintf(logOutput, "%.2f ", fitnessResult[i]);
-        fprintf(logOutput, "\n");
+        fitnessResult = getFitness(individualParameters, rawFitnessVector, get_gait_evaluation_client);
 
         for (int i = 0; i < fitnessResult.size(); i++) {
             if (std::isnan(fitnessResult[i]) == true) {
@@ -777,10 +789,7 @@ void run_individual(std::vector<double> givenPhenotype) {
 
         std::vector<float> fitnessResult = getFitness(givenPhenotype,
                                                       rawFitnessVector,
-                                                      gaitControllerStatus_client,
-                                                      trajectoryMessage_pub,
                                                       get_gait_evaluation_client);
-        fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
     }
 }
 
@@ -999,8 +1008,6 @@ void experiments_verifyFitness() {
 
         std::vector<float> fitnessResult = getFitness(individuals::smallRobotSmallControl,
                                                       rawFitnessVector,
-                                                      gaitControllerStatus_client,
-                                                      trajectoryMessage_pub,
                                                       get_gait_evaluation_client);
 
         fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
@@ -1160,8 +1167,6 @@ void experiments_randomSearch() {
 
             std::vector<float> fitnessResult = getFitness(genToPhen(randomIndividual),
                                                           rawFitnessVector,
-                                                          gaitControllerStatus_client,
-                                                          trajectoryMessage_pub,
                                                           get_gait_evaluation_client);
 
             fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
@@ -1324,28 +1329,27 @@ int main(int argc, char **argv) {
     ros::NodeHandle rch;
 
     actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
-    positionCommand_pub = rch.advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand",
-                                                                           1);
+    positionCommand_pub = rch.advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
+    gaitConfiguration_pub = rch.advertise<dyret_controller::GaitConfiguration>("/dyret/dyret_controller/gaitConfiguration", 1);
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
     gaitControllerStatus_client = rch.serviceClient<dyret_controller::GetGaitControllerStatus>(
             "get_gait_controller_status");
-    trajectoryMessage_pub = rch.advertise<dyret_controller::Trajectory>("/dyret/dyret_controller/trajectoryMessages",
-                                                                        1000);
+
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
+    gaitInferredPos_sub = rch.subscribe("/dyret/dyret_controller/gaitInferredPos", 100, gaitInferredPosCallback);
+
 
     waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
     waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
-    waitForRosInit(trajectoryMessage_pub, "/dyret/dyret_controller/trajectoryMessage");
 
     ros::AsyncSpinner spinner(1);
     spinner.start();
 
     std::string evoInfo = "testInfo";
 
-    resetTrajectoryPos(trajectoryMessage_pub);
     if (resetGaitRecording(get_gait_evaluation_client) == false) {
         spinner.stop();
         ros::shutdown();
