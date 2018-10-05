@@ -83,6 +83,7 @@ bool evolveMorph = true;
 bool instantFitness = false;
 
 std::string morphology;
+std::string gaitType;
 
 bool robotOnStand = false;
 float currentSpeed = 0.0;
@@ -333,7 +334,7 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
     }
 
     // Set gait parameters
-    setGaitParams("highLevelSplineGait", phenoType);
+    setGaitParams(gaitType, phenoType);
 
     // Set leg lengths and wait until they reach the correct length
     setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
@@ -462,26 +463,32 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
 
 std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
 
-    assert(givenGenotype.size() >= 15);
+    if (givenGenotype.size() < 15){
+        ROS_ERROR("givenGenotype.size() < 15: %lu", givenGenotype.size());
+        exit(-1);
+    }
 
     std::map<std::string, double> phenoType;
 
-    phenoType["femurLength"] = givenGenotype[0];
-    phenoType["tibiaLength"] = givenGenotype[1];
+    phenoType["femurLength"]     = givenGenotype[0];
+    phenoType["tibiaLength"]     = givenGenotype[1];
+    phenoType["liftDuration"]    = givenGenotype[2];
+    phenoType["frequencyFactor"] = givenGenotype[3];
 
-    phenoType["p0_x"] =  givenGenotype[2];
-    phenoType["p0_y"] =  givenGenotype[3];
-    phenoType["p1_x"] =  givenGenotype[4];
-    phenoType["p1_y"] =  givenGenotype[5];
-    phenoType["p2_x"] =  givenGenotype[6];
-    phenoType["p2_y"] =  givenGenotype[7];
-    phenoType["p2_z"] =  givenGenotype[8];
-    phenoType["p3_x"] =  givenGenotype[9];
-    phenoType["p3_y"] = givenGenotype[10];
-    phenoType["p3_z"] = givenGenotype[11];
-    phenoType["p4_x"] = givenGenotype[12];
-    phenoType["p4_y"] = givenGenotype[13];
-    phenoType["p4_z"] = givenGenotype[14];
+    phenoType["p0_x"] =   givenGenotype[3] * 0.0;
+    phenoType["p0_y"] =  (givenGenotype[4] * 300.0) - 150.0; // -150 -> 150
+    phenoType["p1_x"] =   givenGenotype[5] * 0.0;
+    phenoType["p1_y"] =  (givenGenotype[6] * 300.0) - 150.0; // -150 -> 150;
+
+    phenoType["p2_x"] =   givenGenotype[7] * 0.0;
+    phenoType["p2_y"] =  (givenGenotype[8] * 300.0) - 150.0; // -150 -> 150;
+    phenoType["p2_z"] =  (givenGenotype[9] * 70.0) + 10.0;   //   10 ->  80
+    phenoType["p3_x"] =  givenGenotype[10] * 0.0;
+    phenoType["p3_y"] = (givenGenotype[11] * 300.0) - 150.0; // -150 -> 150;
+    phenoType["p3_z"] = (givenGenotype[12]* 70.0) + 10.0;;
+    phenoType["p4_x"] =  givenGenotype[13] * 0.0;
+    phenoType["p4_y"] = (givenGenotype[14] * 300.0) - 150.0; // -150 -> 150;
+    phenoType["p4_z"] = (givenGenotype[15] * 70.0) + 10.0;   //   10 ->  80
 
     return phenoType;
 }
@@ -492,21 +499,28 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
     // Set length of individual if not evolving morphology:
     if (evolveMorph == false) {
         if (morphology == "small") {
-            givenIndividualGenotype[7] = 0.0;
+            givenIndividualGenotype[0] = 0.0;
             givenIndividualGenotype[8] = 0.0;
         } else if (morphology == "medium") {
-            givenIndividualGenotype[7] = 0.5;
-            givenIndividualGenotype[8] = 0.5;
+            givenIndividualGenotype[0] = 0.5;
+            givenIndividualGenotype[1] = 0.5;
         } else if (morphology == "large") {
-            givenIndividualGenotype[7] = 1.0;
-            givenIndividualGenotype[8] = 1.0;
+            givenIndividualGenotype[0] = 1.0;
+            givenIndividualGenotype[1] = 1.0;
         } else {
             ROS_ERROR("Morphology \"%s\" not recognized!\n", morphology.c_str());
         }
     }
 
-    //std::vector<double> individualParameters = genToPhen(givenIndividualGenotype);
-    std::map<std::string, double> individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
+    std::map<std::string, double> individualParameters;
+    if (gaitType == "highLevelSplineGait") {
+        individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
+    } else if (gaitType == "lowLevelSplineGait"){
+        individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype);
+    } else {
+        ROS_FATAL("Unknown controller: %s", gaitType.c_str());
+        exit(-1);
+    }
 
     bool validSolution;
     std::vector<float> fitnessResult;
@@ -643,7 +657,7 @@ public:
 
         this->_objs.resize(fitnessFunctions.size());
 
-        std::vector<double> individualData(10);
+        std::vector<double> individualData(ind.gen().size());
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
@@ -796,6 +810,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
 
     evolveMorph = evolveMorphology;
     morphology = givenMorphology;
+    gaitType = givenController;
     currentIndividual = -1;
 
     fitnessFunctions.clear();
@@ -1156,17 +1171,17 @@ void menu_experiments() {
 
     if (!choice.empty()) {
         if (choice == "cs") {
-            experiments_evolve("nsga2", "small", "highLevelSplineController", false);
+            experiments_evolve("nsga2", "small", "highLevelSplineGait", false);
         } else if (choice == "cm") {
-            experiments_evolve("nsga2", "medium", "highLevelSplineController", false);
+            experiments_evolve("nsga2", "medium", "highLevelSplineGait", false);
         } else if (choice == "cl") {
-            experiments_evolve("nsga2", "large", "highLevelSplineController", false);
+            experiments_evolve("nsga2", "large", "highLevelSplineGait", false);
         } else if (choice == "mn") {
-            experiments_evolve("nsga2", "", "highLevelSplineController", true);
+            experiments_evolve("nsga2", "", "highLevelSplineGait", true);
         } else if (choice == "el") {
-            experiments_evolve("nsga2", "", "lowLevelSplineController", true);
+            experiments_evolve("nsga2", "", "lowLevelSplineGait", true);
         } else if (choice == "me") {
-            experiments_evolve("map-elites", "", "highLevelSplineController", true);
+            experiments_evolve("map-elites", "", "highLevelSplineGait", true);
         } else if (choice == "vf") {
             experiments_verifyFitness();
         } else if (choice == "vn") {
