@@ -69,7 +69,7 @@ namespace sferes {
 
           for (size_t i = begin; i < end; ++i) {
             auto individual = pop[i]->gen();
-            std::vector<float> vec = {individual.data(7), individual.data(8)*4.0f}; // 4.0 from size diff of femur (25mm) and tibia (95mm)
+            std::vector<float> vec = {individual.data(0), individual.data(1)*4.0f}; // 4.0 from size diff of femur (25mm) and tibia (95mm)
             legLengths.push_back(vec);
           }
 

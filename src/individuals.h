@@ -3,46 +3,49 @@
 
 #include <vector>
 #include <cmath>
+#include <string>
+#include <map>
 
 namespace individuals{
 
+    std::map<std::string, double> smallRobotSmallControl =
+        {{"stepLength"     , 185.000},
+         {"stepHeight"     ,  75.000},
+         {"smoothing"      ,  50.000},
+         {"frequency"      ,   0.275},
+         {"speed"          ,     NAN},
+         {"wagPhase"       ,   0.000},
+         {"wagAmplitude_x" ,  15.000},
+         {"wagAmplitude_y" ,  10.000},
+         {"femurLength"    ,   0.000},
+         {"tibiaLength"    ,   0.000},
+         {"liftDuration"   ,   0.200}};
 
-  std::vector<double> smallRobotSmallControl = {185.0,   // stepLength
-                                                 75.0,   // stepHeight
-                                                 50.0,   // smoothing
-                                                0.275,   // frequency
-                                                  NAN,   // speed
-                                                  0.0,   // wagPhase
-                                                 15.0,   // wagAmp_x
-                                                 10.0,   // wagAmp_y
-                                                  0.0,   // femurLength
-                                                  0.0,   // tibiaLength
-                                                 0.20};  // liftDuration
+    std::map<std::string, double> largeRobotSmallControl =
+            {{"stepLength"     , 185.000},
+             {"stepHeight"     ,  75.000},
+             {"smoothing"      ,  50.000},
+             {"frequency"      ,   0.275},
+             {"speed"          ,     NAN},
+             {"wagPhase"       ,   0.000},
+             {"wagAmplitude_x" ,  15.000},
+             {"wagAmplitude_y" ,  10.000},
+             {"femurLength"    ,  20.000},
+             {"tibiaLength"    ,  76.000},
+             {"liftDuration"   ,   0.200}};
 
-  std::vector<double> largeRobotSmallControl = {185.0,   // stepLength
-                                                 75.0,   // stepHeight
-                                                 50.0,   // smoothing
-                                                0.275,   // frequency
-                                                  NAN,   // speed
-                                                  0.0,   // wagPhase
-                                                 15.0,   // wagAmp_x
-                                                 10.0,   // wagAmp_y
-                                                 20.0,   // femurLength
-                                                 76.0,   // tibiaLength
-                                                 0.20};  // liftDuration
-
-  std::vector<double> largeRobotLargeControl = {215.0,   // stepLength
-                                                 75.0,   // stepHeight
-                                                 50.0,   // smoothing
-                                                 0.35,   // frequency
-                                                  NAN,   // speed
-                                                  0.0,   // wagPhase
-                                                 15.0,   // wagAmp_x
-                                                 10.0,   // wagAmp_y
-                                                 25.0,   // femurLength
-                                                 95.0,   // tibiaLength
-                                                 0.20};  // liftDuration
-
+    std::map<std::string, double> largeRobotLargeControl =
+            {{"stepLength"     , 215.00},
+             {"stepHeight"     ,  75.00},
+             {"smoothing"      ,  50.00},
+             {"frequency"      ,   0.35},
+             {"speed"          ,    NAN},
+             {"wagPhase"       ,   0.00},
+             {"wagAmplitude_x" ,  15.00},
+             {"wagAmplitude_y" ,  10.00},
+             {"femurLength"    ,  25.00},
+             {"tibiaLength"    ,  95.00},
+             {"liftDuration"   ,   0.20}};
 
 }
 
