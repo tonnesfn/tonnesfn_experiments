@@ -83,7 +83,6 @@ constexpr float phen_maxStepLength = 300.0;
 constexpr float phen_maxFrequency = 2.0;
 
 bool evolveMorph = true;
-bool addDiversity = true;
 bool instantFitness = false;
 
 std::string morphology;
@@ -176,77 +175,19 @@ std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client,
 
     return vectorToReturn;
 }
-/*
-void setGaitParams(double givenStepLength,
-                   double givenStepHeight,
-                   double givenSmoothing,
-                   double givenGaitFrequency,
-                   double givenGaitSpeed,
-                   double givenWagPhaseOffset,
-                   double givenWagAmplitude_x,
-                   double givenWagAmplitude_y,
-                   double givenLiftDuration) {
 
-    dynamic_reconfigure::ReconfigureRequest srv_req;
-    dynamic_reconfigure::ReconfigureResponse srv_resp;
-    dynamic_reconfigure::DoubleParameter param_stepLength;
-    dynamic_reconfigure::DoubleParameter param_stepHeight;
-    dynamic_reconfigure::DoubleParameter param_smoothing;
-    dynamic_reconfigure::DoubleParameter param_gaitFrequency;
-    dynamic_reconfigure::DoubleParameter param_gaitSpeed;
-    dynamic_reconfigure::DoubleParameter param_wagAmplitude_x;
-    dynamic_reconfigure::DoubleParameter param_wagAmplitude_y;
-    dynamic_reconfigure::DoubleParameter param_wagPhase;
-    dynamic_reconfigure::DoubleParameter param_liftDuration;
-    dynamic_reconfigure::IntParameter param_cP;
-    dynamic_reconfigure::IntParameter param_cI;
-    dynamic_reconfigure::IntParameter param_cD;
-    dynamic_reconfigure::Config conf;
+void setGaitParams(std::string gaitName, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
 
-    param_stepLength.name = "stepLength";
-    param_stepLength.value = givenStepLength;
-    param_stepHeight.name = "stepHeight";
-    param_stepHeight.value = givenStepHeight;
-    param_smoothing.name = "smoothing";
-    param_smoothing.value = givenSmoothing;
-    param_gaitFrequency.name = "gaitFrequency";
-    param_gaitFrequency.value = givenGaitFrequency;
-    param_gaitSpeed.name = "gaitSpeed";
-    param_gaitSpeed.value = givenGaitSpeed;
-    param_wagAmplitude_x.name = "wagAmplitude_x";
-    param_wagAmplitude_x.value = givenWagAmplitude_x;
-    param_wagAmplitude_y.name = "wagAmplitude_y";
-    param_wagAmplitude_y.value = givenWagAmplitude_y;
-    param_wagPhase.name = "wagPhase";
-    param_wagPhase.value = givenWagPhaseOffset;
-    param_liftDuration.name = "liftDuration";
-    param_liftDuration.value = givenLiftDuration;
-    param_cP.name = "cP";
-    param_cP.value = 10;
-    param_cI.name = "cI";
-    param_cI.value = 0;
-    param_cD.name = "cD";
-    param_cD.value = 0;
-    conf.doubles.push_back(param_stepLength);
-    conf.doubles.push_back(param_stepHeight);
-    conf.doubles.push_back(param_smoothing);
-    conf.doubles.push_back(param_gaitFrequency);
-    conf.doubles.push_back(param_gaitSpeed);
-    conf.doubles.push_back(param_wagAmplitude_x);
-    conf.doubles.push_back(param_wagAmplitude_y);
-    conf.doubles.push_back(param_wagPhase);
-    conf.doubles.push_back(param_liftDuration);
+    dyret_controller::GaitConfiguration msg;
 
-    if (robotOnStand) {
-        conf.ints.push_back(param_cP);
-        conf.ints.push_back(param_cI);
-        conf.ints.push_back(param_cD);
-    }
+    msg.gaitName = gaitName;
 
-    srv_req.config = conf;
+    msg.parameterName = parameterNames;
 
-    ros::service::call("/gaitController/set_parameters", srv_req, srv_resp);
-}*/
+    msg.parameterValue = parameterValues;
+
+    gaitConfiguration_pub.publish(msg);
+}
 
 void setHighLevelSplineGaitParams(float givenStepLength,
                                   float givenStepHeight,
@@ -258,31 +199,27 @@ void setHighLevelSplineGaitParams(float givenStepLength,
                                   float givenWagAmplitude_y,
                                   float givenLiftDuration) {
 
-    dyret_controller::GaitConfiguration msg;
+    std::vector<std::string> names = {"stepLength",
+                                      "stepHeight",
+                                      "smoothing",
+                                      "frequency",
+                                      "speed",
+                                      "wagPhase",
+                                      "wagAmplitude_x",
+                                      "wagAmplitude_y",
+                                      "liftDuration"};
 
-    msg.gaitName = "highLevelSplineGait";
+    std::vector<float> values = {givenStepLength,
+                                 givenStepHeight,
+                                 givenSmoothing,
+                                 givenGaitFrequency,
+                                 givenGaitSpeed,
+                                 givenWagPhaseOffset,
+                                 givenWagAmplitude_x,
+                                 givenWagAmplitude_y,
+                                 givenLiftDuration};
 
-    msg.parameterName = {"stepLength",
-                         "stepHeight",
-                         "smoothing",
-                         "frequency",
-                         "speed",
-                         "wagPhase",
-                         "wagAmplitude_x",
-                         "wagAmplitude_y",
-                         "liftDuration"};
-
-    msg.parameterValue = {givenStepLength,
-                          givenStepHeight,
-                          givenSmoothing,
-                          givenGaitFrequency,
-                          givenGaitSpeed,
-                          givenWagPhaseOffset,
-                          givenWagAmplitude_x,
-                          givenWagAmplitude_y,
-                          givenLiftDuration};
-
-    gaitConfiguration_pub.publish(msg);
+    setGaitParams("highLevelSplineGait", names, values);
 
 }
 
@@ -725,12 +662,7 @@ public:
     template<typename Indiv>
     void eval(Indiv &ind) {
 
-        // Only add diversity if we have selected it and are evolving morphology
-        if (evolveMorph && addDiversity) {
-            this->_objs.resize(fitnessFunctions.size() + 1);
-        } else {
-            this->_objs.resize(fitnessFunctions.size());
-        }
+        this->_objs.resize(fitnessFunctions.size());
 
         std::vector<double> individualData(10);
 
@@ -799,9 +731,10 @@ void menu_demo() {
 
     std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-    fprintf(logOutput, "    ss - Test small robot (small control)\n"
-                       "    ls - Test large robot (small control)\n"
-                       "    ll - Test large robot (large control)\n"
+    fprintf(logOutput, "    ss - Test small robot (small HLSC)\n"
+                       "    ls - Test large robot (small HLSC)\n"
+                       "    ll - Test large robot (large HLSC)\n"
+                       "    cs - Test low level spline control (small LLSC)\n"
                        "    ms - Request small morphology\n"
                        "    mm - Request medium morphology\n"
                        "    ml - Request large morphology\n");
@@ -822,6 +755,22 @@ void menu_demo() {
             run_individual(individuals::largeRobotSmallControl);
         } else if (choice == "ll") {
             run_individual(individuals::largeRobotLargeControl);
+        } else if (choice == "cs") {
+            std::vector<std::string> names = {"liftDuration", "frequency",
+                                              "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
+            std::vector<float> values = {0.20, 0.28,
+                                         0.0,  92.5,
+                                         0.0, -92.5,
+                                         0.0, -92.5, 50.0,
+                                         0.0,   0.0, 75.00,
+                                         0.0, 142.5, 18.75};
+            setGaitParams("lowLevelSplineGait", names, values);
+            sleep(1);
+            sendContGaitMessage(0.0, actionMessages_pub);
+            sleep(10);
+            sendRestPoseMessage(actionMessages_pub);
+            sleep(1);
+
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
@@ -861,13 +810,11 @@ std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) 
     return ss.str();
 }
 
-void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, bool evolveMorphology,
-                        bool givenAddDiversity) {
+void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, const std::string givenController, bool evolveMorphology) {
     if (givenAlgorithm != "map-elites" && givenAlgorithm != "nsga2") {
         ROS_ERROR("Unknown evolution algorithm: %s", givenAlgorithm.c_str());
     }
 
-    addDiversity = givenAddDiversity;
     evolveMorph = evolveMorphology;
     morphology = givenMorphology;
     currentIndividual = -1;
@@ -916,6 +863,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         if (fullCommand.size() != 0) fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
         fprintf(evoLog, "    \"type\": \"evolution\",\n");
         fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
+        fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
         fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
 
@@ -936,7 +884,6 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
                 if (i != fitnessFunctions.size() - 1) fprintf(evoLog, ",\n");
             }
         } else fprintf(evoLog, "      \"*INSTANT*\"");
-        if (givenAddDiversity) fprintf(evoLog, ", \"Diversity\"\n");
         fprintf(evoLog, "\n");
         fprintf(evoLog, "    ]\n");
 
@@ -963,7 +910,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, evoLogPath);
         else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, evoLogPath);
         else {
-            ROS_FATAL("Invalid algorithm choice: %s", givenAlgorithm.c_str());
+            ROS_FATAL("Invalid algorithm (%s) and controller (%s) choices", givenAlgorithm.c_str(), givenController.c_str());
             exit(-1);
         }
         evoLogPath.clear();
@@ -1216,13 +1163,13 @@ void menu_experiments() {
     std::cout << "  Please choose one experiment: (enter to go back)\n";
 
     fprintf(logOutput,
-            "    cs - evolve control, small morphology\n"
-            "    cm - evolve control, medium morphology\n"
-            "    cl - evolve control, large morphology\n"
-            "    my - evolve cont+morph, with diversity\n"
-            "    mn - evolve cont+morph, w/o diversity\n"
-            "    me - evolve map-elites\n"
-            "    ra - random search\n"
+            "    cs - evolve control, small morphology, highLevel\n"
+            "    cm - evolve control, medium morphology, highLevel\n"
+            "    cl - evolve control, large morphology, highLevel\n"
+            "    mn - evolve cont+morph, highLevel\n"
+            "    me - evolve map-elites, highLevel\n"
+            "    el - evolve cont-morph, lowLevel\n"
+            "    ra - random search, highLevel\n"
             "    vf - verify fitness on single individual\n"
             "    vn - check noise in stability fitness\n");
     fprintf(logOutput, "\n> ");
@@ -1235,19 +1182,19 @@ void menu_experiments() {
         commandQueue.erase(commandQueue.begin());
     }
 
-    if (choice.empty() != true) {
+    if (!choice.empty()) {
         if (choice == "cs") {
-            experiments_evolve("nsga2", "small", false, false);
+            experiments_evolve("nsga2", "small", "highLevelSplineController", false);
         } else if (choice == "cm") {
-            experiments_evolve("nsga2", "medium", false, false);
+            experiments_evolve("nsga2", "medium", "highLevelSplineController", false);
         } else if (choice == "cl") {
-            experiments_evolve("nsga2", "large", false, false);
-        } else if (choice == "my") {
-            experiments_evolve("nsga2", "", true, true);
+            experiments_evolve("nsga2", "large", "highLevelSplineController", false);
         } else if (choice == "mn") {
-            experiments_evolve("nsga2", "", true, false);
+            experiments_evolve("nsga2", "", "highLevelSplineController", true);
+        } else if (choice == "el") {
+            experiments_evolve("nsga2", "", "lowLevelSplineController", true);
         } else if (choice == "me") {
-            experiments_evolve("map-elites", "", true, false);
+            experiments_evolve("map-elites", "", "highLevelSplineController", true);
         } else if (choice == "vf") {
             experiments_verifyFitness();
         } else if (choice == "vn") {
@@ -1356,7 +1303,6 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    addDiversity = true;
     currentIndividual = -1;
 
     if (ros::Time::isSimTime()) {
