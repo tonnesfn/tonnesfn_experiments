@@ -198,40 +198,6 @@ void setGaitParams(std::string gaitName, std::map<std::string, double> phenoType
     setGaitParams(gaitName, parameterNames, parametervalues);
 }
 
-void setHighLevelSplineGaitParams(float givenStepLength,
-                                  float givenStepHeight,
-                                  float givenSmoothing,
-                                  float givenGaitFrequency,
-                                  float givenGaitSpeed,
-                                  float givenWagPhaseOffset,
-                                  float givenWagAmplitude_x,
-                                  float givenWagAmplitude_y,
-                                  float givenLiftDuration) {
-
-    std::vector<std::string> names = {"stepLength",
-                                      "stepHeight",
-                                      "smoothing",
-                                      "frequency",
-                                      "speed",
-                                      "wagPhase",
-                                      "wagAmplitude_x",
-                                      "wagAmplitude_y",
-                                      "liftDuration"};
-
-    std::vector<float> values = {givenStepLength,
-                                 givenStepHeight,
-                                 givenSmoothing,
-                                 givenGaitFrequency,
-                                 givenGaitSpeed,
-                                 givenWagPhaseOffset,
-                                 givenWagAmplitude_x,
-                                 givenWagAmplitude_y,
-                                 givenLiftDuration};
-
-    setGaitParams("highLevelSplineGait", names, values);
-
-}
-
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
     dyret_controller::GetGaitControllerStatus srv;
 
@@ -480,17 +446,16 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
 
     std::map<std::string, double> phenoType;
 
-    phenoType["femurLength"]    = givenGenotype[0] * 25.0;          //  0    ->  25
-    phenoType["tibiaLength"]    = givenGenotype[1] * 95.0;          //  0    ->  95
-    phenoType["stepLength"]     = givenGenotype[2] * 300.0;         //  0    -> 300
-    phenoType["stepHeight"]     = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
-    phenoType["smoothing"]      = givenGenotype[4] * 50.0;          //  0    ->  50
-    phenoType["frequency"]      = givenGenotype[5] * 2.0;           //  0    ->   2.0
-    phenoType["wagPhase"]       = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
-    phenoType["wagAmplitude_x"] = givenGenotype[7] * 50.0;          //  0    ->  50
-    phenoType["wagAmplitude_y"] = givenGenotype[8] * 50.0;          //  0    ->  50
-    phenoType["liftDuration"]   = (givenGenotype[9] * 0.15) + 0.05; //  0.05 ->   0.20
-    phenoType["speed"]          = NAN;
+    phenoType["femurLength"]     = givenGenotype[0] * 25.0;          //  0    ->  25
+    phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          //  0    ->  95
+    phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
+    phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
+    phenoType["smoothing"]       = givenGenotype[4] * 50.0;          //  0    ->  50
+    phenoType["frequencyFactor"] = givenGenotype[5];                 //  0    ->   1.0
+    phenoType["wagPhase"]        = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
+    phenoType["wagAmplitude_x"]  = givenGenotype[7] * 50.0;          //  0    ->  50
+    phenoType["wagAmplitude_y"]  = givenGenotype[8] * 50.0;          //  0    ->  50
+    phenoType["liftDuration"]    = (givenGenotype[9] * 0.15) + 0.05; //  0.05 ->   0.20
 
     return phenoType;
 }
@@ -770,7 +735,7 @@ void menu_demo() {
         } else if (choice == "ll") {
             run_individual(individuals::largeRobotLargeControl);
         } else if (choice == "cs") {
-            std::vector<std::string> names = {"liftDuration", "frequency",
+            std::vector<std::string> names = {"liftDuration", "frequencyFactor",
                                               "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
             std::vector<float> values = {0.20, 0.28,
                                          0.0,  92.5,
@@ -1013,13 +978,7 @@ void experiments_fitnessNoise() {
 std::vector<double> getRandomIndividual() {
     std::vector<double> individual(10);
 
-    do {
-        for (int j = 0; j < individual.size(); j++)
-            individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-    } while (((((individual[0] * 300.0) * ((individual[6] * 2.0) * 60.0)) / 1000.0) >
-              10.0) // Speed has to be below 10m/min
-             || ((individual[0] * 300.0) < 5.0) // StepLength has to be above 5mm
-             || ((individual[6] * 2.0) < 0.1)); // Frequency has to be above 0.1
+    for (int j = 0; j < individual.size(); j++) individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 
     return individual;
 }
