@@ -702,7 +702,9 @@ public:
 
 #include "sferesExperiments.h"
 
-void run_individual(std::map<std::string, double> phenoTypeMap) {
+void run_individual(std::string gaitName, std::map<std::string, double> phenoTypeMap) {
+
+    gaitType = gaitName;
 
     fitnessFunctions.clear();
     fitnessFunctions.emplace_back("MocapSpeed");
@@ -743,11 +745,11 @@ void menu_demo() {
 
     if (choice.empty() == false) {
         if (choice == "ss") {
-            run_individual(individuals::smallRobotSmallControl);
+            run_individual("highLevelSplineGait", individuals::smallRobotSmallControl);
         } else if (choice == "ls") {
-            run_individual(individuals::largeRobotSmallControl);
+            run_individual("highLevelSplineGait", individuals::largeRobotSmallControl);
         } else if (choice == "ll") {
-            run_individual(individuals::largeRobotLargeControl);
+            run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
         } else if (choice == "cs") {
             std::vector<std::string> names = {"liftDuration", "frequencyFactor",
                                               "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
@@ -1297,6 +1299,8 @@ int main(int argc, char **argv) {
     } else {
         fprintf(logOutput, "Currently running in hardware mode\n");
     }
+
+    sleep(1);
 
     std::map<std::string, boost::function<void()> > menu;
     menu["demo"] = &menu_demo;
