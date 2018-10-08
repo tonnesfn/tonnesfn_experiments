@@ -498,9 +498,9 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
 
     std::map<std::string, double> phenoType;
 
-    phenoType["femurLength"]     = givenGenotype[0];
-    phenoType["tibiaLength"]     = givenGenotype[1];
-    phenoType["liftDuration"]    = givenGenotype[2];
+    phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
+    phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
+    phenoType["liftDuration"]    = (givenGenotype[2] * 0.15) + 0.05; // 0.05 ->  0.20
     phenoType["frequencyFactor"] = givenGenotype[3];
 
     phenoType["p0_x"] =   givenGenotype[3] * 0.0;
