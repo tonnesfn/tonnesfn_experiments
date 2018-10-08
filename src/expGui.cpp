@@ -10,6 +10,9 @@
 
 #include "ros/ros.h"
 
+#include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
+
 #include <dynamic_reconfigure/DoubleParameter.h>
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
@@ -96,6 +99,31 @@ std::string fullCommand; // Used to store commands from the arguments permanentl
 
 bool automatedRun() {
     return !fullCommand.empty();
+}
+
+void resetSimulation(){
+
+    std_srvs::Empty empty;
+
+    // First pause physics:
+    ros::service::call("/gazebo/pause_physics", empty);
+
+    // Then reset world:
+    ros::service::call("/gazebo/reset_world", empty);
+
+    // Then reset DyRET:
+    std_srvs::SetBool setBool;
+    setBool.request.data = true; // Reset prismatic joints
+    ros::service::call("/dyret/simulation/reset", setBool);
+
+    // Unpause physics:
+    ros::service::call("/gazebo/unpause_physics", empty);
+
+    // Run a few ticks
+    ros::Duration(0.1).sleep();
+
+    ROS_INFO("Simulation reset");
+
 }
 
 void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::string> &givenRawFitnessVector) {
@@ -544,6 +572,7 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
             if (automatedRun) {
                 if (retryCounter < 3) {
                     fprintf(logOutput, "Retrying\n");
+                    if (ros::Time::isSimTime()) resetSimulation();
                     retryCounter += 1;
                     currentIndividual--;
                     validSolution = false;
@@ -563,7 +592,7 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
 
                     fprintf(logOutput, "Discarding\n");
                     validSolution = true;
-                } else if (choice == 'c') {
+                } else if (choice == 'c') { // Cooldown
                     disableServos(servoConfigClient, actionMessages_pub);
                     fprintf(logOutput, "Servos disabled\n");
 
@@ -577,7 +606,9 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
 
                     currentIndividual--;
                     validSolution = false;
-                } else {
+                } else { // Retry
+                    if (ros::Time::isSimTime()) resetSimulation();
+
                     fprintf(logOutput, "Retrying\n");
                     currentIndividual--;
                     validSolution = false;
