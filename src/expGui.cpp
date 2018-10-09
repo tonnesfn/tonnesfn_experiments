@@ -7,6 +7,7 @@
 #include <chrono>
 #include <chrono>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "ros/ros.h"
 
@@ -1266,8 +1267,10 @@ int main(int argc, char **argv) {
 
     argv_g = argv;
 
+    // If we are running automated run:
     fullCommand = "";
     if (argc > 1) {
+        setbuf(stdout, NULL);
         for (int i = 1; i < argc; i++) {
             commandQueue.emplace_back(argv[i]);
             fullCommand.append(argv[i]);

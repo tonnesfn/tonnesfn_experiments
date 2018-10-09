@@ -6,8 +6,17 @@ import time
 import json
 import string
 import os
+from subprocess import PIPE, Popen
+from threading import Thread
+from queue import Queue, Empty
 
 import amqpurl # A file that contains "url = '$URL'" for your amqp account
+
+
+def enqueue_output(out, queue):
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
 
 
 def callback(ch, method, properties, body):
@@ -41,13 +50,25 @@ def callback(ch, method, properties, body):
     # Executing the program:
     processCommand = ['rosrun', 'tonnesfn_experiments', message['node']]
     processCommand.extend(message['command'].split())
-    console_process = subprocess.Popen(processCommand, stdout=subprocess.PIPE)
+    console_process = subprocess.Popen(processCommand, stdout=subprocess.PIPE, bufsize=0, close_fds=True)
+
+    q = Queue()
+    t = Thread(target=enqueue_output, args=(console_process.stdout, q))
+    t.daemon = True  # thread dies with the program
+    t.start()
 
     try:
 
         while console_process.poll() is None:
+
+            try:
+                line = q.get_nowait()
+            except Empty:
+                pass
+            else:
+                print(line)
+
             connection.process_data_events()
-            time.sleep(1)
 
     except KeyboardInterrupt:
         print("Keyboard interrupt received. Killing process!")
