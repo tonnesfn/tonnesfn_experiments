@@ -126,7 +126,8 @@ void resetSimulation(){
 
 }
 
-void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::string> &givenRawFitnessVector) {
+//TODO: Fix this
+void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client) {
     dyret_controller::GetGaitEvaluation srv;
     std::vector<std::string> descriptorsToReturn;
 
@@ -146,7 +147,7 @@ void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vec
 
         ss << "        }";
 
-        givenRawFitnessVector.push_back(ss.str());
+        //givenRawFitnessVector.push_back(ss.str());
 
     } else {
         ROS_ERROR("Error while calling GaitRecording service with t_getDescriptors!\n");
@@ -154,53 +155,31 @@ void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vec
 
 }
 
-// Has bindings to rawFitness
-std::vector<float> getGaitResults(ros::ServiceClient get_gait_evaluation_client, std::vector<std::string> &givenRawFitnessVector, bool* hasFallen) {
-    dyret_controller::GetGaitEvaluation srv;
-    std::vector<float> vectorToReturn;
+std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
 
+    std::map<std::string, double> mapToReturn;
+
+    dyret_controller::GetGaitEvaluation srv;
     srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getResults;
 
     if (get_gait_evaluation_client.call(srv)) {
+
+        // Make sure the response is valid
         if (srv.response.descriptors.size() != srv.response.results.size()) {
-            ROS_ERROR("Result and descriptor sizes not equal. Cannot process results!");
-            fprintf(stderr, "Desc len: %lu, Res len: %lu\n", srv.response.descriptors.size(), srv.response.results.size());
-
-            for (int i  = 0; i < srv.response.descriptors.size(); i++){
-                fprintf(stderr, "%s\n", srv.response.descriptors[i].c_str());
-            }
-
-            for (int i  = 0; i < srv.response.results.size(); i++){
-                fprintf(stderr, "%.2f\n", srv.response.results[i]);
-            }
-
-
-            return std::vector<float>();
+            ROS_ERROR("Result (%lu) and descriptor (%lu) sizes not equal. Cannot process results!", srv.response.results.size(), srv.response.descriptors.size());
+            return std::map<std::string, double>();
         }
 
+        // Go through all responses and insert into map
         for (int i  = 0; i < srv.response.descriptors.size(); i++){
-            printf("    %s: %.2f\n", srv.response.descriptors[i].c_str(), srv.response.results[i]);
-            if (srv.response.descriptors[i] == "linAcc_z" && srv.response.results[i] < 2.0) *hasFallen = true;
+            mapToReturn[srv.response.descriptors[i]] = srv.response.results[i];
+            //if (srv.response.descriptors[i] == "linAcc_z" && srv.response.results[i] < 2.0) *hasFallen = true;
         }
-
-        std::stringstream ss;
-
-        ss << "        {\n";
-        for (int i = 0; i < srv.response.descriptors.size(); i++) {
-            ss << "          \"" << srv.response.descriptors[i] << "\": " << srv.response.results[i];
-            if (i == srv.response.descriptors.size() - 1) ss << "\n"; else ss << ",\n";
-        }
-
-        ss << "        }";
-
-        givenRawFitnessVector.push_back(ss.str());
-
-        vectorToReturn = srv.response.results;
     } else {
         ROS_ERROR("Error while calling GaitRecording service with t_getResults!\n");
     }
 
-    return vectorToReturn;
+    return mapToReturn;
 }
 
 void setGaitParams(std::string gaitName, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
@@ -299,29 +278,24 @@ float getMaxServoTemperature(bool printAllTemperatures = false) {
     return 0.0;
 }
 
-std::vector<float> getInvalidFitness(){
+// This function takes in a phenotype, and returns the fitness for the individual
+std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
+                                         const ros::ServiceClient& get_gait_evaluation_client,
+                                         std::vector<std::map<std::string, double>> &rawFitnesses) {
 
-}
+    std::map<std::string, double> mapToReturn;
 
-std::vector<float> getFitness(std::map<std::string, double> phenoType,
-                              std::vector<std::string> &rawFitness,
-                              ros::ServiceClient get_gait_evaluation_client) {
-
-    bool hasFallen = false;
+    currentIndividual++;
 
     // Reset if we are in simulation
     if (ros::Time::isSimTime()) resetSimulation();
 
-    currentIndividual++;
-
     // (Return random fitness to test)
-    if (instantFitness == true) {
+    if (instantFitness) {
         usleep(30000);
 
-        for (int i = 0; i < 2; i++) setRandomRawFitness(get_gait_evaluation_client, rawFitness);
-
-        return std::vector<float>{static_cast <float> (rand()) / static_cast <float> (RAND_MAX),
-                                  static_cast <float> (rand()) / static_cast <float> (RAND_MAX)};
+        return std::map<std::string, double>{{"test1", static_cast <float> (rand()) / static_cast <float> (RAND_MAX)},
+                                             {"test2", static_cast <float> (rand()) / static_cast <float> (RAND_MAX)}};
     }
 
     if (ros::Time::isSystemTime()) {
@@ -355,17 +329,14 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
         }
     }
 
-    fprintf(logOutput, "%03u: Evaluating individual:\n", currentIndividual);
-
-    for(auto elem : phenoType){
-        fprintf(logOutput, "    %s: %.3f\n", elem.first.c_str(), elem.second);
-    }
+    fprintf(logOutput, "\n  %03u: Evaluating individual:\n", currentIndividual);
+    printMap(phenoType, "    ", logOutput);
 
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
         // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
         if (getMaxServoTemperature() > 70.0) {
             fprintf(logOutput, "  Temperature is too high at %.1f\n", getMaxServoTemperature());
-            return std::vector<float>();
+            return std::map<std::string, double>();
         }
     }
 
@@ -377,7 +348,7 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
     int secPassed = 0;
     while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
         sleep(1);
-        if (secPassed++ > 60) return std::vector<float>(); // 1 min timeout to reconfigure
+        if (secPassed++ > 60) return std::map<std::string, double>(); // 1 min timeout to reconfigure
     }
 
     // Start the gait and wait for it to finish
@@ -389,7 +360,7 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
     // Wait until the robot is done walking
     ros::Time startTime = ros::Time::now();
     while (gaitInferredPos < evaluationDistance) {
-        sleep(0.1);
+        usleep(1000);
         if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
             printf("  Timed out forward at %ds\n", (ros::Time::now() - startTime).sec);
             break;
@@ -399,13 +370,16 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
     sendIdleMessage(actionMessages_pub);
     sleep(1);
 
-    fprintf(logOutput, "  Res F:\n");
-    std::vector<float> gaitResultsForward = getGaitResults(get_gait_evaluation_client, rawFitness, &hasFallen);
+    std::map<std::string, double> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
-    if (gaitResultsForward.size() == 0) {
+    if (gaitResultsForward.empty()) {
         ROS_ERROR("GaitResultsForward.size() == 0!\n");
-        return gaitResultsForward;
+        return std::map<std::string, double>();
     }
+
+    // Print forward results
+    fprintf(logOutput, "  Res F:\n");
+    printMap(gaitResultsForward, "    ", logOutput);
 
     if (ros::Time::isSimTime()) resetSimulation();
     sleep(1);
@@ -416,7 +390,7 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
 
     startTime = ros::Time::now();
     while (gaitInferredPos > -evaluationDistance) { // Now walking backwards - negate evaluation distance
-        sleep(0.1);
+        usleep(1000);
         if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
             printf("  Timed out reverse at %ds\n", (ros::Time::now() - startTime).sec);
             break;
@@ -426,44 +400,37 @@ std::vector<float> getFitness(std::map<std::string, double> phenoType,
     sendRestPoseMessage(actionMessages_pub);
     sleep(1);
 
-    fprintf(logOutput, "  Res R:\n");
-    std::vector<float> gaitResultsReverse = getGaitResults(get_gait_evaluation_client, rawFitness, &hasFallen);
+    std::map<std::string, double> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
-    if (gaitResultsReverse.size() == 0) {
+    if (gaitResultsReverse.empty()) {
         ROS_ERROR("GaitResultsReverse.size() == 0!\n");
-        return gaitResultsReverse;
+        return std::map<std::string, double>();
     }
 
-    std::vector<float> fitness(fitnessFunctions.size());
+    // Print reverse results
+    fprintf(logOutput, "  Res R:\n");
+    printMap(gaitResultsReverse, "    ", logOutput);
 
-    float fitness_inferredSpeed = (gaitResultsForward[0] + gaitResultsReverse[0]) / 2.0;
-    float fitness_current = (gaitResultsForward[4] + gaitResultsReverse[4]) / 2.0;
-    float fitness_stability = (gaitResultsForward[6] + gaitResultsReverse[6]) / 2.0;
-    float fitness_mocapSpeed = (gaitResultsForward[5] + gaitResultsReverse[5]) / 2.0;
 
-    if (hasFallen){
-      ROS_WARN("Individual has fallen, stability set to -1.0");
-      fitness_stability = -1.0;
+    mapToReturn["Stability"] = (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0;
+
+    if (ros::Time::isSimTime()){
+        mapToReturn["MocapSpeed"] = (getMapValue(gaitResultsForward, "sensorSpeedForward") - getMapValue(gaitResultsReverse, "sensorSpeedForward")) / 2.0;
+    } else {
+        mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
     }
 
-    for (int i = 0; i < fitnessFunctions.size(); i++) {
-        fitness[i] = -1;
-        if (fitnessFunctions[i] == "InferredSpeed") fitness[i] = fitness_inferredSpeed;
-        if (fitnessFunctions[i] == "Current") fitness[i] = fitness_current;
-        if (fitnessFunctions[i] == "Stability") fitness[i] = fitness_stability;
-        if (fitnessFunctions[i] == "MocapSpeed") fitness[i] = fitness_mocapSpeed;
-    }
+    // Print total results
+    fprintf(logOutput, "  Res total: \n");
+    printMap(mapToReturn, "    ", logOutput);
 
-    currentSpeed = fitness_mocapSpeed;
-
-    fprintf(logOutput, "  Res total: ");
-    for (int i = 0; i < fitnessFunctions.size(); i++){
-        fprintf(logOutput, "%s: %.2f", fitnessFunctions[i].c_str(), fitness[i]);
-        if (i < fitnessFunctions.size() - 1) fprintf(logOutput, ", ");
-    }
     fprintf(logOutput, "\n");
 
-    return fitness;
+    // Add raw fitnesses to container
+    rawFitnesses.push_back(gaitResultsForward);
+    rawFitnesses.push_back(gaitResultsReverse);
+
+    return mapToReturn;
 
 }
 
@@ -519,8 +486,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     return phenoType;
 }
 
-std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotype) {
-    std::vector<std::string> rawFitnessVector;
+std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndividualGenotype) {
 
     // Set length of individual if not evolving morphology:
     if (evolveMorph == false) {
@@ -549,21 +515,18 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
     }
 
     bool validSolution;
-    std::vector<float> fitnessResult;
+    std::map<std::string, double> fitnessResult;
 
     int retryCounter = 0;
+    std::vector<std::map<std::string, double>> rawFitness;
 
     do {
         validSolution = true;
-        fitnessResult = getFitness(individualParameters, rawFitnessVector, get_gait_evaluation_client);
 
-        for (int i = 0; i < fitnessResult.size(); i++) {
-            if (std::isnan(fitnessResult[i]) == true) {
-                validSolution = false;
-            }
-        }
+        rawFitness.clear();
+        fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
 
-        if (fitnessResult.size() == 0) validSolution = false;
+        if (fitnessResult.empty()) validSolution = false;
 
         // A valid solution could not be found:
         if ((validSolution == false) || (fitnessResult.size() == 0)) {
@@ -585,8 +548,7 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
                 scanf(" %c", &choice);
 
                 if (choice == 'd') { // Discard
-                    fitnessResult.resize(fitnessFunctions.size());
-                    for (int i = 0; i < fitnessResult.size(); i++) fitnessResult[i] = -1000;
+                    fitnessResult.clear();
 
                     fprintf(logOutput, "Discarding\n");
                     validSolution = true;
@@ -648,18 +610,21 @@ std::vector<float> evaluateIndividual(std::vector<double> givenIndividualGenotyp
     fprintf(evoLog, "      },\n");
 
     fprintf(evoLog, "      \"fitness\": {\n");
-    for (int i = 0; i < fitnessResult.size(); i++) {
-        fprintf(evoLog, "        \"%s\": %f", fitnessFunctions[i].c_str(), fitnessResult[i]);
-        if (i != fitnessResult.size() - 1) fprintf(evoLog, ",");
-        fprintf(evoLog, "  \n");
+    i = 0;
+    for(auto elem : fitnessResult){
+        fprintf(evoLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+        if (i != fitnessResult.size()-1) fprintf(evoLog, ",\n"); else fprintf(evoLog, "\n");
+        i++;
     }
     fprintf(evoLog, "      },\n");
 
+
     fprintf(evoLog, "      \"raw_fitness\": [\n");
-    for (int i = 0; i < rawFitnessVector.size(); i++) {
-        fprintf(evoLog, "%s", rawFitnessVector[i].c_str());
-        if (i == rawFitnessVector.size() - 1) fprintf(evoLog, "\n"); else fprintf(evoLog, ",\n");
-    }
+    fprintf(evoLog, "        {\n");
+    printMap(rawFitness[0], "        ", evoLog);
+    fprintf(evoLog, "        },{\n");
+    printMap(rawFitness[1], "        ", evoLog);
+    fprintf(evoLog, "        }\n");
 
     fprintf(evoLog, "      ]\n");
 
@@ -693,9 +658,11 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        std::vector<float> fitnessResult = evaluateIndividual(individualData);
+        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData);
 
-        for (int i = 0; i < fitnessResult.size(); i++) this->_objs[i] = fitnessResult[i];
+        for (int i = 0; i < fitnessFunctions.size(); i++){
+            this->_objs[i] = fitnessResult[fitnessFunctions[i]];
+        }
 
     }
 };
@@ -715,12 +682,14 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        std::vector<float> fitnessResult = evaluateIndividual(individualData);
+        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData);
 
-        for (int i = 0; i < fitnessResult.size(); i++) this->_objs[i] = fitnessResult[i];
+        for (int i = 0; i < fitnessFunctions.size(); i++){
+            this->_objs[i] = (float) fitnessResult.at(fitnessFunctions[i]);
+        }
 
         std::vector<float> data;
-        data.push_back(fmin(currentSpeed / 10.0f, 1.0));
+        data.push_back(fmin(fitnessResult.at("mocapSpeed") / 10.0f, 1.0));
         data.push_back((individualData[7] * 25.0f + individualData[8] * 95.0f) / 120.0f); // Total leg height
 
         this->set_desc(data);
@@ -742,13 +711,11 @@ void run_individual(std::string gaitName, std::map<std::string, double> phenoTyp
     fitnessFunctions.emplace_back("MocapSpeed");
     fitnessFunctions.emplace_back("Stability");
 
-    std::vector<std::string> rawFitnessVector;
-
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
-
-        std::vector<float> fitnessResult = getFitness(phenoTypeMap,
-                                                      rawFitnessVector,
-                                                      get_gait_evaluation_client);
+        std::vector<std::map<std::string, double>> rawFitnesses;
+        std::map<std::string, double> fitnessResult = getFitness(phenoTypeMap,
+                                                                 get_gait_evaluation_client,
+                                                                 rawFitnesses);
     }
 }
 
@@ -977,14 +944,12 @@ void experiments_verifyFitness() {
     fitnessFunctions.emplace_back("MocapSpeed");
     fitnessFunctions.emplace_back("Stability");
 
-    std::vector<std::string> rawFitnessVector;
 
     ROS_ERROR("Not yet implemented!"); //TODO
     /*
     for (int i = 0; i < numberOfTests; i++) {
 
         std::vector<float> fitnessResult = getFitness(individuals::smallRobotSmallControl,
-                                                      rawFitnessVector,
                                                       get_gait_evaluation_client);
 
 
@@ -1013,16 +978,15 @@ void experiments_fitnessNoise() {
 
         sleep(30);
 
-        std::vector<std::string> rawFitnessVector;
+        std::map<std::string, double> gaitResults = getGaitResults(get_gait_evaluation_client);
 
-        bool hasFallen = false;
-
-        std::vector<float> gaitResults = getGaitResults(get_gait_evaluation_client, rawFitnessVector, &hasFallen);
         fprintf(logOutput, "  Res: ");
-        for (int i = 0; i < gaitResults.size(); i++) {
-            fprintf(logOutput, "%.5f", gaitResults[i]);
-            if (i != (gaitResults.size() - 1)) fprintf(logOutput, ", "); else fprintf(logOutput, "\n");
+        for(auto elem : gaitResults){
+            fprintf(logOutput, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+            if (i != gaitResults.size()-1) fprintf(logOutput, ",\n"); else fprintf(logOutput, "\n");
+            i++;
         }
+
     }
 }
 
@@ -1106,7 +1070,6 @@ void experiments_randomSearch() {
         currentIndividual = 0;
 
         for (int j = 0; j < popSize * (generations); j++) {
-            std::vector<std::string> rawFitnessVector;
 
             // Generate random individual:
             std::vector<double> randomIndividual = getRandomIndividual();
@@ -1135,33 +1098,33 @@ void experiments_randomSearch() {
 
             fclose(randomSearchLog);
 
-            std::vector<float> fitnessResult = getFitness(individualParameters,
-                                                          rawFitnessVector,
-                                                          get_gait_evaluation_client);
+            std::vector<std::map<std::string, double>> rawFitnesses;
+            std::map<std::string, double> fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitnesses);
 
             fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
 
             randomSearchLog = fopen(ss.str().c_str(), "a");
             fprintf(randomSearchLog, "      \"fitness\": {\n");
 
-            for (int k = 0; k < fitnessResult.size(); k++) {
-                fprintf(randomSearchLog, "        \"%s\": %.3f", fitnessFunctions[k].c_str(), fitnessResult[k]);
-                if (k == fitnessResult.size() - 1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
-
-                fprintf(logOutput, "%.2f ", fitnessResult[k]);
-
+            for(auto elem : fitnessResult){
+                fprintf(randomSearchLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+                if (i != fitnessResult.size()-1) fprintf(randomSearchLog, ",\n"); else fprintf(randomSearchLog, "\n");
+                i++;
             }
-            fprintf(logOutput, "\n");
+
+            fprintf(randomSearchLog, "\n");
 
             fprintf(randomSearchLog, "      },\n");
 
             fprintf(randomSearchLog, "      \"raw_fitness\": [\n");
 
-            for (int k = 0; k < rawFitnessVector.size(); k++) {
+            //todo: fix this
+            /*for (int k = 0; k < rawFitnessVector.size(); k++) {
                 fprintf(randomSearchLog, "%s", rawFitnessVector[k].c_str());
                 if (k == fitnessResult.size() - 1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
 
-            }
+            }*/
+
             fprintf(randomSearchLog, "      ]\n");
 
             if (currentIndividual == ((generations) * popSize)) { // If last individual

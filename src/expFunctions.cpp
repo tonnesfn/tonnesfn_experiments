@@ -6,6 +6,27 @@ std::string trim(std::string& str){
     return str.substr(first, (last-first+1));
 }
 
+double getMapValue(const std::map<std::string, double> &givenMap, const std::string &givenValue){
+    try {
+        return givenMap.at(givenValue);
+    }
+    catch (const std::out_of_range& e) {
+        ROS_FATAL("Value %s not found in map", givenValue.c_str());
+        ros::shutdown();
+        exit(-1);
+    }
+}
+
+void printMap(std::map<std::string, double> givenMap, std::string givenLeadingString, FILE * givenDestination){
+
+    int i = 0;
+    for(auto elem : givenMap){
+        fprintf(givenDestination, (givenLeadingString + "\"%s\": %.3f").c_str(), elem.first.c_str(), elem.second);
+        if (i != givenMap.size()-1) fprintf(givenDestination, ",\n"); else fprintf(givenDestination, "\n");
+        i++;
+    }
+}
+
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
     if (givenServoConfigService.call(givenCall))  {
         switch(givenCall.response.status){

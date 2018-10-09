@@ -15,6 +15,9 @@
 #include "dyret_controller/GetGaitControllerStatus.h"
 
 std::string trim(std::string& str);
+void printMap(std::map<std::string, double> givenMap, std::string givenLeadingString, FILE * givenDestination);
+
+double getMapValue(const std::map<std::string, double> &givenMap, const std::string &givenValue);
 
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService);
 bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClient);
