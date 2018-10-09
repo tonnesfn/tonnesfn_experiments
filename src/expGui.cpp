@@ -631,9 +631,9 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
     fprintf(evoLog, "      \"raw_fitness\": [\n");
     fprintf(evoLog, "        {\n");
-    printMap(rawFitness[0], "        ", evoLog);
+    printMap(rawFitness[0], "          ", evoLog);
     fprintf(evoLog, "        },{\n");
-    printMap(rawFitness[1], "        ", evoLog);
+    printMap(rawFitness[1], "          ", evoLog);
     fprintf(evoLog, "        }\n");
 
     fprintf(evoLog, "      ]\n");
@@ -1001,7 +1001,7 @@ void experiments_fitnessNoise() {
 }
 
 std::vector<double> getRandomIndividual() {
-    std::vector<double> individual(10);
+    std::vector<double> individual(17);
 
     for (int j = 0; j < individual.size(); j++) individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 
@@ -1035,7 +1035,6 @@ void experiments_randomSearch() {
         struct tm *now = localtime(&t);
 
         std::string logDirectory = createExperimentDirectory("rand", now);
-
         std::stringstream ss;
         ss << logDirectory << getDateString(now) << "_rand.json";
 
@@ -1050,9 +1049,10 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "{\n");
         fprintf(randomSearchLog, "  \"experiment_info\": {\n");
         fprintf(randomSearchLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
-        fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+        if (fullCommand.size() != 0) fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
         fprintf(randomSearchLog, "    \"type\": \"random\",\n");
         fprintf(randomSearchLog, "    \"algorithm\": \"random\",\n");
+        fprintf(randomSearchLog, "    \"controller\": \"%s\",\n", gaitType.c_str());
         fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
         if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n");
@@ -1098,42 +1098,47 @@ void experiments_randomSearch() {
             }
             fprintf(randomSearchLog, "      ],\n");
 
-            //std::vector<double> individualParameters = genToPhen(randomIndividual);
-            std::map<std::string, double> individualParameters = genToHighLevelSplineGaitPhen(randomIndividual);
+            std::map<std::string, double> individualParameters;
+
+            if (gaitType == "highLevelSplineGait") {
+                individualParameters = genToHighLevelSplineGaitPhen(randomIndividual);
+            } else if (gaitType == "lowLevelSplineGait"){
+                individualParameters = genToLowLevelSplineGaitPhen(randomIndividual);
+            } else {
+                ROS_FATAL("Unknown controller: %s", gaitType.c_str());
+                exit(-1);
+            }
+
+
             fprintf(randomSearchLog, "      \"phenotype\": {\n");
+            int i = 0;
             for(auto elem : individualParameters){
-                fprintf(randomSearchLog, "        \"%s\": %.3f,\n", elem.first.c_str(), elem.second);
+                fprintf(randomSearchLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+                if (i != individualParameters.size()-1) fprintf(randomSearchLog, ",\n"); else fprintf(randomSearchLog, "\n");
+                i++;
             }
             fprintf(randomSearchLog, "      },\n");
 
             fclose(randomSearchLog);
 
-            std::vector<std::map<std::string, double>> rawFitnesses;
-            std::map<std::string, double> fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitnesses);
+            std::vector<std::map<std::string, double>> rawFitness;
+            std::map<std::string, double> fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
 
             fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
 
             randomSearchLog = fopen(ss.str().c_str(), "a");
             fprintf(randomSearchLog, "      \"fitness\": {\n");
 
-            for(auto elem : fitnessResult){
-                fprintf(randomSearchLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
-                if (i != fitnessResult.size()-1) fprintf(randomSearchLog, ",\n"); else fprintf(randomSearchLog, "\n");
-                i++;
-            }
-
-            fprintf(randomSearchLog, "\n");
+            printMap(fitnessResult, "        ", randomSearchLog);
 
             fprintf(randomSearchLog, "      },\n");
 
             fprintf(randomSearchLog, "      \"raw_fitness\": [\n");
-
-            //todo: fix this
-            /*for (int k = 0; k < rawFitnessVector.size(); k++) {
-                fprintf(randomSearchLog, "%s", rawFitnessVector[k].c_str());
-                if (k == fitnessResult.size() - 1) fprintf(randomSearchLog, "\n"); else fprintf(randomSearchLog, ",\n");
-
-            }*/
+            fprintf(randomSearchLog, "        {\n");
+            printMap(rawFitness[0], "          ", randomSearchLog);
+            fprintf(randomSearchLog, "        },{\n");
+            printMap(rawFitness[1], "          ", randomSearchLog);
+            fprintf(randomSearchLog, "        }\n");
 
             fprintf(randomSearchLog, "      ]\n");
 
@@ -1165,7 +1170,8 @@ void menu_experiments() {
             "    mn - evolve cont+morph, highLevel\n"
             "    me - evolve map-elites, highLevel\n"
             "    el - evolve cont-morph, lowLevel\n"
-            "    ra - random search, highLevel\n"
+            "    rh - random search, highLevel\n"
+            "    rl - random search, lowLevel\n"
             "    vf - verify fitness on single individual\n"
             "    vn - check noise in stability fitness\n");
     fprintf(logOutput, "\n> ");
@@ -1195,9 +1201,13 @@ void menu_experiments() {
             experiments_verifyFitness();
         } else if (choice == "vn") {
             experiments_fitnessNoise();
-        } else if (choice == "ra") {
+        } else if (choice == "rl") {
+            gaitType = "lowLevelSplineGait";
             experiments_randomSearch();
-        }
+        } else if (choice == "rh") {
+            gaitType = "highLevelSplineGait";
+            experiments_randomSearch();
+    }
     }
 }
 
