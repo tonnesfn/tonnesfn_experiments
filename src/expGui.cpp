@@ -412,13 +412,23 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     printMap(gaitResultsReverse, "    ", logOutput);
 
 
-    mapToReturn["Stability"] = (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0;
+    // Handle robots that fell
+    if ((gaitResultsForward.at("linAcc_z") > 0) || (gaitResultsForward.at("linAcc_z") > 0)){
+        mapToReturn["Stability"] = fmin(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
 
-    if (ros::Time::isSimTime()){
-        mapToReturn["MocapSpeed"] = (getMapValue(gaitResultsForward, "sensorSpeedForward") - getMapValue(gaitResultsReverse, "sensorSpeedForward")) / 2.0;
+        if (ros::Time::isSimTime()){
+            mapToReturn["MocapSpeed"] = (getMapValue(gaitResultsForward, "sensorSpeedForward") - getMapValue(gaitResultsReverse, "sensorSpeedForward")) / 2.0;
+        } else {
+            mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
+        }
     } else {
-        mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
+        ROS_WARN("Robot fell, discarding fitness");
+
+        mapToReturn["Stability"] = -1;
+        mapToReturn["MocapSpeed"] = 0;
+
     }
+
 
     // Print total results
     fprintf(logOutput, "  Res total: \n");
