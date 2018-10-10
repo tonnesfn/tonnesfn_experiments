@@ -121,7 +121,7 @@ void resetSimulation(){
     ros::service::call("/gazebo/unpause_physics", empty);
 
     // Run a few ticks
-    ros::Duration(0.1).sleep();
+    usleep(10000);
 
     ROS_INFO("Simulation reset");
 

@@ -57,6 +57,8 @@ def callback(ch, method, properties, body):
     t.daemon = True  # thread dies with the program
     t.start()
 
+    console_output_str = ""
+
     try:
 
         while console_process.poll() is None:
@@ -66,7 +68,9 @@ def callback(ch, method, properties, body):
             except Empty:
                 pass
             else:
-                print(line)
+                print(line.decode('utf-8'), end='', flush=True)
+                console_output_str += ''.join(filter(lambda x: x in string.printable, line.decode('utf-8')))
+                time.sleep(0.1)
 
             connection.process_data_events()
 
@@ -75,8 +79,21 @@ def callback(ch, method, properties, body):
         console_process.kill()
         exit()
 
-    console_output_str = console_process.stdout.read().decode('utf-8')
-    console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
+    time.sleep(3)
+
+    # Empty the rest of the queue
+    while True:
+        try:
+            line = q.get_nowait()
+        except Empty:
+            break
+        else:
+            print(line.decode('utf-8'), end='', flush=True)
+            console_output_str += ''.join(filter(lambda x: x in string.printable, line.decode('utf-8')))
+            time.sleep(0.1)
+
+    #console_output_str = console_process.stdout.read().decode('utf-8')
+    #console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
     if "ABORT" in console_output_str:
         print("Experiment aborted.")
@@ -85,7 +102,8 @@ def callback(ch, method, properties, body):
     returnMessage = '{\n'
     returnMessage += "  \"node\": \"{}\",\n".format(platform.node())
     returnMessage += "  \"consoleOutput\": \n"
-    returnMessage += "    \"{}\"\n".format(console_output_str.replace("\n", "\\n"))
+    returnMessage += "    \"{}\"\n".format(console_output_str.replace("\n", "\\n").replace("\"", "\\\""))
+
     returnMessage += ","
 
     logFiles = []
