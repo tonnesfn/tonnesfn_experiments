@@ -127,29 +127,23 @@ void resetSimulation(){
 
 }
 
-//TODO: Fix this
-void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client) {
+void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::map<std::string, double>> &rawFitnesses) {
     dyret_controller::GetGaitEvaluation srv;
     std::vector<std::string> descriptorsToReturn;
 
     srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getDescriptors;
 
     if (get_gait_evaluation_client.call(srv)) {
+        for (int i = 0; i <= 1; i++) {
+            std::map<std::string, double> fitnessMap;
 
-        std::stringstream ss;
+            for (int i = 0; i < srv.response.descriptors.size(); i++) {
+                float randNumber = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+                fitnessMap[srv.response.descriptors[i]] = randNumber;
+            }
 
-        ss << "        {\n";
-        for (int i = 0; i < srv.response.descriptors.size(); i++) {
-            float randNumber = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-
-            ss << "          \"" << srv.response.descriptors[i] << "\": " << randNumber;
-            if (i == srv.response.descriptors.size() - 1) ss << "\n"; else ss << ",\n";
+            rawFitnesses.push_back(fitnessMap);
         }
-
-        ss << "        }";
-
-        //givenRawFitnessVector.push_back(ss.str());
-
     } else {
         ROS_ERROR("Error while calling GaitRecording service with t_getDescriptors!\n");
     }
@@ -295,8 +289,16 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (instantFitness) {
         usleep(30000);
 
-        return std::map<std::string, double>{{"test1", static_cast <float> (rand()) / static_cast <float> (RAND_MAX)},
-                                             {"test2", static_cast <float> (rand()) / static_cast <float> (RAND_MAX)}};
+        setRandomRawFitness(get_gait_evaluation_client, rawFitnesses);
+
+        std::map<std::string, double> mapToReturn;
+
+        for (int i = 0; i < fitnessFunctions.size(); i++){
+            float randNumber = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+            mapToReturn[fitnessFunctions[i]] = randNumber;
+        }
+
+        return mapToReturn;
     }
 
     if (ros::Time::isSystemTime()) {
