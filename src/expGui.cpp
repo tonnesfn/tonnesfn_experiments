@@ -73,7 +73,7 @@ FILE *logOutput = stdout;
 
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 18; // 15 sec max each direction
+int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
 
@@ -417,7 +417,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Handle robots that fell
     if ((gaitResultsForward.at("linAcc_z") > 0) || (gaitResultsForward.at("linAcc_z") > 0)){
-        mapToReturn["Stability"] = fmin(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
+        mapToReturn["Stability"] = fmax(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
 
         if (ros::Time::isSimTime()){
             mapToReturn["MocapSpeed"] = (getMapValue(gaitResultsForward, "sensorSpeedForward") - getMapValue(gaitResultsReverse, "sensorSpeedForward")) / 2.0;
@@ -616,7 +616,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     fprintf(evoLog, "      \"phenotype\": {\n");
     int i = 0;
     for(auto elem : individualParameters){
-        fprintf(evoLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+        fprintf(evoLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
         if (i != individualParameters.size()-1) fprintf(evoLog, ",\n"); else fprintf(evoLog, "\n");
         i++;
     }
@@ -625,7 +625,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     fprintf(evoLog, "      \"fitness\": {\n");
     i = 0;
     for(auto elem : fitnessResult){
-        fprintf(evoLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+        fprintf(evoLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
         if (i != fitnessResult.size()-1) fprintf(evoLog, ",\n"); else fprintf(evoLog, "\n");
         i++;
     }
@@ -995,7 +995,7 @@ void experiments_fitnessNoise() {
 
         fprintf(logOutput, "  Res: ");
         for(auto elem : gaitResults){
-            fprintf(logOutput, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+            fprintf(logOutput, "        \"%s\": %f", elem.first.c_str(), elem.second);
             if (i != gaitResults.size()-1) fprintf(logOutput, ",\n"); else fprintf(logOutput, "\n");
             i++;
         }
@@ -1116,7 +1116,7 @@ void experiments_randomSearch() {
             fprintf(randomSearchLog, "      \"phenotype\": {\n");
             int i = 0;
             for(auto elem : individualParameters){
-                fprintf(randomSearchLog, "        \"%s\": %.3f", elem.first.c_str(), elem.second);
+                fprintf(randomSearchLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
                 if (i != individualParameters.size()-1) fprintf(randomSearchLog, ",\n"); else fprintf(randomSearchLog, "\n");
                 i++;
             }
@@ -1266,6 +1266,8 @@ void menu_configure() {
 }
 
 int main(int argc, char **argv) {
+
+    srand(time(NULL));
 
     argv_g = argv;
 

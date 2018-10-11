@@ -21,7 +21,7 @@ void printMap(std::map<std::string, double> givenMap, std::string givenLeadingSt
 
     int i = 0;
     for(auto elem : givenMap){
-        fprintf(givenDestination, (givenLeadingString + "\"%s\": %.3f").c_str(), elem.first.c_str(), elem.second);
+        fprintf(givenDestination, (givenLeadingString + "\"%s\": %f").c_str(), elem.first.c_str(), elem.second);
         if (i != givenMap.size()-1) fprintf(givenDestination, ",\n"); else fprintf(givenDestination, "\n");
         i++;
     }
