@@ -388,6 +388,17 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     sleep(1);
 
     resetGaitRecording(get_gait_evaluation_client);
+
+    if (ros::Time::isSimTime()) {
+        // Set leg lengths and wait until they reach the correct length
+        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+        secPassed = 0;
+        while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
+            sleep(1);
+            if (secPassed++ > 60) return std::map<std::string, double>(); // 1 min timeout to reconfigure
+        }
+    }
+
     sendContGaitMessage(M_PI, actionMessages_pub);
     sleep(1);
 
@@ -738,7 +749,8 @@ void menu_demo() {
 
     std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-    fprintf(logOutput, "    ss - Test small robot (small HLSC)\n"
+    fprintf(logOutput, "    ts - test hard coded robot\n"
+                       "    ss - Test small robot (small HLSC)\n"
                        "    ls - Test large robot (small HLSC)\n"
                        "    ll - Test large robot (large HLSC)\n"
                        "    cs - Test low level spline control (small LLSC)\n"
@@ -756,7 +768,29 @@ void menu_demo() {
     }
 
     if (choice.empty() == false) {
-        if (choice == "ss") {
+        if (choice == "ts") {
+
+        std::map<std::string, double> customRobot =
+                {{"femurLength", 0.0}, //{{"femurLength", 1.367467},
+                 {"frequencyFactor", 0.98675},
+                 {"liftDuration", 0.159514},
+                 {"p0_x", 0.0},
+                 {"p0_y", 102.399856},
+                 {"p1_x", 0.0},
+                 {"p1_y", 55.270207},
+                 {"p2_x", 0.0},
+                 {"p2_y", -125.971046},
+                 {"p2_z", 69.163904},
+                 {"p3_x", 0.0},
+                 {"p3_y", 43.958044},
+                 {"p3_z", 49.316892},
+                 {"p4_x", 0.0},
+                 {"p4_y", -4.313314},
+                 {"p4_z", 16.276393},
+                 {"tibiaLength", 0.0}}; //{"tibiaLength", 48.817356}};
+
+            run_individual("lowLevelSplineGait", customRobot);
+        } else if (choice == "ss") {
             run_individual("highLevelSplineGait", individuals::smallRobotSmallControl);
         } else if (choice == "ls") {
             run_individual("highLevelSplineGait", individuals::largeRobotSmallControl);
