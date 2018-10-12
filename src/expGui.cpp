@@ -375,9 +375,18 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     std::map<std::string, double> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
+    // Check for empty results
     if (gaitResultsForward.empty()) {
-        ROS_ERROR("GaitResultsForward.size() == 0!\n");
+        ROS_ERROR("GaitResultsForward.size() == 0!");
         return std::map<std::string, double>();
+    }
+
+    // Check for nan values
+    for(auto elem : gaitResultsForward){
+        if (std::isnan(elem.second)){
+            ROS_ERROR("Got NAN value");
+            return std::map<std::string, double>();
+        }
     }
 
     // Print forward results
@@ -416,9 +425,18 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     std::map<std::string, double> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
+    // Check for empty
     if (gaitResultsReverse.empty()) {
-        ROS_ERROR("GaitResultsReverse.size() == 0!\n");
+        ROS_ERROR("GaitResultsReverse.size() == 0!");
         return std::map<std::string, double>();
+    }
+
+    // Check for nan values
+    for(auto elem : gaitResultsReverse){
+        if (std::isnan(elem.second)){
+            ROS_ERROR("Got NAN value");
+            return std::map<std::string, double>();
+        }
     }
 
     // Print reverse results
