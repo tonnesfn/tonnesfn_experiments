@@ -528,7 +528,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     return phenoType;
 }
 
-std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndividualGenotype) {
+std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndividualGenotype, FILE *logFile) {
 
     // Set length of individual if not evolving morphology:
     if (evolveMorph == false) {
@@ -622,65 +622,61 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
     FILE *genFile = fopen("generation", "r");
 
-    FILE *evoLog = fopen(evoLogPath.c_str(), "a");
-    if (evoLog == NULL) {
-        ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
-    }
-
     int currentGeneration;
     fscanf(genFile, "%d", &currentGeneration);
     fclose(genFile);
-    fprintf(evoLog, "    {\n");
-    fprintf(evoLog, "      \"id\": %d,\n", currentIndividual);
-    fprintf(evoLog, "      \"generation\": %d,\n", currentGeneration);
 
-    fprintf(evoLog, "      \"genotype\": [\n");
+
+    fprintf(logFile, "    {\n");
+
+    fprintf(logFile, "      \"id\": %d,\n", currentIndividual);
+    fprintf(logFile, "      \"generation\": %d,\n", currentGeneration);
+
+    fprintf(logFile, "      \"genotype\": [\n");
     for (int i = 0; i < givenIndividualGenotype.size(); i++) {
-        fprintf(evoLog, "        %f", givenIndividualGenotype[i]);
-        if (i != givenIndividualGenotype.size() - 1) fprintf(evoLog, ",");
-        fprintf(evoLog, "  \n");
+        fprintf(logFile, "        %f", givenIndividualGenotype[i]);
+        if (i != givenIndividualGenotype.size() - 1) fprintf(logFile, ",");
+        fprintf(logFile, "  \n");
     }
-    fprintf(evoLog, "      ],\n");
+    fprintf(logFile, "      ],\n");
 
-    fprintf(evoLog, "      \"phenotype\": {\n");
+    fprintf(logFile, "      \"phenotype\": {\n");
     int i = 0;
     for(auto elem : individualParameters){
-        fprintf(evoLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
-        if (i != individualParameters.size()-1) fprintf(evoLog, ",\n"); else fprintf(evoLog, "\n");
+        fprintf(logFile, "        \"%s\": %f", elem.first.c_str(), elem.second);
+        if (i != individualParameters.size()-1) fprintf(logFile, ",\n"); else fprintf(logFile, "\n");
         i++;
     }
-    fprintf(evoLog, "      },\n");
+    fprintf(logFile, "      },\n");
 
-    fprintf(evoLog, "      \"fitness\": {\n");
+    fprintf(logFile, "      \"fitness\": {\n");
     i = 0;
     for(auto elem : fitnessResult){
-        fprintf(evoLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
-        if (i != fitnessResult.size()-1) fprintf(evoLog, ",\n"); else fprintf(evoLog, "\n");
+        fprintf(logFile, "        \"%s\": %f", elem.first.c_str(), elem.second);
+        if (i != fitnessResult.size()-1) fprintf(logFile, ",\n"); else fprintf(logFile, "\n");
         i++;
     }
-    fprintf(evoLog, "      },\n");
+    fprintf(logFile, "      },\n");
 
 
-    fprintf(evoLog, "      \"raw_fitness\": [\n");
-    fprintf(evoLog, "        {\n");
-    printMap(rawFitness[0], "          ", evoLog);
-    fprintf(evoLog, "        },{\n");
-    printMap(rawFitness[1], "          ", evoLog);
-    fprintf(evoLog, "        }\n");
+    fprintf(logFile, "      \"raw_fitness\": [\n");
+    fprintf(logFile, "        {\n");
+    printMap(rawFitness[0], "          ", logFile);
+    fprintf(logFile, "        },{\n");
+    printMap(rawFitness[1], "          ", logFile);
+    fprintf(logFile, "        }\n");
 
-    fprintf(evoLog, "      ]\n");
+    fprintf(logFile, "      ]\n");
 
-    fprintf(evoLog, "    }");
+    fprintf(logFile, "    }");
 
     if (currentIndividual == ((generations) * popSize) - 1) { // If last individual
-        fprintf(evoLog, "\n");
-        fprintf(evoLog, "  ]\n");
-        fprintf(evoLog, "}");
+        fprintf(logFile, "\n");
+        fprintf(logFile, "  ]\n");
+        fprintf(logFile, "}");
     } else {
-        fprintf(evoLog, ",\n");
+        fprintf(logFile, ",\n");
     }
-
-    fclose(evoLog);
 
     return fitnessResult;
 
@@ -700,7 +696,14 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData);
+        FILE *evoLog = fopen(evoLogPath.c_str(), "a");
+        if (evoLog == NULL) {
+            ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
+        }
+
+        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData, evoLog);
+
+        fclose(evoLog);
 
         for (int i = 0; i < fitnessFunctions.size(); i++){
             this->_objs[i] = fitnessResult[fitnessFunctions[i]];
@@ -724,7 +727,14 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData);
+        FILE *evoLog = fopen(evoLogPath.c_str(), "a");
+        if (evoLog == NULL) {
+            ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
+        }
+
+        std::map<std::string, double> fitnessResult = evaluateIndividual(individualData, evoLog);
+
+        fclose(evoLog);
 
         for (int i = 0; i < fitnessFunctions.size(); i++){
             this->_objs[i] = (float) fitnessResult.at(fitnessFunctions[i]);
@@ -1130,84 +1140,17 @@ void experiments_randomSearch() {
 
         fprintf(randomSearchLog, "  \"individuals\": [\n");
 
-        fclose(randomSearchLog);
-
-        currentIndividual = 0;
+        currentIndividual = -1;
 
         for (int j = 0; j < popSize * (generations); j++) {
 
             // Generate random individual:
             std::vector<double> randomIndividual = getRandomIndividual();
 
-            // Log individual
-            randomSearchLog = fopen(ss.str().c_str(), "a");
-            fprintf(randomSearchLog, "    {\n");
-            fprintf(randomSearchLog, "      \"id\": %d,\n", currentIndividual);
-
-            fprintf(randomSearchLog, "      \"genotype\": [\n");
-            for (int k = 0; k < randomIndividual.size(); k++) {
-                fprintf(randomSearchLog, "        %f", randomIndividual[k]);
-                if (k == randomIndividual.size() - 1) fprintf(randomSearchLog, "\n");
-                else
-                    fprintf(randomSearchLog, ",\n");
-            }
-            fprintf(randomSearchLog, "      ],\n");
-
-            std::map<std::string, double> individualParameters;
-
-            if (gaitType == "highLevelSplineGait") {
-                individualParameters = genToHighLevelSplineGaitPhen(randomIndividual);
-            } else if (gaitType == "lowLevelSplineGait"){
-                individualParameters = genToLowLevelSplineGaitPhen(randomIndividual);
-            } else {
-                ROS_FATAL("Unknown controller: %s", gaitType.c_str());
-                exit(-1);
-            }
-
-
-            fprintf(randomSearchLog, "      \"phenotype\": {\n");
-            int i = 0;
-            for(auto elem : individualParameters){
-                fprintf(randomSearchLog, "        \"%s\": %f", elem.first.c_str(), elem.second);
-                if (i != individualParameters.size()-1) fprintf(randomSearchLog, ",\n"); else fprintf(randomSearchLog, "\n");
-                i++;
-            }
-            fprintf(randomSearchLog, "      },\n");
-
-            fclose(randomSearchLog);
-
-            std::vector<std::map<std::string, double>> rawFitness;
-            std::map<std::string, double> fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
-
-            fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
-
-            randomSearchLog = fopen(ss.str().c_str(), "a");
-            fprintf(randomSearchLog, "      \"fitness\": {\n");
-
-            printMap(fitnessResult, "        ", randomSearchLog);
-
-            fprintf(randomSearchLog, "      },\n");
-
-            fprintf(randomSearchLog, "      \"raw_fitness\": [\n");
-            fprintf(randomSearchLog, "        {\n");
-            printMap(rawFitness[0], "          ", randomSearchLog);
-            fprintf(randomSearchLog, "        },{\n");
-            printMap(rawFitness[1], "          ", randomSearchLog);
-            fprintf(randomSearchLog, "        }\n");
-
-            fprintf(randomSearchLog, "      ]\n");
-
-            if (currentIndividual == ((generations) * popSize)) { // If last individual
-                fprintf(randomSearchLog, "    }\n");
-                fprintf(randomSearchLog, "  ]\n");
-                fprintf(randomSearchLog, "}");
-            } else {
-                fprintf(randomSearchLog, "    },\n");
-            }
-
-
-            fclose(randomSearchLog);
+            std::map<std::string, double> fitnessResult = evaluateIndividual(randomIndividual, randomSearchLog);
         }
+
+        fclose(randomSearchLog);
 
         fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
     }
