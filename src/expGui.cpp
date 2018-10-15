@@ -83,6 +83,8 @@ std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
 
+float gaitDifficultyFactor = 0.5;
+
 bool evolveMorph = true;
 bool instantFitness = false;
 
@@ -550,6 +552,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
     } else if (gaitType == "lowLevelSplineGait"){
         individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype);
+        individualParameters["difficultyFactor"] = gaitDifficultyFactor;
     } else {
         ROS_FATAL("Unknown controller: %s", gaitType.c_str());
         exit(-1);
@@ -834,9 +837,9 @@ void menu_demo() {
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
         } else if (choice == "cs") {
-            std::vector<std::string> names = {"liftDuration", "frequencyFactor",
+            std::vector<std::string> names = {"difficultyFactor", "liftDuration", "frequencyFactor",
                                               "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
-            std::vector<float> values = {0.20, 0.28,
+            std::vector<float> values = {0.5, 0.20, 0.28,
                                          0.0,  92.5,
                                          0.0, -92.5,
                                          0.0, -92.5, 50.0,
@@ -943,6 +946,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fprintf(evoLog, "    \"type\": \"evolution\",\n");
         fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
         fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
+        fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
         fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
 
@@ -1127,6 +1131,7 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "    \"type\": \"random\",\n");
         fprintf(randomSearchLog, "    \"algorithm\": \"random\",\n");
         fprintf(randomSearchLog, "    \"controller\": \"%s\",\n", gaitType.c_str());
+        fprintf(randomSearchLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
         fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
         if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n");
@@ -1165,22 +1170,46 @@ void experiments_randomSearch() {
     }
 }
 
+void getDifficultyFactor(){
+  printf("Difficulty?> ");
+
+  std::string difficulty;
+
+  if (commandQueue.empty()) {
+    getline(std::cin, difficulty);
+  } else {
+    difficulty = commandQueue[0];
+    fprintf(logOutput, "*%s*\n", difficulty.c_str());
+    commandQueue.erase(commandQueue.begin());
+  }
+
+  if(difficulty.find_first_not_of("1234567890.-") != std::string::npos){
+    ROS_FATAL("Invalid difficulty factor input");
+    exit(-1);
+  }
+
+  gaitDifficultyFactor = atof(difficulty.c_str());
+}
+
 void menu_experiments() {
     std::string choice;
 
     std::cout << "  Please choose one experiment: (enter to go back)\n";
 
     fprintf(logOutput,
-            "    cs - evolve control, small morphology, highLevel\n"
-            "    cm - evolve control, medium morphology, highLevel\n"
-            "    cl - evolve control, large morphology, highLevel\n"
-            "    mn - evolve cont+morph, highLevel\n"
-            "    me - evolve map-elites, highLevel\n"
-            "    el - evolve cont-morph, lowLevel\n"
-            "    rh - random search, highLevel\n"
-            "    rl - random search, lowLevel\n"
-            "    vf - verify fitness on single individual\n"
-            "    vn - check noise in stability fitness\n");
+            "    Evolution:\n"
+            "      cs - evolve control, small morphology, highLevel\n"
+            "      cm - evolve control, medium morphology, highLevel\n"
+            "      cl - evolve control, large morphology, highLevel\n"
+            "      mn - evolve cont+morph, highLevel\n"
+            "      me - evolve map-elites, highLevel\n"
+            "      el - evolve cont+morph, lowLevel\n"
+            "    Random:\n"
+            "      rh - random search, highLevel\n"
+            "      rl - random search, lowLevel\n"
+            "      vf - verify fitness on single individual\n"
+            "    Misc:\n"
+            "      vn - check noise in stability fitness\n");
     fprintf(logOutput, "\n> ");
 
     if (commandQueue.empty()) {
@@ -1201,6 +1230,8 @@ void menu_experiments() {
         } else if (choice == "mn") {
             experiments_evolve("nsga2", "", "highLevelSplineGait", true);
         } else if (choice == "el") {
+            getDifficultyFactor();
+
             experiments_evolve("nsga2", "", "lowLevelSplineGait", true);
         } else if (choice == "me") {
             experiments_evolve("map-elites", "", "highLevelSplineGait", true);
@@ -1210,6 +1241,9 @@ void menu_experiments() {
             experiments_fitnessNoise();
         } else if (choice == "rl") {
             gaitType = "lowLevelSplineGait";
+
+            getDifficultyFactor();
+
             experiments_randomSearch();
         } else if (choice == "rh") {
             gaitType = "highLevelSplineGait";
