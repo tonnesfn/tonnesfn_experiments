@@ -96,6 +96,7 @@ def callback(ch, method, properties, body):
     #console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
     if "ABORT" in console_output_str:
+        channel.basic_ack(delivery_tag=method.delivery_tag)
         print("Experiment aborted.")
         return
 
@@ -120,7 +121,7 @@ def callback(ch, method, properties, body):
 
     channel.basic_publish(exchange='', routing_key='results', body=returnMessage)
 
-    channel.basic_ack(delivery_tag = method.delivery_tag)
+    channel.basic_ack(delivery_tag=method.delivery_tag)
 
     print("Done!")
 
