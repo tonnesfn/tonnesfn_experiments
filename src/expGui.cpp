@@ -90,7 +90,6 @@ std::string morphology;
 std::string gaitType;
 
 bool robotOnStand = false;
-float currentSpeed = 0.0;
 
 char **argv_g;
 
@@ -571,11 +570,17 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         if (fitnessResult.empty()) validSolution = false;
 
         // A valid solution could not be found:
-        if ((validSolution == false) || (fitnessResult.size() == 0)) {
-            if (automatedRun) {
-                if (retryCounter < 3) {
+        if (!validSolution || fitnessResult.empty()) {
+            if (automatedRun()) {
+                if (retryCounter < 15) {
                     fprintf(logOutput, "Retrying\n");
-                    if (ros::Time::isSimTime()) resetSimulation();
+
+                    if (ros::Time::isSimTime()){
+                        sleep(5);
+                        resetSimulation();
+                        sleep(5);
+                    }
+
                     retryCounter += 1;
                     currentIndividual--;
                     validSolution = false;
@@ -609,7 +614,11 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     currentIndividual--;
                     validSolution = false;
                 } else { // Retry
-                    if (ros::Time::isSimTime()) resetSimulation();
+                    if (ros::Time::isSimTime()){
+                        sleep(5);
+                        resetSimulation();
+                        sleep(5);
+                    }
 
                     fprintf(logOutput, "Retrying\n");
                     currentIndividual--;
@@ -1341,7 +1350,7 @@ int main(int argc, char **argv) {
 
         if (commandQueue.empty() && !automatedRun()) {
             getline(std::cin, choice);
-        } else if (commandQueue.empty() && automatedRun) {
+        } else if (commandQueue.empty() && automatedRun()) {
             choice = "exit";
         } else {
             choice = commandQueue[0];
