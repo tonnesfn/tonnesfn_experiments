@@ -339,7 +339,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
         // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
         if (getMaxServoTemperature() > 70.0) {
-            fprintf(logOutput, "  Temperature is too high at %.1f\n", getMaxServoTemperature());
+            ROS_ERROR("  Temperature is too high at %.1f\n", getMaxServoTemperature());
             return std::map<std::string, double>();
         }
     }
@@ -352,7 +352,11 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     int secPassed = 0;
     while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
         sleep(1);
-        if (secPassed++ > 60) return std::map<std::string, double>(); // 1 min timeout to reconfigure
+        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+        if ( ((ros::Time::isSystemTime()) && (secPassed++ > 60)) || (ros::Time::isSystemTime() && (secPassed++ > 3))){
+            ROS_ERROR("Timed out waiting for legs to be at length");
+            return std::map<std::string, double>();
+        }
     }
 
     // Start the gait and wait for it to finish
@@ -404,8 +408,12 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
         secPassed = 0;
         while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
+            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
             sleep(1);
-            if (secPassed++ > 60) return std::map<std::string, double>(); // 1 min timeout to reconfigure
+            if ( ((ros::Time::isSystemTime()) && (secPassed++ > 60)) || (ros::Time::isSystemTime() && (secPassed++ > 3))){
+                ROS_ERROR("Timed out waiting for legs to be at length");
+                return std::map<std::string, double>(); // 1 min timeout to reconfigure
+            }
         }
     }
 
@@ -502,8 +510,7 @@ double mapNumber(double value, double start1, double stop1, double start2, doubl
 }
 
 double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, double givenOffset, double givenMinRange, double difficultyLevel) {
-    printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f",
-            givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
+    printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f", givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
 
     double oldRange = givenMaxValue - givenMinValue;
     double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (1 - difficultyLevel)) + givenMinRange;
@@ -610,7 +617,10 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         rawFitness.clear();
         fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
 
-        if (fitnessResult.empty()) validSolution = false;
+        if (fitnessResult.empty()){
+            ROS_ERROR("Received empty fitness result");
+            validSolution = false;
+        }
 
         // A valid solution could not be found:
         if (!validSolution || fitnessResult.empty()) {
