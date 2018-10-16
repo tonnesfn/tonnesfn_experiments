@@ -122,7 +122,7 @@ void resetSimulation(){
     ros::service::call("/gazebo/unpause_physics", empty);
 
     // Run a few ticks
-    usleep(10000);
+    usleep(1000);
 
     ROS_INFO("Simulation reset");
 
@@ -497,24 +497,65 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
     return phenoType;
 }
 
+double mapNumber(double value, double start1, double stop1, double start2, double stop2) {
+    return start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));
+}
+
+double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, double givenOffset, double givenMinRange, double difficultyLevel) {
+    printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f",
+            givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
+
+    double oldRange = givenMaxValue - givenMinValue;
+    double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (1 - difficultyLevel)) + givenMinRange;
+
+    double newMax = (newRange / 2) + givenOffset;
+    double newMin = (-newRange / 2) + givenOffset;
+
+    printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f",oldRange, newRange, newMax, newMin);
+
+    if (newMax > givenMaxValue) {
+        newMin = newMin - (newMax - givenMaxValue);
+        newMax = givenMaxValue;
+    }
+
+    if (newMin < givenMinValue) {
+        newMax = newMax - (newMin - givenMinValue);
+        newMin = givenMinValue;
+    }
+
+    printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f", oldRange, newRange, newMax, newMin);
+
+    double numberToReturn = mapNumber(givenNumber, 0, 1, newMin, newMax);
+
+    printf("  giveNumber: %.2f, new number: %.2f", givenNumber, numberToReturn);
+
+    return numberToReturn;
+}
+
 std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
 
-    if (givenGenotype.size() < 15){
-        ROS_ERROR("givenGenotype.size() < 15: %lu", givenGenotype.size());
+    if (givenGenotype.size() < 16){
+        ROS_ERROR("givenGenotype.size() < 16: %lu", givenGenotype.size());
         exit(-1);
     }
 
     std::map<std::string, double> phenoType;
+
+    phenoType["difficultyFactor"] = gaitDifficultyFactor;
 
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = (givenGenotype[2] * 0.15) + 0.05; // 0.05 ->  0.20
     phenoType["frequencyFactor"] = givenGenotype[3];
 
+
     phenoType["p0_x"] =   givenGenotype[3] * 0.0;
-    phenoType["p0_y"] =  (givenGenotype[4] * 300.0) - 150.0; // -150 -> 150
-    phenoType["p1_x"] =   givenGenotype[5] * 0.0;
-    phenoType["p1_y"] =  (givenGenotype[6] * 300.0) - 150.0; // -150 -> 150;
+    phenoType["p1_x"] =   givenGenotype[3] * 0.0;
+
+    // StepLength 25 -> 300, p0 center around 50, p1 center around -50
+
+    phenoType["p0_y"] = getPoint(fmax(givenGenotype[4], givenGenotype[6]), -150.0, 150.0, 50.0, 25.0, gaitDifficultyFactor);
+    phenoType["p1_y"] = getPoint(fmin(givenGenotype[4], givenGenotype[6]), -150.0, 150.0, -50.0, 25.0, gaitDifficultyFactor);
 
     phenoType["p2_x"] =   givenGenotype[7] * 0.0;
     phenoType["p2_y"] =  (givenGenotype[8] * 300.0) - 150.0; // -150 -> 150;
@@ -552,7 +593,6 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
     } else if (gaitType == "lowLevelSplineGait"){
         individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype);
-        individualParameters["difficultyFactor"] = gaitDifficultyFactor;
     } else {
         ROS_FATAL("Unknown controller: %s", gaitType.c_str());
         exit(-1);
@@ -577,6 +617,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
             if (automatedRun()) {
                 if (retryCounter < 15) {
                     fprintf(logOutput, "Retrying\n");
+                    fprintf(stderr, "Retrying\n");
 
                     if (ros::Time::isSimTime()){
                         sleep(5);
