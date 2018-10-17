@@ -105,6 +105,8 @@ bool automatedRun() {
 
 void resetSimulation(){
 
+    usleep(1000);
+
     std_srvs::Empty empty;
 
     // First pause physics:
@@ -348,16 +350,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     setGaitParams(gaitType, phenoType);
 
     // Set leg lengths and wait until they reach the correct length
+    ROS_INFO("Setting leg lengths");
     setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
     int secPassed = 0;
     while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
         sleep(1);
         setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        if ( ((ros::Time::isSystemTime()) && (secPassed++ > 60)) || (ros::Time::isSystemTime() && (secPassed++ > 3))){
+        if ( ((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))){
             ROS_ERROR("Timed out waiting for legs to be at length");
             return std::map<std::string, double>();
         }
+        secPassed += 1;
     }
+    ROS_INFO("Leg lengths achieved");
 
     // Start the gait and wait for it to finish
     resetGaitRecording(get_gait_evaluation_client);
@@ -404,17 +409,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     resetGaitRecording(get_gait_evaluation_client);
 
     if (ros::Time::isSimTime()) {
-        // Set leg lengths and wait until they reach the correct length
+        ROS_INFO("Setting leg lengths");
         setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        secPassed = 0;
+        int secPassed = 0;
         while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
             sleep(1);
-            if ( ((ros::Time::isSystemTime()) && (secPassed++ > 60)) || (ros::Time::isSystemTime() && (secPassed++ > 3))){
+            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+            if ( ((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))){
                 ROS_ERROR("Timed out waiting for legs to be at length");
-                return std::map<std::string, double>(); // 1 min timeout to reconfigure
+                return std::map<std::string, double>();
             }
+            secPassed += 1;
         }
+        ROS_INFO("Leg lengths achieved");
     }
 
     sendContGaitMessage(M_PI, actionMessages_pub);
@@ -513,7 +520,7 @@ double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, 
     printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f", givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
 
     double oldRange = givenMaxValue - givenMinValue;
-    double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (1 - difficultyLevel)) + givenMinRange;
+    double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (difficultyLevel)) + givenMinRange;
 
     double newMax = (newRange / 2) + givenOffset;
     double newMin = (-newRange / 2) + givenOffset;
@@ -555,24 +562,27 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["liftDuration"]    = (givenGenotype[2] * 0.15) + 0.05; // 0.05 ->  0.20
     phenoType["frequencyFactor"] = givenGenotype[3];
 
-
     phenoType["p0_x"] =   givenGenotype[3] * 0.0;
     phenoType["p1_x"] =   givenGenotype[3] * 0.0;
 
     // StepLength 25 -> 300, p0 center around 50, p1 center around -50
-
     phenoType["p0_y"] = getPoint(fmax(givenGenotype[4], givenGenotype[6]), -150.0, 150.0, 50.0, 25.0, gaitDifficultyFactor);
     phenoType["p1_y"] = getPoint(fmin(givenGenotype[4], givenGenotype[6]), -150.0, 150.0, -50.0, 25.0, gaitDifficultyFactor);
 
-    phenoType["p2_x"] =   givenGenotype[7] * 0.0;
-    phenoType["p2_y"] =  (givenGenotype[8] * 300.0) - 150.0; // -150 -> 150;
-    phenoType["p2_z"] =  (givenGenotype[9] * 70.0) + 10.0;   //   10 ->  80
-    phenoType["p3_x"] =  givenGenotype[10] * 0.0;
-    phenoType["p3_y"] = (givenGenotype[11] * 300.0) - 150.0; // -150 -> 150;
-    phenoType["p3_z"] = (givenGenotype[12]* 70.0) + 10.0;;
-    phenoType["p4_x"] =  givenGenotype[13] * 0.0;
-    phenoType["p4_y"] = (givenGenotype[14] * 300.0) - 150.0; // -150 -> 150;
-    phenoType["p4_z"] = (givenGenotype[15] * 70.0) + 10.0;   //   10 ->  80
+    // (potential) Front air point:
+    phenoType["p2_x"] = getPoint(givenGenotype[7], -50.0, 50.0, 0.0, 0.0, gaitDifficultyFactor); // -50, 50 -> 0, 0
+    phenoType["p2_y"] = getPoint(givenGenotype[8], -150, 150, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
+    phenoType["p2_z"] = getPoint(givenGenotype[9], 10.0, 80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+
+    // (potential) Top air point:
+    phenoType["p3_x"] = getPoint(givenGenotype[10], -50.0, 50.0, 0.0, 0.0, gaitDifficultyFactor); // -50, 50 -> 0, 0
+    phenoType["p3_y"] = getPoint(givenGenotype[11], -150, 150, 0, 0, gaitDifficultyFactor); // -150, 150 -> 0, 0
+    phenoType["p3_z"] = getPoint(givenGenotype[12], 10.0, 80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
+
+    // (potential) Back air point:
+    phenoType["p4_x"] = getPoint(givenGenotype[13], -50.0, 50.0, 0.0, 0.0, gaitDifficultyFactor); // -50, 50 -> 0, 0
+    phenoType["p4_y"] = getPoint(givenGenotype[14], -150, 150, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
+    phenoType["p4_z"] = getPoint(givenGenotype[15], 10.0, 80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
 
     return phenoType;
 }
@@ -625,9 +635,8 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         // A valid solution could not be found:
         if (!validSolution || fitnessResult.empty()) {
             if (automatedRun()) {
-                if (retryCounter < 15) {
+                if (retryCounter < 5) {
                     fprintf(logOutput, "Retrying\n");
-                    fprintf(stderr, "Retrying\n");
 
                     if (ros::Time::isSimTime()){
                         sleep(5);
