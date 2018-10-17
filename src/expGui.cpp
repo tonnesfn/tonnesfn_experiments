@@ -112,13 +112,19 @@ void resetSimulation(){
     // First pause physics:
     ros::service::call("/gazebo/pause_physics", empty);
 
+    usleep(1000);
+
     // Then reset world:
     ros::service::call("/gazebo/reset_world", empty);
+
+    usleep(1000);
 
     // Then reset DyRET:
     std_srvs::SetBool setBool;
     setBool.request.data = true; // Reset prismatic joints
     ros::service::call("/dyret/simulation/reset", setBool);
+
+    usleep(1000);
 
     // Unpause physics:
     ros::service::call("/gazebo/unpause_physics", empty);
@@ -286,7 +292,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     currentIndividual++;
 
     // Reset if we are in simulation
-    if (ros::Time::isSimTime()) resetSimulation();
+    if (ros::Time::isSimTime()){
+        resetSimulation();
+        sleep(1);
+    }
 
     // (Return random fitness to test)
     if (instantFitness) {
@@ -403,8 +412,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     fprintf(logOutput, "  Res F:\n");
     printMap(gaitResultsForward, "    ", logOutput);
 
-    if (ros::Time::isSimTime()) resetSimulation();
-    sleep(1);
+    if (ros::Time::isSimTime()){
+        resetSimulation();
+        sleep(1);
+    }
 
     resetGaitRecording(get_gait_evaluation_client);
 

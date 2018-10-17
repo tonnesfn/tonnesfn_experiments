@@ -6,6 +6,7 @@ import time
 import json
 import string
 import os
+import sys
 from subprocess import PIPE, Popen
 from threading import Thread
 from queue import Queue, Empty
@@ -20,30 +21,30 @@ def enqueue_output(out, queue):
 
 
 def callback(ch, method, properties, body):
-    print("Received message: {}".format(body))
+    print("Received message: {}".format(body), file=sys.stderr)
 
     # Extract message and settings:
     message = json.loads(body.decode('utf-8'))
 
     # Write settings file:
-    print(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'))
+    print(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'), file=sys.stderr)
     with open(os.path.join(os.path.expanduser('~'),'catkin_ws/src/tonnesfn_experiments/src/evoSettings.h'), "w") as evo_settings_file:
         evo_settings_file.write("const int popSize =  {};\nconst int generations = {};\n".format(message['settings']['individuals'], message['settings']['generations']))
 
     if (message['node'] != 'expGui') and (message['node'] != 'mapGui'):
-        print("  Invalid node: {}".format(message['node']))
+        print("  Invalid node: {}".format(message['node']), file=sys.stderr)
         channel.basic_publish(exchange='', routing_key='results', body='Invalid node: {}'.format(message['node']))
         return
 
     # Building the project:
-    print("Building tonnesfn_experiments:")
-    result = subprocess.run(['catkin', 'build', 'tonnesfn_experiments'], stdout=subprocess.PIPE)
+    print("Building tonnesfn_experiments:", file=sys.stderr)
+    result = subprocess.run('cd ~/catkin_ws && source devel/setup.bash && catkin build tonnesfn_experiments', stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
     result_str = result.stdout.decode('utf-8')
 
     if "packages succeeded!" in result_str:
-        print("  Compilation successful")
+        print("  Compilation successful", file=sys.stderr)
     else:
-        print("  Compilation failed")
+        print("  Compilation failed", file=sys.stderr)
         channel.basic_publish(exchange='', routing_key='results', body='Compilation failed: {}'.format(result_str))
         return
 
@@ -68,14 +69,14 @@ def callback(ch, method, properties, body):
             except Empty:
                 pass
             else:
-                print(line.decode('utf-8'), end='', flush=True)
+                print(line.decode('utf-8'), end='', flush=True, file=sys.stderr)
                 console_output_str += ''.join(filter(lambda x: x in string.printable, line.decode('utf-8')))
                 time.sleep(0.1)
 
             connection.process_data_events()
 
     except KeyboardInterrupt:
-        print("Keyboard interrupt received. Killing process!")
+        print("Keyboard interrupt received. Killing process!", file=sys.stderr)
         console_process.kill()
         exit()
 
@@ -88,7 +89,7 @@ def callback(ch, method, properties, body):
         except Empty:
             break
         else:
-            print(line.decode('utf-8'), end='', flush=True)
+            print(line.decode('utf-8'), end='', flush=True, file=sys.stderr)
             console_output_str += ''.join(filter(lambda x: x in string.printable, line.decode('utf-8')))
             time.sleep(0.1)
 
@@ -97,7 +98,7 @@ def callback(ch, method, properties, body):
 
     if "ABORT" in console_output_str:
         channel.basic_ack(delivery_tag=method.delivery_tag)
-        print("Experiment aborted.")
+        print("Experiment aborted.", file=sys.stderr)
         return
 
     returnMessage = '{\n'
@@ -123,7 +124,7 @@ def callback(ch, method, properties, body):
 
     channel.basic_ack(delivery_tag=method.delivery_tag)
 
-    print("Done!")
+    print("Done!", file=sys.stderr)
 
 
 if __name__ == '__main__':
