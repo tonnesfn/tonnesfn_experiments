@@ -103,6 +103,7 @@ def callback(ch, method, properties, body):
 
     returnMessage = '{\n'
     returnMessage += "  \"node\": \"{}\",\n".format(platform.node())
+    returnMessage += "  \"load\": [{}, {}, {}],\n".format(os.getloadavg()[0], os.getloadavg()[1], os.getloadavg()[2])
     returnMessage += "  \"consoleOutput\": \n"
     returnMessage += "    \"{}\"\n".format(console_output_str.replace("\n", "\\n").replace("\"", "\\\""))
 
