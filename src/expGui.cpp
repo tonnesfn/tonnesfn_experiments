@@ -69,6 +69,8 @@ ros::Publisher actionMessages_pub;
 ros::Publisher positionCommand_pub;
 ros::Publisher gaitConfiguration_pub;
 
+unsigned int randomSeed;
+
 FILE *logOutput = stdout;
 
 double currentFemurLength = 0.0;
@@ -528,7 +530,7 @@ double mapNumber(double value, double start1, double stop1, double start2, doubl
 }
 
 double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, double givenOffset, double givenMinRange, double difficultyLevel) {
-    printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f", givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
+    //printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f", givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
 
     double oldRange = givenMaxValue - givenMinValue;
     double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (difficultyLevel)) + givenMinRange;
@@ -536,7 +538,7 @@ double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, 
     double newMax = (newRange / 2) + givenOffset;
     double newMin = (-newRange / 2) + givenOffset;
 
-    printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f",oldRange, newRange, newMax, newMin);
+    //printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f",oldRange, newRange, newMax, newMin);
 
     if (newMax > givenMaxValue) {
         newMin = newMin - (newMax - givenMaxValue);
@@ -548,11 +550,11 @@ double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, 
         newMin = givenMinValue;
     }
 
-    printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f", oldRange, newRange, newMax, newMin);
+    //printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f", oldRange, newRange, newMax, newMin);
 
     double numberToReturn = mapNumber(givenNumber, 0, 1, newMin, newMax);
 
-    printf("  giveNumber: %.2f, new number: %.2f", givenNumber, numberToReturn);
+    //printf("  giveNumber: %.2f, new number: %.2f", givenNumber, numberToReturn);
 
     return numberToReturn;
 }
@@ -1201,6 +1203,7 @@ void experiments_randomSearch() {
         if (fullCommand.size() != 0) fprintf(randomSearchLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
         fprintf(randomSearchLog, "    \"type\": \"random\",\n");
         fprintf(randomSearchLog, "    \"algorithm\": \"random\",\n");
+        fprintf(randomSearchLog, "    \"seed\": \"%u\",\n", randomSeed);
         fprintf(randomSearchLog, "    \"controller\": \"%s\",\n", gaitType.c_str());
         fprintf(randomSearchLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
         fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
@@ -1333,6 +1336,7 @@ void menu_configure() {
     fprintf(logOutput, "    e - enable servo torques\n");
     fprintf(logOutput, "    d - disable servo torques\n");
     fprintf(logOutput, "    r - restPose\n");
+    fprintf(logOutput, "    q - set random seed\n");
     fprintf(logOutput, "    x - reset simulation\n");
     fprintf(logOutput, "\n> ");
 
@@ -1368,6 +1372,9 @@ void menu_configure() {
             sendRestPoseMessage(actionMessages_pub);
         } else if (choice == "x") {
             resetSimulation();
+        } else if (choice == "q") {
+            randomSeed = 0;
+            srand(randomSeed);
         }
 
     }
@@ -1376,7 +1383,9 @@ void menu_configure() {
 
 int main(int argc, char **argv) {
 
-    srand(time(NULL));
+    randomSeed = time(NULL);
+
+    srand(randomSeed);
 
     argv_g = argv;
 
