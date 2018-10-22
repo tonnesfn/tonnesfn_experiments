@@ -531,7 +531,7 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
     phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
     phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
     phenoType["smoothing"]       = givenGenotype[4] * 50.0;          //  0    ->  50
-    phenoType["frequency"]       = 0.25 + givenGenotype[5] * 2.25;   //  0.25 ->   2.5
+    phenoType["frequency"]       = 0.25 + givenGenotype[5] * 1.25;   //  0.25 ->   1.5
     phenoType["wagPhase"]        = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
     phenoType["wagAmplitude_x"]  = givenGenotype[7] * 50.0;          //  0    ->  50
     phenoType["wagAmplitude_y"]  = givenGenotype[8] * 50.0;          //  0    ->  50
@@ -587,19 +587,19 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
 
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
-    phenoType["liftDuration"]    = 0.05 + (givenGenotype[2] * 0.15); // 0.05 ->  0.20
-    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 2.25);   // 0.25->2.5
+    phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
+    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 1.25); // 0.25 ->  1.5
 
-    phenoType["wagPhase"]        = getPoint(givenGenotype[4], 0, 2*M_PI,  0.0, 0.2, gaitDifficultyFactor);
-    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5], 0, 50.0, 0.0, 5, gaitDifficultyFactor);
-    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6], 0, 50.0, 0.0, 5, gaitDifficultyFactor);
+    phenoType["wagPhase"]        = getPoint(givenGenotype[4], 0, 2*M_PI, 0.0, 0.2, gaitDifficultyFactor);
+    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5], 0,   50.0, 0.0, 5.0, gaitDifficultyFactor);
+    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6], 0,   50.0, 0.0, 5.0, gaitDifficultyFactor);
 
     phenoType["p0_x"] =   givenGenotype[7] * 0.0;
     phenoType["p1_x"] =   givenGenotype[9] * 0.0;
 
     // StepLength 25 -> 300, p0 center around 75, p1 center around -75
-    phenoType["p0_y"] = getPoint(fmax(givenGenotype[8], givenGenotype[10]), -150.0, 150.0,  75.0, 25.0, sqrt(gaitDifficultyFactor));
-    phenoType["p1_y"] = getPoint(fmin(givenGenotype[8], givenGenotype[10]), -150.0, 150.0, -75.0, 25.0, sqrt(gaitDifficultyFactor));
+    phenoType["p0_y"] = getPoint(fmax(givenGenotype[8], givenGenotype[10]), -150.0, 150.0,   50.0, 50.0, sqrt(gaitDifficultyFactor));
+    phenoType["p1_y"] = getPoint(fmin(givenGenotype[8], givenGenotype[10]), -150.0, 150.0, -100.0, 50.0, sqrt(gaitDifficultyFactor));
 
     // (potential) Front air point:
     phenoType["p2_x"] = getPoint(givenGenotype[11],  -25.0,  25.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
