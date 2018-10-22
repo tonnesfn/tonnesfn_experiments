@@ -27,7 +27,7 @@ namespace sferes_nsga2{
     };
 
     // Setup evolutionary framework
-    typedef gen::EvoFloat<17, Params> gen_t;
+    typedef gen::EvoFloat<20, Params> gen_t;
     typedef phen::Parameters<gen_t,FitExp2MO<Params>, Params> phen_t;
     typedef eval::Eval<Params> eval_t;
     typedef boost::fusion::vector<stat::State<phen_t, Params> > stat_t;

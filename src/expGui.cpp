@@ -576,8 +576,8 @@ double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, 
 
 std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
 
-    if (givenGenotype.size() < 16){
-        ROS_ERROR("givenGenotype.size() < 16: %lu", givenGenotype.size());
+    if (givenGenotype.size() < 20){
+        ROS_ERROR("givenGenotype.size() < 20: %lu", givenGenotype.size());
         exit(-1);
     }
 
@@ -590,27 +590,31 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["liftDuration"]    = 0.05 + (givenGenotype[2] * 0.15); // 0.05 ->  0.20
     phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 2.25);   // 0.25->2.5
 
-    phenoType["p0_x"] =   givenGenotype[3] * 0.0;
-    phenoType["p1_x"] =   givenGenotype[3] * 0.0;
+    phenoType["wagPhase"]        = getPoint(givenGenotype[4], 0, 2*M_PI,  0.0, 0.2, gaitDifficultyFactor);
+    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5], 0, 50.0, 0.0, 5, gaitDifficultyFactor);
+    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6], 0, 50.0, 0.0, 5, gaitDifficultyFactor);
 
-    // StepLength 25 -> 300, p0 center around 100, p1 center around -100
-    phenoType["p0_y"] = getPoint(fmax(givenGenotype[4], givenGenotype[6]), -150.0, 150.0,  100.0, 25.0, sqrt(gaitDifficultyFactor));
-    phenoType["p1_y"] = getPoint(fmin(givenGenotype[4], givenGenotype[6]), -150.0, 150.0, -100.0, 25.0, sqrt(gaitDifficultyFactor));
+    phenoType["p0_x"] =   givenGenotype[7] * 0.0;
+    phenoType["p1_x"] =   givenGenotype[9] * 0.0;
+
+    // StepLength 25 -> 300, p0 center around 75, p1 center around -75
+    phenoType["p0_y"] = getPoint(fmax(givenGenotype[8], givenGenotype[10]), -150.0, 150.0,  75.0, 25.0, sqrt(gaitDifficultyFactor));
+    phenoType["p1_y"] = getPoint(fmin(givenGenotype[8], givenGenotype[10]), -150.0, 150.0, -75.0, 25.0, sqrt(gaitDifficultyFactor));
 
     // (potential) Front air point:
-    phenoType["p2_x"] = getPoint(givenGenotype[7],  -25.0,  25.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
-    phenoType["p2_y"] = getPoint(givenGenotype[8], -150.0, 150.0, 75.0, 50.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> 50, 100
-    phenoType["p2_z"] = getPoint(givenGenotype[9],   10.0,  80.0, 30.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 25, 35
+    phenoType["p2_x"] = getPoint(givenGenotype[11],  -25.0,  25.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
+    phenoType["p2_y"] = getPoint(givenGenotype[12], -150.0, 150.0, 75.0, 50.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> 50, 100
+    phenoType["p2_z"] = getPoint(givenGenotype[13],   10.0,  80.0, 30.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 25, 35
 
     // (potential) Top air point:
-    phenoType["p3_x"] = getPoint(givenGenotype[10],  -25.0,  25.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
-    phenoType["p3_y"] = getPoint(givenGenotype[11], -150.0, 150.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> 0, 0
-    phenoType["p3_z"] = getPoint(givenGenotype[12],   10.0,  80.0, 50.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 45, 55
+    phenoType["p3_x"] = getPoint(givenGenotype[14],  -25.0,  25.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
+    phenoType["p3_y"] = getPoint(givenGenotype[15], -150.0, 150.0,  0.0,  0.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> 0, 0
+    phenoType["p3_z"] = getPoint(givenGenotype[16],   10.0,  80.0, 50.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 45, 55
 
     // (potential) Back air point:
-    phenoType["p4_x"] = getPoint(givenGenotype[13],  -25.0,  25.0,   0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
-    phenoType["p4_y"] = getPoint(givenGenotype[14], -150.0, 150.0, -75.0, 50.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> -50, -100
-    phenoType["p4_z"] = getPoint(givenGenotype[15],   10.0,  80.0,  30.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 25, 35
+    phenoType["p4_x"] = getPoint(givenGenotype[17],  -25.0,  25.0,   0.0,  0.0, sqrt(gaitDifficultyFactor)); // -25, 25 -> 0, 0
+    phenoType["p4_y"] = getPoint(givenGenotype[18], -150.0, 150.0, -75.0, 50.0, sqrt(gaitDifficultyFactor)); // -150, 150 -> -50, -100
+    phenoType["p4_z"] = getPoint(givenGenotype[19],   10.0,  80.0,  30.0, 10.0, sqrt(gaitDifficultyFactor)); // 10, 80 -> 25, 35
 
     return phenoType;
 }
