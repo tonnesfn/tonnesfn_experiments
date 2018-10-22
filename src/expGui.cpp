@@ -419,68 +419,81 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         sleep(1);
     }
 
-    resetGaitRecording(get_gait_evaluation_client);
+    std::map<std::string, double> gaitResultsReverse;
 
-    if (ros::Time::isSimTime()) {
-        ROS_INFO("Setting leg lengths");
-        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        int secPassed = 0;
-        while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-            sleep(1);
+    // Only evaluate reverse if in the real world:
+    if (ros::Time::isSystemTime()) {
+
+        resetGaitRecording(get_gait_evaluation_client);
+
+        if (ros::Time::isSimTime()) {
+            ROS_INFO("Setting leg lengths");
             setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-            if ( ((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))){
-                ROS_ERROR("Timed out waiting for legs to be at length");
-                return std::map<std::string, double>();
+            int secPassed = 0;
+            while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
+                sleep(1);
+                setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+                if (((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))) {
+                    ROS_ERROR("Timed out waiting for legs to be at length");
+                    return std::map<std::string, double>();
+                }
+                secPassed += 1;
             }
-            secPassed += 1;
+            ROS_INFO("Leg lengths achieved");
         }
-        ROS_INFO("Leg lengths achieved");
-    }
 
-    sendContGaitMessage(M_PI, actionMessages_pub);
-    sleep(1);
+        sendContGaitMessage(M_PI, actionMessages_pub);
+        sleep(1);
 
-    startTime = ros::Time::now();
-    while (gaitInferredPos > -evaluationDistance) { // Now walking backwards - negate evaluation distance
-        usleep(1000);
-        if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
-            printf("  Timed out reverse at %ds\n", (ros::Time::now() - startTime).sec);
-            break;
+        startTime = ros::Time::now();
+        while (gaitInferredPos > -evaluationDistance) { // Now walking backwards - negate evaluation distance
+            usleep(1000);
+            if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
+                printf("  Timed out reverse at %ds\n", (ros::Time::now() - startTime).sec);
+                break;
+            }
         }
-    }
 
-    sendRestPoseMessage(actionMessages_pub);
-    sleep(1);
+        sendRestPoseMessage(actionMessages_pub);
+        sleep(1);
 
-    std::map<std::string, double> gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
+        gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
-    // Check for empty
-    if (gaitResultsReverse.empty()) {
-        ROS_ERROR("GaitResultsReverse.size() == 0!");
-        return std::map<std::string, double>();
-    }
-
-    // Check for nan values
-    for(auto elem : gaitResultsReverse){
-        if (std::isnan(elem.second)){
-            ROS_ERROR("Got NAN value");
+        // Check for empty
+        if (gaitResultsReverse.empty()) {
+            ROS_ERROR("GaitResultsReverse.size() == 0!");
             return std::map<std::string, double>();
         }
+
+        // Check for nan values
+        for (auto elem : gaitResultsReverse) {
+            if (std::isnan(elem.second)) {
+                ROS_ERROR("Got NAN value");
+                return std::map<std::string, double>();
+            }
+        }
+
+        // Print reverse results
+        fprintf(logOutput, "  Res R:\n");
+        printMap(gaitResultsReverse, "    ", logOutput);
     }
 
-    // Print reverse results
-    fprintf(logOutput, "  Res R:\n");
-    printMap(gaitResultsReverse, "    ", logOutput);
-
-
     // Handle robots that fell
-    if ((gaitResultsForward.at("linAcc_z") > 0) || (gaitResultsForward.at("linAcc_z") > 0)){
-        mapToReturn["Stability"] = fmax(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
+    if ((gaitResultsForward.at("linAcc_z") > 0) || ((!gaitResultsReverse.empty()) && (gaitResultsReverse.at("linAcc_z") > 0))){
+        if (gaitResultsReverse.empty()) {
+            mapToReturn["Stability"] = fmax(-1.0, gaitResultsForward["combImuStab"]);
+        } else {
+            mapToReturn["Stability"] = fmax(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
+        }
 
         if (ros::Time::isSimTime()){
-            mapToReturn["MocapSpeed"] = (getMapValue(gaitResultsForward, "sensorSpeedForward") - getMapValue(gaitResultsReverse, "sensorSpeedForward")) / 2.0;
+            mapToReturn["MocapSpeed"] = getMapValue(gaitResultsForward, "sensorSpeedForward");
         } else {
-            mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
+            if (gaitResultsReverse.empty()) {
+                mapToReturn["MocapSpeed"] = gaitResultsForward["sensorSpeed"];
+            } else {
+                mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
+            }
         }
     } else {
         ROS_WARN("Robot fell, discarding fitness");
@@ -499,7 +512,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Add raw fitnesses to container
     rawFitnesses.push_back(gaitResultsForward);
-    rawFitnesses.push_back(gaitResultsReverse);
+    if (!gaitResultsReverse.empty()){
+        rawFitnesses.push_back(gaitResultsReverse);
+    }
 
     return mapToReturn;
 
@@ -703,6 +718,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
             }
         }
 
+
     } while (validSolution == false);
 
     FILE *genFile = fopen("generation", "r");
@@ -743,12 +759,15 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     }
     fprintf(logFile, "      },\n");
 
-
     fprintf(logFile, "      \"raw_fitness\": [\n");
     fprintf(logFile, "        {\n");
     printMap(rawFitness[0], "          ", logFile);
-    fprintf(logFile, "        },{\n");
-    printMap(rawFitness[1], "          ", logFile);
+
+    if (rawFitness.size() > 1) {
+        fprintf(logFile, "        },{\n");
+        printMap(rawFitness[1], "          ", logFile);
+    }
+
     fprintf(logFile, "        }\n");
 
     fprintf(logFile, "      ]\n");
