@@ -10,5 +10,5 @@
 
   <include file="$(find dyret_controller)/launch/fullController.launch" />
 
-  <node pkg="tonnesfn_experiments" name="workManagerClient" type="workManagerClient.py" />
+  <node pkg="tonnesfn_experiments" name="workManagerClient" type="workManagerClient.py" required="true" />
 </launch>

@@ -1458,7 +1458,7 @@ int main(int argc, char **argv) {
     if (resetGaitRecording(get_gait_evaluation_client) == false) {
         spinner.stop();
         ros::shutdown();
-        exit(0);
+        exit(-2);
     }
 
     currentIndividual = -1;

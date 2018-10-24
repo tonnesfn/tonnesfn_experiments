@@ -99,7 +99,9 @@ bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
     dyret_controller::GetGaitEvaluation srv;
     srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_resetStatistics;
     if (!get_gait_evaluation_client.call(srv)){
-        ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics\n");
+        printf("Error while calling GaitRecording service with t_resetStatistics\n");
+        ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics");
+
         return false;
     }
 

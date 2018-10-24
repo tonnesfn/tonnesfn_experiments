@@ -93,11 +93,17 @@ def callback(ch, method, properties, body):
             console_output_str += ''.join(filter(lambda x: x in string.printable, line.decode('utf-8')))
             time.sleep(0.1)
 
+    if "Error while calling GaitRecording" in console_output_str:
+        print("Returncode: {}".format(console_process.returncode))
+        channel.basic_nack(delivery_tag=method.delivery_tag)
+        exit(-1)
+
+
     #console_output_str = console_process.stdout.read().decode('utf-8')
     #console_output_str = ''.join(filter(lambda x: x in string.printable, console_output_str))
 
     if "ABORT" in console_output_str:
-        channel.basic_ack(delivery_tag=method.delivery_tag)
+        channel.basic_nack(delivery_tag=method.delivery_tag)
         print("Experiment aborted.", file=sys.stderr)
         return
 
