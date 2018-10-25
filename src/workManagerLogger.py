@@ -27,14 +27,17 @@ def callback(ch, method, properties, body):
 
         print("Received invalid JSON message, saved to ({})!".format(filename))
 
+    channel.basic_ack(delivery_tag=method.delivery_tag)
+
 
 if __name__ == '__main__':
     params = pika.URLParameters(amqpurl.url)
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
+    channel.basic_qos(prefetch_count=1)
 
     channel.queue_declare(queue='results')
 
-    channel.basic_consume(callback, queue='results', no_ack=True)
+    channel.basic_consume(callback, queue='results')
 
     channel.start_consuming()
