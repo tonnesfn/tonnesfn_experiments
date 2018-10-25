@@ -85,6 +85,8 @@ std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
 
+const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
+
 float gaitDifficultyFactor = 0.5;
 
 bool evolveMorph = true;
@@ -96,6 +98,8 @@ std::string gaitType;
 bool robotOnStand = false;
 
 char **argv_g;
+
+std::vector<std::vector<float>> lastOptimalParents;
 
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
@@ -293,12 +297,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     currentIndividual++;
 
-    // Reset if we are in simulation
-    if (ros::Time::isSimTime()){
-        resetSimulation();
-        usleep(1000);
-    }
-
     // (Return random fitness to test)
     if (instantFitness) {
         usleep(30000);
@@ -313,6 +311,12 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
 
         return mapToReturn;
+    }
+
+    // Reset if we are in simulation
+    if (ros::Time::isSimTime()){
+        resetSimulation();
+        usleep(1000);
     }
 
     if (ros::Time::isSystemTime()) {
@@ -731,6 +735,9 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     fscanf(genFile, "%d", &currentGeneration);
     fclose(genFile);
 
+    if (currentIndividual != 0) {
+        fprintf(logFile, ",\n");
+    }
 
     fprintf(logFile, "    {\n");
 
@@ -778,17 +785,20 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
     fprintf(logFile, "    }");
 
-    if (currentIndividual == ((generations) * popSize) - 1) { // If last individual
+/*    if (currentIndividual != -1) { // If last individual
         fprintf(logFile, "\n");
         fprintf(logFile, "  ]\n");
         fprintf(logFile, "}");
     } else {
         fprintf(logFile, ",\n");
-    }
+    }*/
 
     return fitnessResult;
 
 }
+
+void stopEa();
+bool stopCondition();
 
 SFERES_FITNESS (FitExp2MO, sferes::fit::Fitness)
 {
@@ -810,6 +820,29 @@ public:
         }
 
         std::map<std::string, double> fitnessResult = evaluateIndividual(individualData, evoLog);
+
+        // Run at end of generations:
+        if ((currentIndividual != 0) && ((currentIndividual+1) != popSize) &&  ((currentIndividual+1) % (popSize)) == 0){
+            if(currentIndividual == ((popSize * generations)-1)) { // Check for end without stop condition
+                fprintf(stdout, "Printing at end of run (individual %d)!\n", currentIndividual);
+                fprintf(evoLog, "\n");
+                fprintf(evoLog, "  ]\n");
+                fprintf(evoLog, "}");
+            } else if (stopCondition()){
+                stopEa();
+
+                fprintf(stdout, "Printing at stop condition (individual %d)!\n", currentIndividual);
+                fprintf(stdout, "currentIndividual: %d, popSize: %d\n", currentIndividual, popSize);
+
+                fprintf(evoLog, "\n");
+                fprintf(evoLog, "  ]\n");
+                fprintf(evoLog, "}");
+            }
+        }
+
+
+        //fprintf(stderr, "%u, %u\n", currentIndividual, ((popSize * generations)-1));
+
 
         fclose(evoLog);
 
@@ -862,6 +895,79 @@ public:
 };
 
 #include "sferesExperiments.h"
+
+void stopEa(){
+    sferes_nsga2::ea.stop();
+}
+
+int generationsWithoutImprovement = 0;
+bool stopCondition(){
+
+    if (currentIndividual > popSize*2){
+
+        printf("\nOld optimal parents:\n");
+        for (int i = 0; i < lastOptimalParents.size(); i++) {
+            printf("  ");
+            for (int j = 0; j < lastOptimalParents[i].size(); j++){
+                printf("%.2f, ", lastOptimalParents[i][j]);
+            }
+            printf("\n");
+        }
+
+        bool foundNew = false;
+
+        printf("\nNew optimal parents:\n");
+        for (int i = 0; i < sferes_nsga2::ea.pop().size(); i++) {
+            if (sferes_nsga2::ea.parent_pop()[i]->rank() == 0) {
+                printf("  ");
+                for (int j = 0; j < sferes_nsga2::ea.parent_pop()[i]->data().size(); j++){
+                    printf("%.2f, ", sferes_nsga2::ea.parent_pop()[i]->data()[j]);
+                }
+
+                bool alreadyExists = false;
+                for (int j = 0; j < lastOptimalParents.size(); j++) {
+                    if (sferes_nsga2::ea.parent_pop()[i]->data() == lastOptimalParents[j]){
+                        alreadyExists = true;
+                        printf(" *found*");
+                    }
+                }
+
+                if (!alreadyExists){
+                    foundNew = true;
+                    printf(" *new*");
+                }
+
+                printf("\n");
+
+            }
+        }
+
+        if (foundNew){
+            generationsWithoutImprovement = 0;
+        } else {
+            generationsWithoutImprovement += 1;
+
+            int limit = ceil(evalsWithoutImprovement / popSize);
+
+            printf("  No improvement, counter now at %d / %d\n", generationsWithoutImprovement, limit);
+
+            if (generationsWithoutImprovement >= limit){
+                return true;
+            }
+        }
+
+    }
+
+    // Save lastOptimalParents
+    lastOptimalParents.clear();
+    for (int i = 0; i < sferes_nsga2::ea.parent_pop().size(); i++){
+        if (sferes_nsga2::ea.parent_pop()[i]->rank() == 0) {
+            lastOptimalParents.push_back(sferes_nsga2::ea.parent_pop()[i]->data());
+        }
+    }
+
+    return false;
+}
 
 void run_individual(std::string gaitName, std::map<std::string, double> phenoTypeMap) {
 
