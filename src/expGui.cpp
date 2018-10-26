@@ -1087,7 +1087,7 @@ std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) 
     mkdir(ss.str().c_str(), 0700);
     ss.str(std::string());
 
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "/";
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "_" << std::setfill('0') << std::setw(3) << int(gaitDifficultyFactor*100.0) << "/";
 
     mkdir(ss.str().c_str(), 0700);
     return ss.str();
@@ -1129,7 +1129,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         std::string experimentDirectory = createExperimentDirectory(givenAlgorithm, now);
 
         std::stringstream ss;
-        ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << ".json";
+        ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << "_" << std::setfill('0') << std::setw(3) << int(gaitDifficultyFactor*100.0) << ".json";
 
         evoLogPath = ss.str();
 
