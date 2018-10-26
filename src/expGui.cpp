@@ -594,9 +594,9 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
     phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 1.25); // 0.25 ->  1.5
 
-    phenoType["wagPhase"]        = getPoint(givenGenotype[4], 0, 2*M_PI, 0.0, 0.2, gaitDifficultyFactor);
-    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5], 0,   50.0, 0.0, 5.0, gaitDifficultyFactor);
-    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6], 0,   50.0, 0.0, 5.0, gaitDifficultyFactor);
+    phenoType["wagPhase"]        = getPoint(givenGenotype[4], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
+    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
+    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
 
     phenoType["p0_x"] =   givenGenotype[7] * 0.0;
     phenoType["p1_x"] =   givenGenotype[9] * 0.0;
