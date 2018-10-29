@@ -1039,14 +1039,15 @@ void menu_demo() {
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
         } else if (choice == "cs") {
-            std::vector<std::string> names = {"difficultyFactor", "liftDuration", "frequencyFactor",
+
+            std::vector<std::string> names = {"difficultyFactor", "liftDuration", "frequency", "femurLength", "tibiaLength", "wagPhase", "wagAmplitude_x", "wagAmplitude_y",
                                               "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
-            std::vector<float> values = {0.5, 0.20, 0.28,
+            std::vector<float> values = {0.42, 0.20, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
                                          0.0,  92.5,
                                          0.0, -92.5,
-                                         0.0, -92.5, 50.0,
-                                         0.0,   0.0, 75.00,
-                                         0.0, 142.5, 18.75};
+                                         -25.0, -92.5, 50.0,
+                                         -100.0,   0.0, 75.00,
+                                         -25.0, 142.5, 18.75};
             setGaitParams("lowLevelSplineGait", names, values);
             sleep(1);
             sendContGaitMessage(0.0, actionMessages_pub);
