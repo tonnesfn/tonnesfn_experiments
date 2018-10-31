@@ -2,6 +2,7 @@
 import pika
 import json
 import time
+import os
 
 import amqpurl # A file that contains "url = '$URL'" for your amqp account
 
@@ -10,9 +11,13 @@ def callback(ch, method, properties, body):
     try:
         d = json.loads(body)
 
-        logFileName = d['node'] + '_' + d['logFile']['name'].split('/')[-1]
+        logFileName = d['exp'] + '/' + d['node'] + '_' + d['logFile']['name'].split('/')[-1]
 
         print("Received valid JSON results from {}, saving to: {}".format(d['node'], logFileName))
+
+        if not os.path.exists(d['exp']):
+            os.mkdir(d['exp'])
+            print("  Directory {} does not exist! It has now been created.\n".format(d['exp']))
 
         file = open(logFileName, "w")
         file.write(json.dumps(d['logFile']['contents'], indent=4, sort_keys=True))

@@ -76,7 +76,8 @@ def callback(ch, method, properties, body):
             connection.process_data_events()
 
     except KeyboardInterrupt:
-        print("Keyboard interrupt received. Killing process!", file=sys.stderr)
+        print("Keyboard interrupt received. Killing process and removing job!", file=sys.stderr)
+        channel.basic_ack(delivery_tag=method.delivery_tag)
         console_process.kill()
         exit()
 
@@ -109,6 +110,7 @@ def callback(ch, method, properties, body):
 
     returnMessage = '{\n'
     returnMessage += "  \"node\": \"{}\",\n".format(platform.node())
+    returnMessage += "  \"exp\": \"{}\",\n".format(message['exp'])
     returnMessage += "  \"load\": [{}, {}, {}],\n".format(os.getloadavg()[0], os.getloadavg()[1], os.getloadavg()[2])
     returnMessage += "  \"consoleOutput\": \n"
     returnMessage += "    \"{}\"\n".format(console_output_str.replace("\n", "\\n").replace("\"", "\\\""))
