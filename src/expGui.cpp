@@ -85,6 +85,7 @@ std::string evoLogPath;
 
 const int numberOfEvalsInTesting = 1;
 
+const bool useStopCondition = false;
 const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
 
 float gaitDifficultyFactor = 0.5;
@@ -902,6 +903,8 @@ void stopEa(){
 
 int generationsWithoutImprovement = 0;
 bool stopCondition(){
+
+    if (!useStopCondition) return false;
 
     if (currentIndividual > popSize*2){
 
