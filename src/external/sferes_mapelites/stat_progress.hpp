@@ -6,7 +6,7 @@
 #include <sferes/stat/stat.hpp>
 
 namespace sferes {
-    namespace stat {
+    namespace sferes_stat {
         SFERES_STAT(MapProgress, Stat)
         {
         public:

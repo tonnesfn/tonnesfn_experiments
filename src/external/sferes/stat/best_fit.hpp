@@ -44,7 +44,7 @@
 #include "../fit/fitness.hpp"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     SFERES_STAT(BestFit, Stat) {
     public:
       template<typename E>

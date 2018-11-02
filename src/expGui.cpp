@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <iomanip>
 #include <chrono>
-#include <chrono>
 #include <unistd.h>
 #include <stdio.h>
 
@@ -32,6 +31,7 @@
 #include "dyret_controller/ConfigureGait.h"
 #include "dyret_controller/DistAngMeasurement.h"
 #include "dyret_controller/GetInferredPosition.h"
+#include "dyret_controller/GaitControllerCommandService.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -65,9 +65,12 @@ ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::ServiceClient servoStatus_client;
 ros::ServiceClient gaitConfiguration_client;
+ros::ServiceClient gaitCommandService_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
+
+gazebo::WorldConnection& gz = gazebo::WorldConnection::instance();
 
 unsigned int randomSeed;
 
@@ -109,7 +112,7 @@ bool automatedRun() {
 }
 
 void resetSimulation(){
-
+/*
     usleep(1000);
 
     std_srvs::Empty empty;
@@ -137,8 +140,11 @@ void resetSimulation(){
     // Run a few ticks
     usleep(1000);
 
-    ROS_INFO("Simulation reset");
+    ROS_INFO("Simulation reset");*/
 
+    if (gz.reset() == false){
+        ROS_ERROR("Could not reset simulation");
+    }
 }
 
 void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::map<std::string, double>> &rawFitnesses) {
@@ -294,6 +300,75 @@ float getInferredPosition(){
     return srv.response.currentInferredPosition.distance;
 }
 
+void runGaitControllerWithActionMessage(bool forward){
+
+    resetGaitRecording(get_gait_evaluation_client);
+
+    if (forward) sendContGaitMessage(0.0, actionMessages_pub);
+    else sendContGaitMessage(M_PI, actionMessages_pub);
+
+    sleep(1);
+
+    // Wait until the robot is done walking
+    ros::Time startTime = ros::Time::now();
+    while (getInferredPosition() < evaluationDistance) {
+        usleep(1000);
+        if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
+            printf("  Timed out forward at %ds\n", (ros::Time::now() - startTime).sec);
+            break;
+        }
+    }
+
+    sendIdleMessage(actionMessages_pub);
+    sleep(1);
+}
+
+void spinGaitControllerOnce(){
+
+    dyret_controller::GaitControllerCommandService srv;
+
+    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_spinOnce;
+
+    if (gaitCommandService_client.call(srv) == false) {
+        //ROS_ERROR("Error while calling gaitControllerCommand service");
+        // ERROR HERE
+    }
+
+}
+
+void runGaitWithServiceCalls(){
+    resetGaitRecording(get_gait_evaluation_client);
+
+    ros::Time startTime_sim = ros::Time::now();
+    ros::WallTime startTime_rw = ros::WallTime::now();
+    while (getInferredPosition() < evaluationDistance) {
+        gz.step(30);
+        spinGaitControllerOnce();
+
+        // Timeout in sim time
+        if ((ros::Time::now() - startTime_sim).sec > (evaluationTimeout)) {
+            printf("  Timed out (sim) forward at %ds\n", (ros::Time::now() - startTime_sim).sec);
+            break;
+        }
+
+        // Timeout in realtime
+        if ((ros::WallTime::now() - startTime_rw).sec > 120) {
+            printf("  Timed out (forward) at %ds\n", (ros::WallTime::now() - startTime_rw).sec);
+            return;
+        }
+
+
+    }
+
+    pauseGaitRecording(get_gait_evaluation_client);
+
+    auto current_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Program has been running for " << (ros::WallTime::now() - startTime_rw).sec << " seconds in realtime" << std::endl;
+    std::cout << "Program has been running for " << (ros::Time::now() - startTime_sim).sec << " seconds in sim time" << std::endl;
+
+}
+
 // This function takes in a phenotype, and returns the fitness for the individual
 std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
                                          const ros::ServiceClient& get_gait_evaluation_client,
@@ -385,24 +460,15 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
     ROS_INFO("Leg lengths achieved");
 
-    // Start the gait and wait for it to finish
-    resetGaitRecording(get_gait_evaluation_client);
-    sendContGaitMessage(0.0, actionMessages_pub);
 
-    sleep(1);
 
-    // Wait until the robot is done walking
-    ros::Time startTime = ros::Time::now();
-    while (getInferredPosition() < evaluationDistance) {
-        usleep(1000);
-        if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
-            printf("  Timed out forward at %ds\n", (ros::Time::now() - startTime).sec);
-            break;
-        }
+    if (ros::Time::isSystemTime()) {
+        runGaitControllerWithActionMessage(true);
+    } else {
+        pauseGazebo();
+        runGaitWithServiceCalls();
+        unpauseGazebo();
     }
-
-    sendIdleMessage(actionMessages_pub);
-    sleep(1);
 
     std::map<std::string, double> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
@@ -411,6 +477,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         ROS_ERROR("GaitResultsForward.size() == 0!");
         return std::map<std::string, double>();
     }
+
+    //printMap(gaitResultsForward, "gaitResultsForward: ", stderr);
 
     // Check for nan values
     for(auto elem : gaitResultsForward){
@@ -452,20 +520,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             ROS_INFO("Leg lengths achieved");
         }
 
-        sendContGaitMessage(M_PI, actionMessages_pub);
-        sleep(1);
-
-        startTime = ros::Time::now();
-        while (getInferredPosition() > -evaluationDistance) { // Now walking backwards - negate evaluation distance
-            usleep(1000);
-            if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
-                printf("  Timed out reverse at %ds\n", (ros::Time::now() - startTime).sec);
-                break;
-            }
-        }
-
-        sendRestPoseMessage(actionMessages_pub);
-        usleep(1000);
+        runGaitControllerWithActionMessage(false);
 
         gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
@@ -1290,7 +1345,7 @@ void experiments_fitnessNoise() {
 }
 
 std::vector<double> getRandomIndividual() {
-    std::vector<double> individual(17);
+    std::vector<double> individual(20);
 
     for (int j = 0; j < individual.size(); j++) individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 
@@ -1549,8 +1604,9 @@ int main(int argc, char **argv) {
     ros::NodeHandle rch;
 
     actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
-    //gaitConfiguration_pub = rch.advertise<dyret_controller::GaitConfiguration>("/dyret/dyret_controller/gaitConfiguration", 1);
     gaitConfiguration_client = rch.serviceClient<dyret_controller::ConfigureGait>("/dyret/dyret_controller/gaitConfigurationService");
+    gaitCommandService_client = rch.serviceClient<dyret_controller::GaitControllerCommandService>("/dyret/dyret_controller/gaitControllerCommandService");
+    inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
@@ -1559,8 +1615,6 @@ int main(int argc, char **argv) {
 
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
-    //gaitInferredPos_sub = rch.subscribe("/dyret/dyret_controller/gaitInferredPos", 100, gaitInferredPosCallback);
-    inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
 
     waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
     waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
@@ -1575,6 +1629,8 @@ int main(int argc, char **argv) {
         ros::shutdown();
         exit(-2);
     }
+
+
 
     currentIndividual = -1;
 

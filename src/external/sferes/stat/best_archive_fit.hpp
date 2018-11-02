@@ -44,7 +44,7 @@
 #include "../fit/fitness.hpp>"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     /// Stat to be used with Novelty Search: save the best individual (fitness-wise) in the archive
     /// Warning: it assumes that the Novelty modifier is the first modifier!
     SFERES_STAT(BestArchiveFit, Stat) {

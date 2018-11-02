@@ -154,7 +154,7 @@ namespace sferes {
     struct Resume {
       template<typename EA>
       void resume(EA& ea) {
-        typedef stat::State<typename EA::phen_t, typename EA::params_t>  state_t;
+        typedef sferes_stat::State<typename EA::phen_t, typename EA::params_t>  state_t;
         const state_t& s = *boost::fusion::find<state_t>(ea.stat());
         ea.set_gen(s.gen() + 1);
         ea.set_pop(s.pop());
@@ -182,7 +182,7 @@ namespace sferes {
 #ifdef SFERES_NO_STATE
       typedef Stat stat_t;
 #else
-      typedef typename boost::fusion::vector<stat::State<Phen, Params> > state_v_t;
+      typedef typename boost::fusion::vector<sferes_stat::State<Phen, Params> > state_v_t;
       typedef typename boost::fusion::joint_view<Stat, state_v_t> joint_t;
       typedef typename boost::fusion::result_of::as_vector<joint_t>::type  stat_t;
 #endif
@@ -233,12 +233,12 @@ namespace sferes {
         _make_res_dir();
         //saveCurrentDir();
         _set_status("resumed");
-        if (boost::fusion::find<stat::State<Phen, Params> >(_stat) == boost::fusion::end(_stat)) {
+        if (boost::fusion::find<sferes_stat::State<Phen, Params> >(_stat) == boost::fusion::end(_stat)) {
           std::cout<<"WARNING: no State found in stat_t, cannot resume" << std::endl;
           return;
         }
         _load(fname);
-        typedef typename boost::fusion::result_of::find<stat_t, stat::State<Phen, Params> >::type has_state_t;
+        typedef typename boost::fusion::result_of::find<stat_t, sferes_stat::State<Phen, Params> >::type has_state_t;
         Resume<stat_t, has_state_t> r;
         r.resume(*this);
         assert(!_pop.empty());

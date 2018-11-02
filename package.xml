@@ -19,6 +19,8 @@
   <build_depend>dyret_common</build_depend>
   <build_depend>dyret_hardware</build_depend>
   <build_depend>dyret_controller</build_depend>
+  <build_depend>gazebo_dev</build_depend>
+  <build_depend>gazebo_msgs</build_depend>
 
   <run_depend>message_runtime</run_depend>
   <run_depend>roscpp</run_depend>

@@ -46,7 +46,7 @@
 #include "../stat/stat.hpp"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     SFERES_STAT(ParetoFront, Stat) {
     public:
       typedef std::vector<boost::shared_ptr<Phen> > pareto_t;

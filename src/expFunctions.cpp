@@ -1,5 +1,72 @@
 #include "expFunctions.h"
 
+// Needed to access `WorldControl` message
+#include <gazebo/msgs/msgs.hh>
+#include <gazebo/gazebo_client.hh>
+// Needed to access `spinOnce`
+#include <ros/ros.h>
+// Needed for reset functionality
+#include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
+
+namespace gazebo {
+    WorldConnection::WorldConnection() {
+        // Initialize Gazebo on creation, this is safe since this class
+        // can only be used through singleton!
+        if(!gazebo::client::setup(0, nullptr)){
+            ROS_FATAL("Gazebo client setup failed!");
+        }
+        // Initialize connection to gazebo through node
+        node.reset(new gazebo::transport::Node());
+        node->Init();
+        // Create publisher
+        pub = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
+    }
+
+    WorldConnection::~WorldConnection() {
+        // Shutdown Gazebo connection
+        if(!gazebo::client::shutdown()){
+            ROS_FATAL("Gazebo client shutdown failed!");
+        }
+    }
+
+    void WorldConnection::step(const size_t steps) {
+        gazebo::msgs::WorldControl msg;
+
+        msg.set_multi_step(steps);
+
+        pub->Publish(msg);
+        ros::spinOnce();
+    }
+
+    bool WorldConnection::reset() {
+        static std_srvs::Empty empty;
+        if(!ros::service::call("/gazebo/reset_world", empty)){
+            // Could not reset world!
+            return false;
+        }
+        // Create service request for DyRET
+        std_srvs::SetBool b;
+        b.request.data = true;
+        if(!ros::service::call("/dyret/simulation/reset", b)){
+            // Could not reset DyRET!
+            return false;
+        }
+        // All is well that ends well
+        return true;
+    }
+}
+
+void pauseGazebo(){
+    std_srvs::Empty empty;
+    ros::service::call("/gazebo/pause_physics", empty);
+}
+
+void unpauseGazebo(){
+    std_srvs::Empty empty;
+    ros::service::call("/gazebo/unpause_physics", empty);
+}
+
 std::string trim(std::string& str){
     size_t first = str.find_first_not_of(' ');
     size_t last = str.find_last_not_of(' ');
@@ -101,6 +168,20 @@ bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client){
     if (!get_gait_evaluation_client.call(srv)){
         printf("Error while calling GaitRecording service with t_resetStatistics\n");
         ROS_ERROR("Error while calling GaitRecording service with t_resetStatistics");
+
+        return false;
+    }
+
+    return true;
+
+}
+
+bool pauseGaitRecording(ros::ServiceClient get_gait_evaluation_client){
+    dyret_controller::GetGaitEvaluation srv;
+    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_pause;
+    if (!get_gait_evaluation_client.call(srv)){
+        printf("Error while calling GaitRecording service with t_pause\n");
+        ROS_ERROR("Error while calling GaitRecording service with t_pause");
 
         return false;
     }

@@ -43,7 +43,7 @@
 #include "../stc.hpp"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     SFERES_CLASS(MeanFit) {
     public:
       template<typename E>

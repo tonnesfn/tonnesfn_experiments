@@ -9,7 +9,7 @@
 #include "binary_map.hpp"
 
 namespace sferes {
-    namespace stat {
+    namespace sferes_stat {
 
         // - write in generic binary format
         // - work only for evofloat & sampled !

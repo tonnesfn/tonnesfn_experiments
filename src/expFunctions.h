@@ -4,6 +4,8 @@
 #include <string>
 #include "ros/ros.h"
 
+#include <gazebo/transport/transport.hh>
+
 #include "dyret_common/Configuration.h"
 #include "dyret_common/Configure.h"
 #include "dyret_common/Pose.h"
@@ -28,9 +30,43 @@ void disableServos(ros::ServiceClient givenServoConfigClient, ros::Publisher giv
 
 bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client);
+bool pauseGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 
 void sendRestPoseMessage(ros::Publisher givenActionMessages_pub);
 void sendIdleMessage(ros::Publisher givenActionMessages_pub);
 void sendContGaitMessage(double givenDirection, ros::Publisher givenActionMessages_pub);
+
+void pauseGazebo();
+void unpauseGazebo();
+
+namespace gazebo {
+    class WorldConnection {
+    private:
+        // Global connection to Gazebo
+        gazebo::transport::NodePtr node;
+        // Connection to publish messages to simulation
+        gazebo::transport::PublisherPtr pub;
+        // Private constructor!
+        WorldConnection();
+        ~WorldConnection();
+
+    public:
+        // Send step message to Gazebo and let ROS code complete
+        void step(const size_t steps = 1);
+
+        // Reset all models in simulation to initial positions
+        bool reset();
+
+        // Delete copy constructor to avoid unintended copy!
+        WorldConnection(const WorldConnection&) = delete;
+        void operator=(const WorldConnection&)  = delete;
+
+        // Create static method to retrieve instance
+        static WorldConnection& instance() {
+            static WorldConnection inst;
+            return inst;
+        }
+    };
+}
 
 #endif

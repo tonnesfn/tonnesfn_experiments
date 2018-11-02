@@ -41,7 +41,7 @@
 #include "../fit/fitness.hpp"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     // a statistics class that saves the full population + gen number
     // this is useful for restarting sferes when it is killed
     SFERES_STAT(State, Stat) {

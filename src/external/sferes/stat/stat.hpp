@@ -44,7 +44,7 @@
 #include "../stc.hpp"
 
 namespace sferes {
-  namespace stat {
+  namespace sferes_stat {
     template<typename Phen, typename Params, typename Exact = stc::Itself>
     class Stat {
      public:

@@ -9,7 +9,7 @@
 // #define MAP_WRITE_PARENTS
 
 namespace sferes {
-    namespace stat {
+    namespace sferes_stat {
         SFERES_STAT(Map, Stat)
         {
         public:

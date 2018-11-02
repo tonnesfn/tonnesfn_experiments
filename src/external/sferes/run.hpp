@@ -46,9 +46,9 @@
 // the C function stat() [man 2 stat] and our stat::
 // namespace
 // (asio include stat but we do not use it...)
-#define stat stat_test
+#define sferes_stat stat_test
 #include <boost/asio/signal_set.hpp>
-#undef stat
+#undef sferes_stat
 
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>

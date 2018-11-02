@@ -30,7 +30,7 @@ namespace sferes_nsga2{
     typedef gen::EvoFloat<20, Params> gen_t;
     typedef phen::Parameters<gen_t,FitExp2MO<Params>, Params> phen_t;
     typedef eval::Eval<Params> eval_t;
-    typedef boost::fusion::vector<stat::State<phen_t, Params> > stat_t;
+    typedef boost::fusion::vector<sferes_stat::State<phen_t, Params> > stat_t;
     typedef modif::Dummy<> modifier_t;
     typedef ea::Nsga2<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
     ea_t ea;
@@ -70,7 +70,7 @@ namespace sferes_mapElites{
     typedef phen::Parameters<gen_t, FitMapElites<Params>, Params> phen_t;
     typedef eval::Eval<Params> eval_t;
     //typedef boost::fusion::vector<stat::State<phen_t, Params> > stat_t;
-    typedef boost::fusion::vector< stat::Map<phen_t, Params>, stat::BestFit<phen_t, Params>, stat::MapBinary<phen_t, Params> > stat_t;
+    typedef boost::fusion::vector< sferes_stat::Map<phen_t, Params>, sferes_stat::BestFit<phen_t, Params>, sferes_stat::MapBinary<phen_t, Params> > stat_t;
     typedef modif::Dummy<> modifier_t;
     //typedef ea::Nsga2<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
     typedef ea::MapElites<phen_t, eval_t, stat_t, modifier_t, Params> ea_t;
