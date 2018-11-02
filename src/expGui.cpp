@@ -1431,6 +1431,7 @@ void experiments_randomSearch() {
             std::map<std::string, double> fitnessResult = evaluateIndividual(randomIndividual, randomSearchLog);
         }
 
+        fprintf(randomSearchLog, "\n]}\n");
         fclose(randomSearchLog);
 
         fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
@@ -1629,8 +1630,6 @@ int main(int argc, char **argv) {
         ros::shutdown();
         exit(-2);
     }
-
-
 
     currentIndividual = -1;
 
