@@ -58,13 +58,21 @@ namespace gazebo {
 }
 
 void pauseGazebo(){
+    usleep(1000);
     std_srvs::Empty empty;
-    ros::service::call("/gazebo/pause_physics", empty);
+    if (ros::service::call("/gazebo/pause_physics", empty) == false){
+      fprintf(stderr, "Error when calling pause_physics\n");
+    }
+    ROS_INFO("Paused physics");
+    usleep(1000);
 }
 
 void unpauseGazebo(){
     std_srvs::Empty empty;
-    ros::service::call("/gazebo/unpause_physics", empty);
+    if(ros::service::call("/gazebo/unpause_physics", empty) == false){
+      fprintf(stderr, "Error when calling unpause_physics\n");
+    }
+    ROS_INFO("Unpaused physics");
 }
 
 std::string trim(std::string& str){

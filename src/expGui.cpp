@@ -145,6 +145,7 @@ void resetSimulation(){
     if (gz.reset() == false){
         ROS_ERROR("Could not reset simulation");
     }
+
 }
 
 void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::map<std::string, double>> &rawFitnesses) {
@@ -460,8 +461,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
     ROS_INFO("Leg lengths achieved");
 
-
-
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
     } else {
@@ -736,9 +735,10 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     fprintf(logOutput, "Retrying\n");
 
                     if (ros::Time::isSimTime()){
-                        sleep(5);
+                        unpauseGazebo(); // Unpause in case it has become stuck in paused mode
+                        usleep(1000);
                         resetSimulation();
-                        sleep(5);
+                        usleep(1000);
                     }
 
                     retryCounter += 1;
@@ -786,7 +786,6 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                 }
             }
         }
-
 
     } while (validSolution == false);
 
@@ -900,10 +899,6 @@ public:
                 fprintf(evoLog, "}");
             }
         }
-
-
-        //fprintf(stderr, "%u, %u\n", currentIndividual, ((popSize * generations)-1));
-
 
         fclose(evoLog);
 
