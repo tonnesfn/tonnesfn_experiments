@@ -26,7 +26,6 @@
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
 
-#include "dyret_controller/PositionCommand.h"
 #include "dyret_controller/ActionMessage.h"
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
@@ -66,7 +65,6 @@ ros::ServiceClient servoStatus_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
-ros::Publisher positionCommand_pub;
 ros::Publisher gaitConfiguration_pub;
 
 unsigned int randomSeed;
@@ -1544,7 +1542,6 @@ int main(int argc, char **argv) {
     ros::NodeHandle rch;
 
     actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
-    positionCommand_pub = rch.advertise<dyret_controller::PositionCommand>("/dyret/dyret_controller/positionCommand", 1);
     gaitConfiguration_pub = rch.advertise<dyret_controller::GaitConfiguration>("/dyret/dyret_controller/gaitConfiguration", 1);
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
