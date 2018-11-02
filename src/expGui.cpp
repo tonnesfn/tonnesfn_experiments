@@ -31,6 +31,7 @@
 #include "dyret_controller/GetGaitControllerStatus.h"
 #include "dyret_controller/ConfigureGait.h"
 #include "dyret_controller/DistAngMeasurement.h"
+#include "dyret_controller/GetInferredPosition.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -58,6 +59,7 @@
 #include "expFunctions.h"
 
 ros::ServiceClient servoConfigClient;
+ros::ServiceClient inferredPositionClient;
 ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
@@ -76,8 +78,6 @@ double currentTibiaLength = 0.0;
 int evaluationTimeout = 15; // 15 sec max each direction
 float evaluationDistance = 1500.0;
 int currentIndividual;
-
-float gaitInferredPos = 0.0f;
 
 std::string evoLogPath;
 
@@ -242,10 +242,6 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
                           msg->prismatic[7].position) / 4.0;
 }
 
-void gaitInferredPosCallback(const dyret_controller::DistAngMeasurement::ConstPtr &msg) {
-    gaitInferredPos = msg->distance;
-}
-
 bool legsAreLength(float femurLengths, float tibiaLengths) {
     return ((fabs(femurLengths - currentFemurLength) < 3.0f) && (fabs(tibiaLengths - currentTibiaLength) < 3.0f));
 }
@@ -283,6 +279,19 @@ float getMaxServoTemperature(bool printAllTemperatures = false) {
   return maxTemp;*/
 
     return 0.0;
+}
+
+float getInferredPosition(){
+    dyret_controller::GetInferredPosition srv;
+
+    if (!inferredPositionClient.call(srv)){
+        printf("Error while calling GetInferredPosition service\n");
+        ROS_ERROR("Error while calling GetInferredPosition service");
+
+        return 0.0;
+    }
+
+    return srv.response.currentInferredPosition.distance;
 }
 
 // This function takes in a phenotype, and returns the fitness for the individual
@@ -384,7 +393,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Wait until the robot is done walking
     ros::Time startTime = ros::Time::now();
-    while (gaitInferredPos < evaluationDistance) {
+    while (getInferredPosition() < evaluationDistance) {
         usleep(1000);
         if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
             printf("  Timed out forward at %ds\n", (ros::Time::now() - startTime).sec);
@@ -447,7 +456,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         sleep(1);
 
         startTime = ros::Time::now();
-        while (gaitInferredPos > -evaluationDistance) { // Now walking backwards - negate evaluation distance
+        while (getInferredPosition() > -evaluationDistance) { // Now walking backwards - negate evaluation distance
             usleep(1000);
             if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
                 printf("  Timed out reverse at %ds\n", (ros::Time::now() - startTime).sec);
@@ -1550,8 +1559,8 @@ int main(int argc, char **argv) {
 
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
-    gaitInferredPos_sub = rch.subscribe("/dyret/dyret_controller/gaitInferredPos", 100, gaitInferredPosCallback);
-
+    //gaitInferredPos_sub = rch.subscribe("/dyret/dyret_controller/gaitInferredPos", 100, gaitInferredPosCallback);
+    inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
 
     waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
     waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
