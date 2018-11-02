@@ -29,7 +29,7 @@
 #include "dyret_controller/ActionMessage.h"
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
-#include "dyret_controller/GaitConfiguration.h"
+#include "dyret_controller/ConfigureGait.h"
 #include "dyret_controller/DistAngMeasurement.h"
 
 #include "external/sferes/phen/parameters.hpp"
@@ -62,10 +62,10 @@ ros::ServiceClient get_gait_evaluation_client;
 ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::ServiceClient servoStatus_client;
+ros::ServiceClient gaitConfiguration_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
-ros::Publisher gaitConfiguration_pub;
 
 unsigned int randomSeed;
 
@@ -193,15 +193,13 @@ std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluat
 
 void setGaitParams(std::string gaitName, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
 
-    dyret_controller::GaitConfiguration msg;
+    dyret_controller::ConfigureGait srv;
 
-    msg.gaitName = gaitName;
+    srv.request.gaitConfiguration.gaitName       = gaitName;
+    srv.request.gaitConfiguration.parameterName  = parameterNames;
+    srv.request.gaitConfiguration.parameterValue = parameterValues;
 
-    msg.parameterName = parameterNames;
-
-    msg.parameterValue = parameterValues;
-
-    gaitConfiguration_pub.publish(msg);
+    gaitConfiguration_client.call(srv);
 }
 
 void setGaitParams(std::string gaitName, std::map<std::string, double> phenoTypeMap){
@@ -1542,7 +1540,8 @@ int main(int argc, char **argv) {
     ros::NodeHandle rch;
 
     actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
-    gaitConfiguration_pub = rch.advertise<dyret_controller::GaitConfiguration>("/dyret/dyret_controller/gaitConfiguration", 1);
+    //gaitConfiguration_pub = rch.advertise<dyret_controller::GaitConfiguration>("/dyret/dyret_controller/gaitConfiguration", 1);
+    gaitConfiguration_client = rch.serviceClient<dyret_controller::ConfigureGait>("/dyret/dyret_controller/gaitConfigurationService");
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
