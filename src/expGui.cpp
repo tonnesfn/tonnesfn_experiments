@@ -71,6 +71,17 @@ ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
 
 gazebo::WorldConnection& gz = gazebo::WorldConnection::instance();
+// Configuration:
+const bool skipReverseEvaluation = true;
+const int numberOfEvalsInTesting = 1;
+
+const bool useStopCondition = false;
+const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
+
+//const std::string resumeFile = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001"; // File to resume. Does not resume if empty
+const std::string resumeFile = ""; // File to resume. Does not resume if empty
+
+//
 
 unsigned int randomSeed;
 
@@ -83,11 +94,6 @@ float evaluationDistance = 1000.0;
 int currentIndividual;
 
 std::string evoLogPath;
-
-const int numberOfEvalsInTesting = 1;
-
-const bool useStopCondition = false;
-const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
 
 float gaitDifficultyFactor = 0.5;
 
@@ -1238,10 +1244,17 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fclose(evoLog);
 
         // Add directory command to argc and argv going into sferes:
-        int argc_tmp = 2;
-        char *argv_tmp[3];
+        int argc_tmp;
+        char *argv_tmp[5];
         argv_tmp[0] = argv_g[0]; // Copy the first reference
-        argv_tmp[2] = 0;
+
+        if (resumeFile.empty()) {
+            argc_tmp = 2;
+            argv_tmp[2] = 0;
+        } else {
+            argc_tmp = 4;
+            argv_tmp[4] = 0;
+        }
 
         mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
 
@@ -1249,7 +1262,18 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         const char *sferesCommand = commString.c_str();
         argv_tmp[1] = const_cast<char *>(sferesCommand);
 
-        fprintf(logOutput, "%s, %s\n", argv_tmp[0], argv_tmp[1]);
+        std::string resString = "--resume";
+        const char *res = resString.c_str();
+        argv_tmp[2] = const_cast<char *>(res);
+
+        std::string fileString = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001";
+        const char *resName = fileString.c_str();
+        argv_tmp[3] = const_cast<char *>(resName);
+
+        for (int i = 0; i < argc_tmp; i++){
+            fprintf(stderr, " %s ", argv_tmp[i]);
+        }
+        fprintf(stderr, "\n");
 
         if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, evoLogPath);
         else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, evoLogPath);
