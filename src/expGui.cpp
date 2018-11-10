@@ -457,9 +457,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
     }
 
-    // Set gait parameters
-    setGaitParams(gaitType, phenoType);
-
     // Set leg lengths and wait until they reach the correct length
     ROS_INFO("Setting leg lengths");
     setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
@@ -474,6 +471,15 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         secPassed += 1;
     }
     ROS_INFO("Leg lengths achieved");
+
+    if (ros::Time::isSystemTime()){
+        sleep(1);
+    }
+
+    // Set gait parameters
+    setGaitParams(gaitType, phenoType);
+
+    usleep(1000);
 
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
