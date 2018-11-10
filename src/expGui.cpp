@@ -257,7 +257,7 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
 }
 
 bool legsAreLength(float femurLengths, float tibiaLengths) {
-    return ((fabs(femurLengths - currentFemurLength) < 3.0f) && (fabs(tibiaLengths - currentTibiaLength) < 3.0f));
+    return ((fabs(femurLengths - currentFemurLength) < 1.0f) && (fabs(tibiaLengths - currentTibiaLength) < 1.0f));
 }
 
 float getServoVoltage() {
