@@ -70,7 +70,8 @@ ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
 
-gazebo::WorldConnection& gz = gazebo::WorldConnection::instance();
+gazebo::WorldConnection* gz;
+
 // Configuration:
 const bool skipReverseEvaluation = true;
 const int numberOfEvalsInTesting = 1;
@@ -148,7 +149,7 @@ void resetSimulation(){
 
     ROS_INFO("Simulation reset");*/
 
-    if (gz.reset() == false){
+    if (gz->reset() == false){
         ROS_ERROR("Could not reset simulation");
     }
 
@@ -346,10 +347,15 @@ void spinGaitControllerOnce(){
 void runGaitWithServiceCalls(){
     resetGaitRecording(get_gait_evaluation_client);
 
+    if (!ros::Time::isSimTime()) {
+        ROS_ERROR("In runGaitWithServiceCalls in hardware experiments!");
+    }
+
+
     ros::Time startTime_sim = ros::Time::now();
     ros::WallTime startTime_rw = ros::WallTime::now();
     while (getInferredPosition() < evaluationDistance) {
-        gz.step(30);
+        gz->step(30);
         spinGaitControllerOnce();
 
         // Timeout in sim time
@@ -1654,6 +1660,8 @@ int main(int argc, char **argv) {
 
     if (ros::Time::isSimTime()) {
         fprintf(logOutput, "Currently running in simulation mode\n");
+
+        gz = &gazebo::WorldConnection::instance();
     } else {
         fprintf(logOutput, "Currently running in hardware mode\n");
     }
