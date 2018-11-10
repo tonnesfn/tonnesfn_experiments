@@ -327,7 +327,9 @@ void runGaitControllerWithActionMessage(bool forward){
         }
     }
 
-    sendIdleMessage(actionMessages_pub);
+    ROS_INFO("Sent rest pose message");
+    sendRestPoseMessage(actionMessages_pub);
+
     sleep(1);
 }
 
