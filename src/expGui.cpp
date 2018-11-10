@@ -511,8 +511,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     std::map<std::string, double> gaitResultsReverse;
 
     // Only evaluate reverse if in the real world:
-    if (ros::Time::isSystemTime()) {
+    if (ros::Time::isSystemTime() && !skipReverseEvaluation) {
 
+        ROS_INFO("Evaluating reverse");
         resetGaitRecording(get_gait_evaluation_client);
 
         if (ros::Time::isSimTime()) {
