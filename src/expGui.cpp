@@ -73,14 +73,16 @@ ros::Publisher actionMessages_pub;
 gazebo::WorldConnection* gz;
 
 // Configuration:
-const bool skipReverseEvaluation = true;
+const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
 const int numberOfEvalsInTesting = 1;
 
-const bool useStopCondition = false;
+const bool useStopCondition = false;    // Use stop condition in evolution
 const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
 
-//const std::string resumeFile = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001"; // File to resume. Does not resume if empty
-const std::string resumeFile = ""; // File to resume. Does not resume if empty
+const std::string resumeFile = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001"; // File to resume. Does not resume if empty
+//const std::string resumeFile = ""; // File to resume. Does not resume if empty
+
+const bool cooldownPromptEnabled = false; // Prompt for cooldown between each generation in hardware
 
 //
 
@@ -415,10 +417,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         usleep(1000);
     }
 
-    if (ros::Time::isSystemTime()) {
+    if (ros::Time::isSystemTime() && cooldownPromptEnabled) {
         // Code to stop for cooldown at the start of each new generation:
         if (currentIndividual == popSize) {
-            currentIndividual = 0;
+            currentIndividual = 0; // !! This might cause issues !!
             getMaxServoTemperature(true);
             fprintf(logOutput, "Cooldown to 50C? (y/n) > ");
 
