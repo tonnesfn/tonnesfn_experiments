@@ -466,7 +466,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
         sleep(1);
         setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        if ( ((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))){
+        if ( ((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))){
             ROS_ERROR("Timed out waiting for legs to be at length");
             return std::map<std::string, double>();
         }
@@ -533,7 +533,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
                 sleep(1);
                 setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-                if (((ros::Time::isSystemTime()) && (secPassed > 60)) || (ros::Time::isSimTime() && (secPassed > 5))) {
+                if (((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))) {
                     ROS_ERROR("Timed out waiting for legs to be at length");
                     return std::map<std::string, double>();
                 }
