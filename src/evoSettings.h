@@ -1,2 +1,2 @@
-const int popSize =  16;
-const int generations = 1;
+const int popSize =  8;
+const int generations = 8;
