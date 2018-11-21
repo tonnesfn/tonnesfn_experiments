@@ -1082,6 +1082,7 @@ void menu_demo() {
                        "    ll - Test large robot (large HLSC)\n"
                        "    cs - Test low level spline control (small LLSC)\n"
                        "    ms - Request small morphology\n"
+                       "    mx - Request 10mm morphology\n"
                        "    mm - Request medium morphology\n"
                        "    ml - Request large morphology\n");
     fprintf(logOutput, "\n> ");
@@ -1143,6 +1144,9 @@ void menu_demo() {
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
+        } else if (choice == "mx") {
+            setLegLengths(10.0, 10.0);
+            fprintf(logOutput, "10mm morphology requested\n");
         } else if (choice == "mm") {
             setLegLengths(12.5, 47.5);
             fprintf(logOutput, "Medium morphology requested\n");
