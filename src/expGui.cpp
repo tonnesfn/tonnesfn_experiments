@@ -79,8 +79,7 @@ const int numberOfEvalsInTesting = 1;
 const bool useStopCondition = false;    // Use stop condition in evolution
 const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
 
-const std::string resumeFile = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001"; // File to resume. Does not resume if empty
-//const std::string resumeFile = ""; // File to resume. Does not resume if empty
+const std::string resumeFile = ""; // File to resume. Does not resume if empty
 
 const bool cooldownPromptEnabled = false; // Prompt for cooldown between each generation in hardware
 
@@ -1291,8 +1290,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         const char *res = resString.c_str();
         argv_tmp[2] = const_cast<char *>(res);
 
-        std::string fileString = "/home/tonnesfn/catkin_ws/experimentResults/20181110105751_nsga2_000/sferes/gen_0001";
-        const char *resName = fileString.c_str();
+        const char *resName = resumeFile.c_str();
         argv_tmp[3] = const_cast<char *>(resName);
 
         for (int i = 0; i < argc_tmp; i++){
