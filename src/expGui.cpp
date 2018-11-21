@@ -595,6 +595,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     fprintf(logOutput, "  Res total: \n");
     printMap(mapToReturn, "    ", logOutput);
 
+    if (mapToReturn["MocapSpeed"] == 0.0){
+        ROS_ERROR("MocapSpeed 0");
+    }
+
     fprintf(logOutput, "\n");
 
     // Add raw fitnesses to container
