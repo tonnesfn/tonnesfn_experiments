@@ -19,6 +19,7 @@ bool loggerCommandCallback(tonnesfn_experiments::LoggerCommand::Request  &req,
     if (req.command == req.INIT_LOG){
         ROS_INFO("Received INIT_LOG command with path \"%s\" and individual \"%s\"", req.logPath.c_str(), req.individual.c_str());
         bag.open(bagPath.c_str(), rosbag::bagmode::Write);
+        bag.setCompression(rosbag::CompressionType::BZ2);
     } else if (req.command == req.ENABLE_LOGGING){
         ROS_INFO("Received START_LOGGING command");
         loggingEnabled = true;
