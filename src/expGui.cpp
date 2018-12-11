@@ -353,10 +353,18 @@ void runGaitControllerWithActionMessage(bool forward){
 
     // Wait until the robot is done walking
     ros::Time startTime = ros::Time::now();
-    while (getInferredPosition() < evaluationDistance) {
+    while (true) {
         usleep(1000);
+
+        float currentPos = getInferredPosition();
+
         if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
-            printf("  Timed out forward at %ds\n", (ros::Time::now() - startTime).sec);
+            printf("  Timed out at %ds/%ds (dist %.0fmm/%.0fmm)\n", (ros::Time::now() - startTime).sec, evaluationTimeout, currentPos, evaluationDistance);
+            break;
+        }
+
+        if (currentPos > evaluationDistance){
+            printf("  Reached position with %.2fmm / %.2fmm (time %ds/%ds)\n", currentPos, evaluationDistance, (ros::Time::now() - startTime).sec, evaluationTimeout);
             break;
         }
     }
@@ -507,7 +515,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             secPassed += 1;
         }
         ROS_INFO("Leg lengths achieved");
-
 
         if (ros::Time::isSystemTime()) {
             sleep(1);
