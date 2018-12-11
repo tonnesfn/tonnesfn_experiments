@@ -1,0 +1,13 @@
+# Service to configure logging
+uint8 command
+
+uint8 INIT_LOG = 0
+uint8 ENABLE_LOGGING = 1
+uint8 DISABLE_LOGGING = 2
+uint8 SAVE_LOG = 3
+
+string logPath
+string individual
+
+---
+

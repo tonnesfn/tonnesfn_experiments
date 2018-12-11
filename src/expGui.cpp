@@ -33,6 +33,8 @@
 #include "dyret_controller/GetInferredPosition.h"
 #include "dyret_controller/GaitControllerCommandService.h"
 
+#include "tonnesfn_experiments/LoggerCommand.h"
+
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
 #include "external/sferes/ea/nsga2.hpp"
@@ -61,19 +63,20 @@
 ros::ServiceClient servoConfigClient;
 ros::ServiceClient inferredPositionClient;
 ros::ServiceClient get_gait_evaluation_client;
-ros::Publisher poseCommand_pub;
 ros::ServiceClient gaitControllerStatus_client;
 ros::ServiceClient servoStatus_client;
 ros::ServiceClient gaitConfiguration_client;
 ros::ServiceClient gaitCommandService_client;
+ros::ServiceClient loggerCommandService_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher actionMessages_pub;
+ros::Publisher poseCommand_pub;
 
 gazebo::WorldConnection* gz;
 
 // Configuration:
-const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
+const bool skipReverseEvaluation = false; // Only evaluate forwards, not back again
 const int numberOfEvalsInTesting = 1;
 
 const bool useStopCondition = false;    // Use stop condition in evolution
@@ -309,12 +312,42 @@ float getInferredPosition(){
     return srv.response.currentInferredPosition.distance;
 }
 
+bool initLog(std::string individual){
+    tonnesfn_experiments::LoggerCommand srv;
+
+    std::string logPath = evoLogPath.substr(0, evoLogPath.find_last_of("\\/")) + "/bags/";
+
+    mkdir(logPath.c_str(), 0700);
+
+    srv.request.command = srv.request.INIT_LOG;
+    srv.request.logPath = logPath;
+    srv.request.individual = individual;
+
+    if (!loggerCommandService_client.call(srv)) {
+        printf("Error while calling LoggerCommand service\n");
+        ROS_ERROR("Error while calling LoggerCommand service");
+        return false;
+    }
+
+    ROS_INFO("Log initialized");
+
+    return true;
+}
+
 void runGaitControllerWithActionMessage(bool forward){
 
     resetGaitRecording(get_gait_evaluation_client);
 
-    if (forward) sendContGaitMessage(0.0, actionMessages_pub);
-    else sendContGaitMessage(M_PI, actionMessages_pub);
+    std::string direction;
+    if (forward){
+        sendContGaitMessage(0.0, actionMessages_pub);
+        direction = "F";
+    } else {
+        sendContGaitMessage(M_PI, actionMessages_pub);
+        direction = "R";
+    }
+
+    initLog(std::to_string(currentIndividual) + direction);
 
     sleep(1);
 
@@ -328,8 +361,8 @@ void runGaitControllerWithActionMessage(bool forward){
         }
     }
 
-    ROS_INFO("Sent rest pose message");
-    sendRestPoseMessage(actionMessages_pub);
+    ROS_INFO("Sent idle message");
+    sendIdleMessage(actionMessages_pub);
 
     sleep(1);
 }
@@ -678,7 +711,8 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 1.25); // 0.25 ->  1.5
+    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 0.5); // 0.25 ->  1.5
+    ROS_ERROR("Reduced frequency for debugging");
 
     phenoType["wagPhase"]        = getPoint(givenGenotype[4], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
     phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
@@ -1650,6 +1684,7 @@ int main(int argc, char **argv) {
     gaitConfiguration_client = rch.serviceClient<dyret_controller::ConfigureGait>("/dyret/dyret_controller/gaitConfigurationService");
     gaitCommandService_client = rch.serviceClient<dyret_controller::GaitControllerCommandService>("/dyret/dyret_controller/gaitControllerCommandService");
     inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
+    loggerCommandService_client = rch.serviceClient<tonnesfn_experiments::LoggerCommand>("/dyret/dyret_logger/loggerCommand");
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
