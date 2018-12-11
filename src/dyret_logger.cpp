@@ -3,6 +3,9 @@
 #include <rosbag/bag.h>
 
 #include "dyret_common/State.h"
+#include "dyret_common/Pose.h"
+#include "sensor_msgs/Imu.h"
+#include "geometry_msgs/PoseStamped.h"
 #include "tonnesfn_experiments/LoggerCommand.h"
 
 rosbag::Bag bag;
@@ -34,9 +37,27 @@ bool loggerCommandCallback(tonnesfn_experiments::LoggerCommand::Request  &req,
 
 }
 
-void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
+void stateCallback(const dyret_common::State::ConstPtr &msg) {
     if (loggingEnabled){
         bag.write("/dyret/state", msg->header.stamp, msg);
+    }
+}
+
+void commandCallback(const dyret_common::Pose::ConstPtr &msg) {
+    if (loggingEnabled){
+        bag.write("/dyret/command", msg->header.stamp, msg);
+    }
+}
+
+void imuCallback(const sensor_msgs::Imu::ConstPtr &msg) {
+    if (loggingEnabled){
+        bag.write("/dyret/sensor/imu", msg->header.stamp, msg);
+    }
+}
+
+void poseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {
+    if (loggingEnabled){
+        bag.write("/dyret/sensor/pose", msg->header.stamp, msg);
     }
 }
 
@@ -46,7 +67,10 @@ int main(int argc, char **argv) {
 
   ros::ServiceServer loggerCommandServer = n.advertiseService("/dyret/dyret_logger/loggerCommand", loggerCommandCallback);
 
-  ros::Subscriber dyretState_sub = n.subscribe("/dyret/state", 1, dyretStateCallback);
+  ros::Subscriber state_sub = n.subscribe("/dyret/state", 100, stateCallback);
+  ros::Subscriber command_sub = n.subscribe("/dyret/command", 100, commandCallback);
+  ros::Subscriber imu_sub = n.subscribe("/dyret/sensor/imu", 100, imuCallback);
+  ros::Subscriber pose_sub = n.subscribe("/dyret/sensor/pose", 100, poseCallback);
 
   ROS_INFO("dyret_logger running");
 
