@@ -492,22 +492,26 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Set leg lengths and wait until they reach the correct length
-    ROS_INFO("Setting leg lengths");
-    setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-    int secPassed = 0;
-    while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-        sleep(1);
-        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        if ( ((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))){
-            ROS_ERROR("Timed out waiting for legs to be at length");
-            return std::map<std::string, double>();
-        }
-        secPassed += 1;
-    }
-    ROS_INFO("Leg lengths achieved");
 
-    if (ros::Time::isSystemTime()){
-        sleep(1);
+    if (evolveMorph) {
+        ROS_INFO("Setting leg lengths");
+        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+        int secPassed = 0;
+        while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
+            sleep(1);
+            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+            if (((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))) {
+                ROS_ERROR("Timed out waiting for legs to be at length");
+                return std::map<std::string, double>();
+            }
+            secPassed += 1;
+        }
+        ROS_INFO("Leg lengths achieved");
+
+
+        if (ros::Time::isSystemTime()) {
+            sleep(1);
+        }
     }
 
     // Set gait parameters
@@ -558,20 +562,23 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         ROS_INFO("Evaluating reverse");
         resetGaitRecording(get_gait_evaluation_client);
 
-        if (ros::Time::isSimTime()) {
-            ROS_INFO("Setting leg lengths");
-            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-            int secPassed = 0;
-            while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-                sleep(1);
+        if (evolveMorph) {
+            if (ros::Time::isSimTime()) {
+                ROS_INFO("Setting leg lengths");
                 setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-                if (((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))) {
-                    ROS_ERROR("Timed out waiting for legs to be at length");
-                    return std::map<std::string, double>();
+                int secPassed = 0;
+                while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
+                    sleep(1);
+                    setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
+                    if (((ros::Time::isSystemTime()) && (secPassed > 90)) ||
+                        (ros::Time::isSimTime() && (secPassed > 5))) {
+                        ROS_ERROR("Timed out waiting for legs to be at length");
+                        return std::map<std::string, double>();
+                    }
+                    secPassed += 1;
                 }
-                secPassed += 1;
+                ROS_INFO("Leg lengths achieved");
             }
-            ROS_INFO("Leg lengths achieved");
         }
 
         runGaitControllerWithActionMessage(false);
@@ -1216,12 +1223,11 @@ std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) 
     return ss.str();
 }
 
-void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, const std::string givenController, bool evolveMorphology) {
+void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, const std::string givenController) {
     if (givenAlgorithm != "map-elites" && givenAlgorithm != "nsga2") {
         ROS_ERROR("Unknown evolution algorithm: %s", givenAlgorithm.c_str());
     }
 
-    evolveMorph = evolveMorphology;
     morphology = givenMorphology;
     gaitType = givenController;
     currentIndividual = -1;
@@ -1281,7 +1287,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fprintf(evoLog, "    \"generations\": %d,\n", generations);
         fprintf(evoLog, "    \"population\": %d,\n", popSize);
 
-        if (evolveMorphology) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
+        if (evolveMorph) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
         else
             fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
 
@@ -1566,19 +1572,19 @@ void menu_experiments() {
 
     if (!choice.empty()) {
         if (choice == "cs") {
-            experiments_evolve("nsga2", "small", "highLevelSplineGait", false);
+            experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "cm") {
-            experiments_evolve("nsga2", "medium", "highLevelSplineGait", false);
+            experiments_evolve("nsga2", "medium", "highLevelSplineGait");
         } else if (choice == "cl") {
-            experiments_evolve("nsga2", "large", "highLevelSplineGait", false);
+            experiments_evolve("nsga2", "large", "highLevelSplineGait");
         } else if (choice == "mn") {
-            experiments_evolve("nsga2", "", "highLevelSplineGait", true);
+            experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "el") {
             getDifficultyFactor();
 
-            experiments_evolve("nsga2", "", "lowLevelSplineGait", true);
+            experiments_evolve("nsga2", "small", "lowLevelSplineGait");
         } else if (choice == "me") {
-            experiments_evolve("map-elites", "", "highLevelSplineGait", true);
+            experiments_evolve("map-elites", "small", "highLevelSplineGait");
         } else if (choice == "vf") {
             experiments_verifyFitness();
         } else if (choice == "vn") {
@@ -1602,6 +1608,7 @@ void menu_configure() {
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
+    fprintf(logOutput, "    m - enable/disable morphology evolution\n");
     fprintf(logOutput, "    s - enable/disable stand testing\n");
     fprintf(logOutput, "    e - enable servo torques\n");
     fprintf(logOutput, "    d - disable servo torques\n");
@@ -1640,6 +1647,9 @@ void menu_configure() {
             fprintf(logOutput, "Servos disabled!\n");
         } else if (choice == "r") {
             sendRestPoseMessage(actionMessages_pub);
+        } else if (choice == "m") {
+            evolveMorph = !evolveMorph;
+            if (evolveMorph) fprintf(logOutput, "Now evolving morphology\n"); else fprintf(logOutput, "Now NOT evolving morphology\n");
         } else if (choice == "x") {
             resetSimulation();
         } else if (choice == "q") {
