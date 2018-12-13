@@ -30,17 +30,6 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
 )
 
-add_service_files(
-  FILES
-  LoggerCommand.srv
-)
-
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  geometry_msgs
-)
-
 find_package(Boost REQUIRED COMPONENTS 
   program_options
   serialization
@@ -67,12 +56,5 @@ target_link_libraries(expGui ${catkin_LIBRARIES})
 target_link_libraries(expGui ${Boost_LIBRARIES})
 target_link_libraries(expGui ${TBB_LIBRARIES})
 add_dependencies(expGui
-  ${catkin_EXPORTED_TARGETS})
-
-add_executable(dyret_logger
-	       src/dyret_logger.cpp
-              )
-target_link_libraries(dyret_logger ${catkin_LIBRARIES})
-add_dependencies(dyret_logger
   ${catkin_EXPORTED_TARGETS})
 

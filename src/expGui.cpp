@@ -32,8 +32,7 @@
 #include "dyret_controller/DistAngMeasurement.h"
 #include "dyret_controller/GetInferredPosition.h"
 #include "dyret_controller/GaitControllerCommandService.h"
-
-#include "tonnesfn_experiments/LoggerCommand.h"
+#include "dyret_controller/LoggerCommand.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -94,8 +93,8 @@ FILE *logOutput = stdout;
 
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 10;
-float evaluationDistance = 1000.0;
+int evaluationTimeout = 15;
+float evaluationDistance = 1500.0;
 int currentIndividual;
 
 std::string evoLogPath;
@@ -313,7 +312,7 @@ float getInferredPosition(){
 }
 
 bool initLog(std::string individual){
-    tonnesfn_experiments::LoggerCommand srv;
+    dyret_controller::LoggerCommand srv;
 
     std::string logPath = evoLogPath.substr(0, evoLogPath.find_last_of("\\/")) + "/bags/";
 
@@ -725,8 +724,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = 0.1 + (givenGenotype[3] * 0.2); // 0.25 ->  1.5
-    ROS_ERROR("Reduced frequency for debugging");
+    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 1.25); // 0.25 ->  1.5
 
     phenoType["wagPhase"]        = getPoint(givenGenotype[4], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
     phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
@@ -1285,6 +1283,8 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
         fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
         fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
+        fprintf(evoLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+        fprintf(evoLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
         fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
 
@@ -1488,6 +1488,8 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "    \"seed\": \"%u\",\n", randomSeed);
         fprintf(randomSearchLog, "    \"controller\": \"%s\",\n", gaitType.c_str());
         fprintf(randomSearchLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
+        fprintf(randomSearchLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+        fprintf(randomSearchLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
         fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
         fprintf(randomSearchLog, "    \"user\": \"%s\",\n", getenv("USER"));
         if (ros::Time::isSimTime()) fprintf(randomSearchLog, "    \"platform\": \"simulation\",\n");
@@ -1701,7 +1703,7 @@ int main(int argc, char **argv) {
     gaitConfiguration_client = rch.serviceClient<dyret_controller::ConfigureGait>("/dyret/dyret_controller/gaitConfigurationService");
     gaitCommandService_client = rch.serviceClient<dyret_controller::GaitControllerCommandService>("/dyret/dyret_controller/gaitControllerCommandService");
     inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
-    loggerCommandService_client = rch.serviceClient<tonnesfn_experiments::LoggerCommand>("/dyret/dyret_logger/loggerCommand");
+    loggerCommandService_client = rch.serviceClient<dyret_controller::LoggerCommand>("/dyret/dyret_logger/loggerCommand");
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
