@@ -104,6 +104,8 @@ float gaitDifficultyFactor = 0.5;
 bool evolveMorph = true;
 bool instantFitness = false;
 
+float frequencyFactor = 1.0;
+
 std::string morphology;
 std::string gaitType;
 
@@ -667,11 +669,15 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
     phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
     phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
     phenoType["smoothing"]       = givenGenotype[4] * 50.0;          //  0    ->  50
-    phenoType["frequency"]       = 0.25 + givenGenotype[5] * 1.25;   //  0.25 ->   1.5
+    phenoType["frequency"]       = (0.25 + givenGenotype[5] * 1.25) * frequencyFactor;   //  0.25 ->   1.5
     phenoType["wagPhase"]        = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
     phenoType["wagAmplitude_x"]  = givenGenotype[7] * 50.0;          //  0    ->  50
     phenoType["wagAmplitude_y"]  = givenGenotype[8] * 50.0;          //  0    ->  50
     phenoType["liftDuration"]    = (givenGenotype[9] * 0.15) + 0.05; //  0.05 ->   0.20
+
+    if (frequencyFactor != 1.0){
+        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
+    }
 
     return phenoType;
 }
@@ -724,7 +730,11 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = 0.25 + (givenGenotype[3] * 1.25); // 0.25 ->  1.5
+    phenoType["frequency"]       = (0.25 + (givenGenotype[3] * 1.25)) * frequencyFactor; // 0.25 ->  1.5
+
+    if (frequencyFactor != 1.0){
+        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
+    }
 
     phenoType["wagPhase"]        = getPoint(givenGenotype[4], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
     phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
@@ -1619,6 +1629,7 @@ void menu_configure() {
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
     fprintf(logOutput, "    m - enable/disable morphology evolution\n");
     fprintf(logOutput, "    s - enable/disable stand testing\n");
+    fprintf(logOutput, "    f - set frequency factor\n");
     fprintf(logOutput, "    e - enable servo torques\n");
     fprintf(logOutput, "    d - disable servo torques\n");
     fprintf(logOutput, "    r - restPose\n");
@@ -1654,6 +1665,11 @@ void menu_configure() {
         } else if (choice == "d") {
             disableServos(servoConfigClient, actionMessages_pub);
             fprintf(logOutput, "Servos disabled!\n");
+        } else if (choice == "f") {
+            fprintf(logOutput, "  Frequency factor> ");
+            std::cin >> frequencyFactor;
+            std::cin.ignore(10000, '\n');
+            fprintf(logOutput, "  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "r") {
             sendRestPoseMessage(actionMessages_pub);
         } else if (choice == "m") {
@@ -1764,6 +1780,7 @@ int main(int argc, char **argv) {
         }
 
         if (choice.empty() == true || choice == "exit") {
+            fprintf(stderr, "Exiting\n");
             spinner.stop();
             ros::shutdown();
             exit(0);
