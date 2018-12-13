@@ -25,7 +25,6 @@
 #include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
 
-#include "dyret_controller/ActionMessage.h"
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
 #include "dyret_controller/ConfigureGait.h"
@@ -69,7 +68,6 @@ ros::ServiceClient gaitCommandService_client;
 ros::ServiceClient loggerCommandService_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber gaitInferredPos_sub;
-ros::Publisher actionMessages_pub;
 ros::Publisher poseCommand_pub;
 
 gazebo::WorldConnection* gz;
@@ -210,18 +208,19 @@ std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluat
     return mapToReturn;
 }
 
-void setGaitParams(std::string gaitName, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
+void setGaitParams(std::string gaitName, bool directionForward, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
 
     dyret_controller::ConfigureGait srv;
 
-    srv.request.gaitConfiguration.gaitName       = gaitName;
-    srv.request.gaitConfiguration.parameterName  = parameterNames;
-    srv.request.gaitConfiguration.parameterValue = parameterValues;
+    srv.request.gaitConfiguration.gaitName         = gaitName;
+    srv.request.gaitConfiguration.directionForward = directionForward;
+    srv.request.gaitConfiguration.parameterName    = parameterNames;
+    srv.request.gaitConfiguration.parameterValue   = parameterValues;
 
     gaitConfiguration_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitName, bool directionForward, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -230,7 +229,7 @@ void setGaitParams(std::string gaitName, std::map<std::string, double> phenoType
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitName, parameterNames, parametervalues);
+    setGaitParams(gaitName, directionForward, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -335,27 +334,95 @@ bool initLog(std::string individual){
     return true;
 }
 
+void adjustGaitPose(){
+    dyret_controller::GaitControllerCommandService srv;
+
+    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_adjustGaitPose;
+
+    if (gaitCommandService_client.call(srv) == false) {
+        ROS_ERROR("Error while calling gaitControllerCommand service for adjustGaitPose");
+    }
+}
+
+void adjustRestPose(){
+    dyret_controller::GaitControllerCommandService srv;
+
+    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_adjustRestPose;
+
+    if (gaitCommandService_client.call(srv) == false) {
+        ROS_ERROR("Error while calling gaitControllerCommand service for adjustRestPose");
+    }
+}
+
+void startWalking(){
+    dyret_controller::GaitControllerCommandService srv;
+
+    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_startWalking;
+
+    if (gaitCommandService_client.call(srv) == false) {
+        ROS_ERROR("Error while calling gaitControllerCommand service for startWalking");
+    }
+}
+
+void stopWalking(){
+    dyret_controller::GaitControllerCommandService srv;
+
+    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_stopWalking;
+
+    if (gaitCommandService_client.call(srv) == false) {
+        ROS_ERROR("Error while calling gaitControllerCommand service for stopWalking");
+    }
+}
+
+bool startLogging(){
+    dyret_controller::LoggerCommand srv;
+
+    srv.request.command = srv.request.ENABLE_LOGGING;
+
+    if (!loggerCommandService_client.call(srv)) {
+        printf("Error while calling LoggerCommand service\n");
+        ROS_ERROR("Error while calling LoggerCommand service");
+        return false;
+    }
+
+    return true;
+}
+
+bool saveLog(){
+    dyret_controller::LoggerCommand srv;
+
+    srv.request.command = srv.request.SAVE_LOG;
+
+    if (!loggerCommandService_client.call(srv)) {
+        printf("Error while calling LoggerCommand service\n");
+        ROS_ERROR("Error while calling LoggerCommand service");
+        return false;
+    }
+
+    return true;
+}
+
 void runGaitControllerWithActionMessage(bool forward){
 
     resetGaitRecording(get_gait_evaluation_client);
 
     std::string direction;
-    if (forward){
-        sendContGaitMessage(0.0, actionMessages_pub);
-        direction = "F";
-    } else {
-        sendContGaitMessage(M_PI, actionMessages_pub);
-        direction = "R";
-    }
+    if (forward) direction = "F"; else direction = "R";
 
+    // Start walking
+    startWalking();
+
+    // Start bag logging
     initLog(std::to_string(currentIndividual) + direction);
+    startLogging();
 
-    sleep(1);
+    // Start fitness recording
+    startGaitRecording(get_gait_evaluation_client);
 
     // Wait until the robot is done walking
     ros::Time startTime = ros::Time::now();
     while (true) {
-        usleep(1000);
+        usleep(100);
 
         float currentPos = getInferredPosition();
 
@@ -370,10 +437,17 @@ void runGaitControllerWithActionMessage(bool forward){
         }
     }
 
-    ROS_INFO("Sent idle message");
-    sendIdleMessage(actionMessages_pub);
+    // Pause fitness recording
+    pauseGaitRecording(get_gait_evaluation_client);
 
-    sleep(1);
+    // Save and stop bag logging
+    saveLog();
+
+    // Stop walking
+    stopWalking();
+
+
+
 }
 
 void spinGaitControllerOnce(){
@@ -383,8 +457,7 @@ void spinGaitControllerOnce(){
     srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_spinOnce;
 
     if (gaitCommandService_client.call(srv) == false) {
-        //ROS_ERROR("Error while calling gaitControllerCommand service");
-        // ERROR HERE
+        ROS_ERROR("Error while calling gaitControllerCommand service");
     }
 
 }
@@ -469,7 +542,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             scanf(" %c", &choice);
 
             if (choice == 'y') {
-                disableServos(servoConfigClient, actionMessages_pub);
+                ROS_ERROR("Not implemented!"); //TODO: implement this
+                //disableServos(servoConfigClient, actionMessages_pub);
                 long long int currentTime = getMs();
                 fprintf(logOutput, "00.0 ");
                 while (getMaxServoTemperature(true) > 50) {
@@ -481,7 +555,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                 std::cin.ignore();
                 std::cin.ignore();
 
-                enableServos(actionMessages_pub);
+                ROS_ERROR("Not implemented!"); //TODO: implement this
+                //// enableServos(actionMessages_pub);
 
                 std::cout << "Press enter to continue evolution";
                 std::cin.ignore();
@@ -501,7 +576,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Set leg lengths and wait until they reach the correct length
-
     if (evolveMorph) {
         ROS_INFO("Setting leg lengths");
         setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
@@ -523,9 +597,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Set gait parameters
-    setGaitParams(gaitType, phenoType);
+    setGaitParams(gaitType, true, phenoType);
 
-    usleep(1000);
+    adjustGaitPose();
 
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
@@ -542,8 +616,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         ROS_ERROR("GaitResultsForward.size() == 0!");
         return std::map<std::string, double>();
     }
-
-    //printMap(gaitResultsForward, "gaitResultsForward: ", stderr);
 
     // Check for nan values
     for(auto elem : gaitResultsForward){
@@ -568,6 +640,12 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (ros::Time::isSystemTime() && !skipReverseEvaluation) {
 
         ROS_INFO("Evaluating reverse");
+
+        // Set gait parameters
+        setGaitParams(gaitType, false, phenoType);
+
+        adjustGaitPose();
+
         resetGaitRecording(get_gait_evaluation_client);
 
         if (evolveMorph) {
@@ -842,12 +920,14 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     fprintf(logOutput, "Discarding\n");
                     validSolution = true;
                 } else if (choice == 'c') { // Cooldown
-                    disableServos(servoConfigClient, actionMessages_pub);
+                    ROS_ERROR("Not implemented!"); //TODO: implement this
+                    //disableServos(servoConfigClient, actionMessages_pub);
                     fprintf(logOutput, "Servos disabled\n");
 
                     while (getMaxServoTemperature(true) > 50) { sleep(15); }
 
-                    enableServos(actionMessages_pub);
+                    ROS_ERROR("Not implemented!"); //TODO: implement this
+                    //enableServos(actionMessages_pub);
 
                     std::cout << "Press enter to continue evolution";
                     std::cin.ignore();
@@ -1189,11 +1269,13 @@ void menu_demo() {
                                          -25.0, -92.5, 50.0,
                                          -100.0,   0.0, 75.00,
                                          -25.0, 142.5, 18.75};
-            setGaitParams("lowLevelSplineGait", names, values);
+            setGaitParams("lowLevelSplineGait", true, names, values);
             sleep(1);
-            sendContGaitMessage(0.0, actionMessages_pub);
+            ROS_ERROR("Not implemented!"); //TODO: implement this
+            //sendContGaitMessage(0.0, actionMessages_pub);
             sleep(10);
-            sendRestPoseMessage(actionMessages_pub);
+            ROS_ERROR("Not implemented!"); //TODO: implement this
+            //sendRestPoseMessage(actionMessages_pub);
             sleep(1);
 
         } else if (choice == "ms") {
@@ -1660,10 +1742,12 @@ void menu_configure() {
 
             robotOnStand = !robotOnStand;
         } else if (choice == "e") {
-            enableServos(actionMessages_pub);
+            ROS_ERROR("Not implemented!"); //TODO: implement this
+            //enableServos(actionMessages_pub);
             fprintf(logOutput, "Servos enabled!\n");
         } else if (choice == "d") {
-            disableServos(servoConfigClient, actionMessages_pub);
+            ROS_ERROR("Not implemented!"); //TODO: implement this
+            //disableServos(servoConfigClient, actionMessages_pub);
             fprintf(logOutput, "Servos disabled!\n");
         } else if (choice == "f") {
             fprintf(logOutput, "  Frequency factor> ");
@@ -1671,7 +1755,8 @@ void menu_configure() {
             std::cin.ignore(10000, '\n');
             fprintf(logOutput, "  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "r") {
-            sendRestPoseMessage(actionMessages_pub);
+            ROS_ERROR("Not implemented!"); //TODO: implement this
+            //sendRestPoseMessage(actionMessages_pub);
         } else if (choice == "m") {
             evolveMorph = !evolveMorph;
             if (evolveMorph) fprintf(logOutput, "Now evolving morphology\n"); else fprintf(logOutput, "Now NOT evolving morphology\n");
@@ -1715,7 +1800,6 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "exp2Gui");
     ros::NodeHandle rch;
 
-    actionMessages_pub = rch.advertise<dyret_controller::ActionMessage>("/dyret/dyret_controller/actionMessages", 10);
     gaitConfiguration_client = rch.serviceClient<dyret_controller::ConfigureGait>("/dyret/dyret_controller/gaitConfigurationService");
     gaitCommandService_client = rch.serviceClient<dyret_controller::GaitControllerCommandService>("/dyret/dyret_controller/gaitControllerCommandService");
     inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");

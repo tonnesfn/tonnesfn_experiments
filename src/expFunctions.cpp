@@ -139,26 +139,6 @@ bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClie
     return callServoConfigService(srv, givenServoConfigClient);
 }
 
-void sendActionMessage(bool sleep, ros::Publisher givenActionMessages_pub){
-    dyret_controller::ActionMessage actionMessage;
-    actionMessage.configuration = dyret_controller::ActionMessage::t_mammal;
-    if (sleep == true) actionMessage.actionType = dyret_controller::ActionMessage::t_sleep; else actionMessage.actionType = dyret_controller::ActionMessage::t_restPose;
-    actionMessage.speed = 0.0;
-    actionMessage.direction = 0.0;
-    givenActionMessages_pub.publish(actionMessage);
-}
-
-// This enables all servoes again. No need to send torque-message, as sending a position automatically enables torque
-void enableServos(ros::Publisher givenActionMessages_pub){
-    sendActionMessage(false, givenActionMessages_pub);
-}
-
-void disableServos(ros::ServiceClient givenServoConfigClient, ros::Publisher givenActionMessages_pub){
-    sendActionMessage(true, givenActionMessages_pub);
-    sleep(1);
-    sendServoTorqueMessage(0, givenServoConfigClient);
-}
-
 bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client){
     dyret_controller::GetGaitEvaluation srv;
     srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_start;
@@ -196,33 +176,6 @@ bool pauseGaitRecording(ros::ServiceClient get_gait_evaluation_client){
 
     return true;
 
-}
-
-void sendRestPoseMessage(ros::Publisher givenActionMessages_pub){
-    dyret_controller::ActionMessage actionMessage;
-    actionMessage.configuration = dyret_controller::ActionMessage::t_mammal;
-    actionMessage.actionType = dyret_controller::ActionMessage::t_restPose;
-    actionMessage.speed = 0.0;
-    actionMessage.direction = 0.0;
-    givenActionMessages_pub.publish(actionMessage);
-}
-
-void sendIdleMessage(ros::Publisher givenActionMessages_pub){
-    dyret_controller::ActionMessage actionMessage;
-    actionMessage.configuration = dyret_controller::ActionMessage::t_mammal;
-    actionMessage.actionType = dyret_controller::ActionMessage::t_idle;
-    actionMessage.speed = 0.0;
-    actionMessage.direction = 0.0;
-    givenActionMessages_pub.publish(actionMessage);
-}
-
-void sendContGaitMessage(double givenDirection, ros::Publisher givenActionMessages_pub){
-    dyret_controller::ActionMessage actionMessage;
-    actionMessage.configuration = dyret_controller::ActionMessage::t_mammal;
-    actionMessage.actionType = dyret_controller::ActionMessage::t_contGait;
-    actionMessage.speed = 0.0;
-    actionMessage.direction = givenDirection;
-    givenActionMessages_pub.publish(actionMessage);
 }
 
 bool callConfigurationService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService){
