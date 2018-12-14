@@ -208,19 +208,27 @@ std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluat
     return mapToReturn;
 }
 
-void setGaitParams(std::string gaitName, bool directionForward, std::vector<std::string> parameterNames, std::vector<float> parameterValues){
+void setGaitParams(std::string gaitName,
+                   bool directionForward,
+                   float femurLength,
+                   float tibiaLength,
+                   std::vector<std::string> parameterNames,
+                   std::vector<float> parameterValues){
 
     dyret_controller::ConfigureGait srv;
 
-    srv.request.gaitConfiguration.gaitName         = gaitName;
-    srv.request.gaitConfiguration.directionForward = directionForward;
-    srv.request.gaitConfiguration.parameterName    = parameterNames;
-    srv.request.gaitConfiguration.parameterValue   = parameterValues;
+    srv.request.gaitConfiguration.gaitName           = gaitName;
+    srv.request.gaitConfiguration.directionForward   = directionForward;
+    srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
+    srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
+    srv.request.gaitConfiguration.femurLength        = femurLength;
+    srv.request.gaitConfiguration.tibiaLength        = tibiaLength;
+    srv.request.gaitConfiguration.prepareForGait = true;
 
     gaitConfiguration_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName, bool directionForward, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitName, bool directionForward, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -229,7 +237,7 @@ void setGaitParams(std::string gaitName, bool directionForward, std::map<std::st
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitName, directionForward, parameterNames, parametervalues);
+    setGaitParams(gaitName, directionForward, femurLength, tibiaLength, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -575,31 +583,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
     }
 
-    // Set leg lengths and wait until they reach the correct length
-    if (evolveMorph) {
-        ROS_INFO("Setting leg lengths");
-        setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-        int secPassed = 0;
-        while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-            sleep(1);
-            setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-            if (((ros::Time::isSystemTime()) && (secPassed > 90)) || (ros::Time::isSimTime() && (secPassed > 5))) {
-                ROS_ERROR("Timed out waiting for legs to be at length");
-                return std::map<std::string, double>();
-            }
-            secPassed += 1;
-        }
-        ROS_INFO("Leg lengths achieved");
-
-        if (ros::Time::isSystemTime()) {
-            sleep(1);
-        }
-    }
-
     // Set gait parameters
-    setGaitParams(gaitType, true, phenoType);
-
-    adjustGaitPose();
+    setGaitParams(gaitType, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
 
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
@@ -642,30 +627,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         ROS_INFO("Evaluating reverse");
 
         // Set gait parameters
-        setGaitParams(gaitType, false, phenoType);
-
-        adjustGaitPose();
+        setGaitParams(gaitType, false, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
 
         resetGaitRecording(get_gait_evaluation_client);
-
-        if (evolveMorph) {
-            if (ros::Time::isSimTime()) {
-                ROS_INFO("Setting leg lengths");
-                setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-                int secPassed = 0;
-                while (!legsAreLength(phenoType.at("femurLength"), phenoType.at("tibiaLength"))) {
-                    sleep(1);
-                    setLegLengths(phenoType.at("femurLength"), phenoType.at("tibiaLength"));
-                    if (((ros::Time::isSystemTime()) && (secPassed > 90)) ||
-                        (ros::Time::isSimTime() && (secPassed > 5))) {
-                        ROS_ERROR("Timed out waiting for legs to be at length");
-                        return std::map<std::string, double>();
-                    }
-                    secPassed += 1;
-                }
-                ROS_INFO("Leg lengths achieved");
-            }
-        }
 
         runGaitControllerWithActionMessage(false);
 
@@ -714,7 +678,6 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         mapToReturn["MocapSpeed"] = 0;
 
     }
-
 
     // Print total results
     fprintf(logOutput, "  Res total: \n");
@@ -1260,24 +1223,7 @@ void menu_demo() {
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
         } else if (choice == "cs") {
-
-            std::vector<std::string> names = {"difficultyFactor", "liftDuration", "frequency", "femurLength", "tibiaLength", "wagPhase", "wagAmplitude_x", "wagAmplitude_y",
-                                              "p0_x", "p0_y", "p1_x", "p1_y", "p2_x", "p2_y", "p2_z", "p3_x", "p3_y", "p3_z", "p4_x", "p4_y", "p4_z"};
-            std::vector<float> values = {0.42, 0.20, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                         0.0,  92.5,
-                                         0.0, -92.5,
-                                         -25.0, -92.5, 50.0,
-                                         -100.0,   0.0, 75.00,
-                                         -25.0, 142.5, 18.75};
-            setGaitParams("lowLevelSplineGait", true, names, values);
-            sleep(1);
             ROS_ERROR("Not implemented!"); //TODO: implement this
-            //sendContGaitMessage(0.0, actionMessages_pub);
-            sleep(10);
-            ROS_ERROR("Not implemented!"); //TODO: implement this
-            //sendRestPoseMessage(actionMessages_pub);
-            sleep(1);
-
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
