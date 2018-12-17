@@ -127,6 +127,22 @@ bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClien
     }
 }
 
+bool setServoSpeeds(float givenSpeed, ros::ServiceClient givenServoConfigClient){
+    dyret_common::Configure srv;
+
+    srv.request.configuration.revolute.type = dyret_common::RevoluteConfig::TYPE_SET_SPEED;
+    srv.request.configuration.revolute.ids.resize(12);
+    srv.request.configuration.revolute.parameters.resize(12);
+
+    for (int i = 0; i < 12; i++){
+        srv.request.configuration.revolute.ids[i] = i;
+        srv.request.configuration.revolute.parameters[i] = givenSpeed;
+    }
+
+    return callServoConfigService(srv, givenServoConfigClient);
+
+}
+
 bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClient){
     dyret_common::Configure srv;
 

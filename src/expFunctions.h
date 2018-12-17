@@ -22,6 +22,7 @@ double getMapValue(const std::map<std::string, double> &givenMap, const std::str
 
 bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClient givenServoConfigService);
 bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClient);
+bool setServoSpeeds(float givenSpeed, ros::ServiceClient givenServoConfigClient);
 
 bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 bool resetGaitRecording(ros::ServiceClient get_gait_evaluation_client);

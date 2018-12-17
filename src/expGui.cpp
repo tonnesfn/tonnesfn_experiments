@@ -261,6 +261,14 @@ void setLegLengths(float femurLengths, float tibiaLengths) {
     poseCommand_pub.publish(msg);
 }
 
+void sendAngleCommand(std::vector<float> angles){
+    dyret_common::Pose msg;
+
+    msg.revolute = angles;
+
+    poseCommand_pub.publish(msg);
+}
+
 void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
     currentFemurLength = (msg->prismatic[0].position + msg->prismatic[2].position + msg->prismatic[4].position +
                           msg->prismatic[6].position) / 4.0;
@@ -1784,6 +1792,11 @@ int main(int argc, char **argv) {
     }
 
     sleep(1);
+
+    setServoSpeeds(0.01, servoConfigClient);
+
+    std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
+    sendAngleCommand(restPose);
 
     std::map<std::string, boost::function<void()> > menu;
     menu["demo"] = &menu_demo;
