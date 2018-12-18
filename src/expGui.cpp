@@ -81,9 +81,11 @@ const int evalsWithoutImprovement = 64; // Number of individuals without improve
 
 const std::string resumeFile = ""; // File to resume. Does not resume if empty
 
-const bool cooldownPromptEnabled = false; // Prompt for cooldown between each generation in hardware
+const bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
 //
+
+std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
 
 unsigned int randomSeed;
 
@@ -94,6 +96,7 @@ double currentTibiaLength = 0.0;
 int evaluationTimeout = 15;
 float evaluationDistance = 1500.0;
 int currentIndividual;
+std::vector<float> servoTemperatures(12);
 
 std::string evoLogPath;
 
@@ -221,9 +224,15 @@ void setGaitParams(std::string gaitName,
     srv.request.gaitConfiguration.directionForward   = directionForward;
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
     srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
-    srv.request.gaitConfiguration.femurLength        = femurLength;
-    srv.request.gaitConfiguration.tibiaLength        = tibiaLength;
     srv.request.gaitConfiguration.prepareForGait = true;
+
+    if (evolveMorph){
+        srv.request.gaitConfiguration.femurLength = femurLength;
+        srv.request.gaitConfiguration.tibiaLength = tibiaLength;
+    } else {
+        srv.request.gaitConfiguration.femurLength = 0.0;
+        srv.request.gaitConfiguration.tibiaLength = 0.0;
+    }
 
     gaitConfiguration_client.call(srv);
 }
@@ -274,6 +283,13 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
                           msg->prismatic[6].position) / 4.0;
     currentTibiaLength = (msg->prismatic[1].position + msg->prismatic[3].position + msg->prismatic[5].position +
                           msg->prismatic[7].position) / 4.0;
+
+    // Find and fill out max temperature variable used for cooldown
+
+    for (int i = 0; i < msg->revolute.size(); i++){
+        servoTemperatures[i] = msg->revolute[i].temperature;
+    }
+
 }
 
 bool legsAreLength(float femurLengths, float tibiaLengths) {
@@ -281,7 +297,9 @@ bool legsAreLength(float femurLengths, float tibiaLengths) {
 }
 
 float getServoVoltage() {
-/*
+  ROS_ERROR("getServoVoltage not implemented!");
+
+  /*
   dyret_common::GetServoStatuses  gssres;
   servoStatus_client.call(gssres);
 
@@ -298,21 +316,16 @@ float getServoVoltage() {
 }
 
 float getMaxServoTemperature(bool printAllTemperatures = false) {
-/*  float maxTemp = -1.0;
-
-  dyret_common::GetServoStatuses  gssres;
-  servoStatus_client.call(gssres);
+  float maxTemp = -1.0f;
 
   if (printAllTemperatures) printf("Servo temperatures: ");
-  for (int i = 0; i < gssres.response.servoStatuses.size(); i++){
-    if (gssres.response.servoStatuses[i].temperature > maxTemp) maxTemp = gssres.response.servoStatuses[i].temperature;
-    if (printAllTemperatures) printf("%.2f ",gssres.response.servoStatuses[i].temperature);
+  for (int i = 0; i < servoTemperatures.size(); i++){
+    if (servoTemperatures[i] > maxTemp) maxTemp = servoTemperatures[i];
+    if (printAllTemperatures) printf("%.2f ", servoTemperatures[i]);
   }
   if (printAllTemperatures) printf("\n");
 
-  return maxTemp;*/
-
-    return 0.0;
+  return maxTemp;
 }
 
 float getInferredPosition(){
@@ -516,6 +529,33 @@ void runGaitWithServiceCalls(){
 
 }
 
+void cooldownServos(){
+    getMaxServoTemperature(true);
+    fprintf(logOutput, "Cooldown to 50C? (y/n) > ");
+
+    char choice;
+    scanf(" %c", &choice);
+
+    if (choice == 'y') {
+        disableServos(servoConfigClient);
+        long long int currentTime = getMs();
+        fprintf(logOutput, "00.0 ");
+        while (getMaxServoTemperature(true) > 50) {
+            sleep(10);
+            fprintf(logOutput, "%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
+        }
+
+        std::cout << "Press enter to enable servos";
+        std::cin.ignore();
+        std::cin.ignore();
+
+        enableServos(servoConfigClient);
+
+        std::cout << "Press enter to continue evolution";
+        std::cin.ignore();
+    }
+}
+
 // This function takes in a phenotype, and returns the fitness for the individual
 std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
                                          const ros::ServiceClient& get_gait_evaluation_client,
@@ -547,37 +587,12 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         usleep(1000);
     }
 
-    if (ros::Time::isSystemTime() && cooldownPromptEnabled) {
+    if (ros::Time::isSystemTime() && cooldownPromptEnabled && currentIndividual == popSize) {
         // Code to stop for cooldown at the start of each new generation:
-        if (currentIndividual == popSize) {
-            currentIndividual = 0; // !! This might cause issues !!
-            getMaxServoTemperature(true);
-            fprintf(logOutput, "Cooldown to 50C? (y/n) > ");
+        currentIndividual = 0; // !! This might cause issues !!
 
-            char choice;
-            scanf(" %c", &choice);
+        cooldownServos();
 
-            if (choice == 'y') {
-                ROS_ERROR("Not implemented!"); //TODO: implement this
-                //disableServos(servoConfigClient, actionMessages_pub);
-                long long int currentTime = getMs();
-                fprintf(logOutput, "00.0 ");
-                while (getMaxServoTemperature(true) > 50) {
-                    sleep(10);
-                    fprintf(logOutput, "%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
-                }
-
-                std::cout << "Press enter to enable servos";
-                std::cin.ignore();
-                std::cin.ignore();
-
-                ROS_ERROR("Not implemented!"); //TODO: implement this
-                //// enableServos(actionMessages_pub);
-
-                std::cout << "Press enter to continue evolution";
-                std::cin.ignore();
-            }
-        }
     }
 
     fprintf(logOutput, "\n  %03u: Evaluating individual:\n", currentIndividual);
@@ -1668,7 +1683,8 @@ void menu_configure() {
     fprintf(logOutput, "    f - set frequency factor\n");
     fprintf(logOutput, "    e - enable servo torques\n");
     fprintf(logOutput, "    d - disable servo torques\n");
-    fprintf(logOutput, "    r - restPose\n");
+    fprintf(logOutput, "    r - restPose, adjusted\n");
+    fprintf(logOutput, "    t - restPose, directly\n");
     fprintf(logOutput, "    q - set random seed\n");
     fprintf(logOutput, "    x - reset simulation\n");
     fprintf(logOutput, "\n> ");
@@ -1696,21 +1712,21 @@ void menu_configure() {
 
             robotOnStand = !robotOnStand;
         } else if (choice == "e") {
-            ROS_ERROR("Not implemented!"); //TODO: implement this
-            //enableServos(actionMessages_pub);
-            fprintf(logOutput, "Servos enabled!\n");
+            enableServos(servoConfigClient);
+            fprintf(logOutput, "Torque enabled!\n");
         } else if (choice == "d") {
-            ROS_ERROR("Not implemented!"); //TODO: implement this
-            //disableServos(servoConfigClient, actionMessages_pub);
-            fprintf(logOutput, "Servos disabled!\n");
+            disableServos(servoConfigClient);
+            fprintf(logOutput, "Torque disabled!\n");
         } else if (choice == "f") {
             fprintf(logOutput, "  Frequency factor> ");
             std::cin >> frequencyFactor;
             std::cin.ignore(10000, '\n');
             fprintf(logOutput, "  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "r") {
-            ROS_ERROR("Not implemented!"); //TODO: implement this
-            //sendRestPoseMessage(actionMessages_pub);
+            adjustRestPose();
+        } else if (choice == "t"){
+            setServoSpeeds(0.01, servoConfigClient);
+            sendAngleCommand(restPose);
         } else if (choice == "m") {
             evolveMorph = !evolveMorph;
             if (evolveMorph) fprintf(logOutput, "Now evolving morphology\n"); else fprintf(logOutput, "Now NOT evolving morphology\n");
@@ -1791,11 +1807,14 @@ int main(int argc, char **argv) {
         fprintf(logOutput, "Currently running in hardware mode\n");
     }
 
+    fprintf(logOutput, "Evo settings: %d generations of %d individuals\n", generations, popSize);
+
+    fprintf(logOutput, "\n");
+
     sleep(1);
 
     setServoSpeeds(0.01, servoConfigClient);
 
-    std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
     sendAngleCommand(restPose);
 
     std::map<std::string, boost::function<void()> > menu;
