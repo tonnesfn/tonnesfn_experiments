@@ -106,7 +106,7 @@ bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClien
     if (givenServoConfigService.call(givenCall))  {
         switch(givenCall.response.status){
             case dyret_common::Configure::Response::STATUS_NOERROR:
-                ROS_INFO("Configure servo service returned no error");
+                ROS_DEBUG("Configure servo service returned no error");
                 break;
             case dyret_common::Configure::Response::STATUS_STATE:
                 ROS_ERROR("State error from configure servo response");

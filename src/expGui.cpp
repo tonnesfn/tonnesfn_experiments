@@ -224,7 +224,13 @@ void setGaitParams(std::string gaitName,
     srv.request.gaitConfiguration.directionForward   = directionForward;
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
     srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
-    srv.request.gaitConfiguration.prepareForGait = true;
+
+    if (ros::Time::isSimTime()) {
+        srv.request.gaitConfiguration.prepareForGait = false;
+    } else {
+        srv.request.gaitConfiguration.prepareForGait = true;
+    }
+
 
     if (evolveMorph){
         srv.request.gaitConfiguration.femurLength = femurLength;
@@ -493,6 +499,7 @@ void spinGaitControllerOnce(){
 
 void runGaitWithServiceCalls(){
     resetGaitRecording(get_gait_evaluation_client);
+    startGaitRecording(get_gait_evaluation_client);
 
     if (!ros::Time::isSimTime()) {
         ROS_ERROR("In runGaitWithServiceCalls in hardware experiments!");
@@ -628,7 +635,12 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     // Check for nan values
     for(auto elem : gaitResultsForward){
         if (std::isnan(elem.second)){
-            ROS_ERROR("Got NAN value");
+            ROS_ERROR("Got NAN value for %s", elem.first.c_str());
+
+            for(auto elem2 : gaitResultsForward){
+                fprintf(stderr, "  %s: %.2f\n", elem2.first.c_str(), elem2.second);
+            }
+
             return std::map<std::string, double>();
         }
     }
