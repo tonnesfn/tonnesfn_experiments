@@ -619,9 +619,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
     } else {
-        pauseGazebo();
+        //pauseGazebo();
         runGaitWithServiceCalls();
-        unpauseGazebo();
+        //unpauseGazebo();
     }
 
     std::map<std::string, double> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
@@ -1327,6 +1327,8 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         commandQueue.erase(commandQueue.begin());
     }
 
+    pauseGazebo();
+
     for (int i = 0; i < numberOfTests; i++) {
         currentIndividual = -1;
 
@@ -1428,6 +1430,8 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
 
         fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
     }
+
+    unpauseGazebo();
 
 };
 
