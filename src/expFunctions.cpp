@@ -147,9 +147,9 @@ bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClie
     dyret_common::Configure srv;
 
     if (enable == true){
-        srv.request.configuration.revolute.type =dyret_common::RevoluteConfig::TYPE_ENABLE_TORQUE;
+        srv.request.configuration.revolute.type = dyret_common::RevoluteConfig::TYPE_ENABLE_TORQUE;
     } else {
-        srv.request.configuration.revolute.type =dyret_common::RevoluteConfig::TYPE_DISABLE_TORQUE;
+        srv.request.configuration.revolute.type = dyret_common::RevoluteConfig::TYPE_DISABLE_TORQUE;
     }
 
     srv.request.configuration.revolute.ids = {0,1,2,3,4,5,6,7,8,9,10,11,12};

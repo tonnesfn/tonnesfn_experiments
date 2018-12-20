@@ -1741,7 +1741,9 @@ void menu_configure() {
         } else if (choice == "r") {
             adjustRestPose();
         } else if (choice == "t"){
-            setServoSpeeds(0.01, servoConfigClient);
+            if (ros::Time::isSystemTime()){
+                setServoSpeeds(0.01, servoConfigClient);
+            }
             sendAngleCommand(restPose);
         } else if (choice == "m") {
             evolveMorph = !evolveMorph;
@@ -1829,7 +1831,9 @@ int main(int argc, char **argv) {
 
     sleep(1);
 
-    setServoSpeeds(0.01, servoConfigClient);
+    if (ros::Time::isSystemTime()){
+        setServoSpeeds(0.01, servoConfigClient);
+    }
 
     sendAngleCommand(restPose);
 
