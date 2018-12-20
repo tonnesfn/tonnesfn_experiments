@@ -456,7 +456,7 @@ void runGaitControllerWithActionMessage(bool forward){
 
     // Wait until the robot is done walking
     ros::Time startTime = ros::Time::now();
-    while (true) {
+    while (ros::ok()) {
         usleep(100);
 
         float currentPos = getInferredPosition();
@@ -508,7 +508,7 @@ void runGaitWithServiceCalls(){
 
     ros::Time startTime_sim = ros::Time::now();
     ros::WallTime startTime_rw = ros::WallTime::now();
-    while (getInferredPosition() < evaluationDistance) {
+    while (ros::ok() && (getInferredPosition() < evaluationDistance)) {
         gz->step(30);
         spinGaitControllerOnce();
 
@@ -841,6 +841,9 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     return phenoType;
 }
 
+void stopEa();
+bool stopCondition();
+
 std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndividualGenotype, FILE *logFile) {
 
     // Set length of individual if not evolving morphology:
@@ -891,8 +894,9 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
             if (automatedRun()) {
                 if (retryCounter < 5) {
                     fprintf(logOutput, "Retrying\n");
+                    ROS_WARN("Retrying");
 
-                    if (ros::Time::isSimTime()){
+                    if (ros::Time::isSimTime()) {
                         unpauseGazebo(); // Unpause in case it has become stuck in paused mode
                         usleep(1000);
                         resetSimulation();
@@ -906,7 +910,11 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     fprintf(logOutput, "ABORT - after three retries without results\n");
                     exit(-1);
                 }
-            } else {
+            } else if (!ros::ok()){
+                ros::shutdown();
+                exit(-1);
+                break;
+            }else {
                 fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
 
                 char choice;
@@ -1016,9 +1024,6 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     return fitnessResult;
 
 }
-
-void stopEa();
-bool stopCondition();
 
 SFERES_FITNESS (FitExp2MO, sferes::fit::Fitness)
 {
