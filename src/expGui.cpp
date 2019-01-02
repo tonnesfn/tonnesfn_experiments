@@ -213,6 +213,7 @@ std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluat
 
 void setGaitParams(std::string gaitName,
                    bool directionForward,
+                   bool prepareForGait,
                    float femurLength,
                    float tibiaLength,
                    std::vector<std::string> parameterNames,
@@ -222,15 +223,9 @@ void setGaitParams(std::string gaitName,
 
     srv.request.gaitConfiguration.gaitName           = gaitName;
     srv.request.gaitConfiguration.directionForward   = directionForward;
+    srv.request.gaitConfiguration.prepareForGait     = prepareForGait;
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
     srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
-
-    if (ros::Time::isSimTime()) {
-        srv.request.gaitConfiguration.prepareForGait = false;
-    } else {
-        srv.request.gaitConfiguration.prepareForGait = true;
-    }
-
 
     if (evolveMorph){
         srv.request.gaitConfiguration.femurLength = femurLength;
@@ -243,7 +238,7 @@ void setGaitParams(std::string gaitName,
     gaitConfiguration_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName, bool directionForward, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitName, bool directionForward, bool prepareForGait, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -252,7 +247,7 @@ void setGaitParams(std::string gaitName, bool directionForward, float femurLengt
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitName, directionForward, femurLength, tibiaLength, parameterNames, parametervalues);
+    setGaitParams(gaitName, directionForward, prepareForGait, femurLength, tibiaLength, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -597,16 +592,14 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (ros::Time::isSystemTime() && cooldownPromptEnabled && currentIndividual == popSize) {
         // Code to stop for cooldown at the start of each new generation:
         currentIndividual = 0; // !! This might cause issues !!
-
         cooldownServos();
-
     }
 
     fprintf(logOutput, "\n  %03u: Evaluating individual:\n", currentIndividual);
     printMap(phenoType, "    ", logOutput);
 
+    // Check servo temperature and consider fitness invalid if too high (due to DC motor characterics)
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
-        // Check temperature - if its over the limit below, consider fitness invalid (due to DC motor characterics)
         if (getMaxServoTemperature() > 70.0) {
             ROS_ERROR("  Temperature is too high at %.1f\n", getMaxServoTemperature());
             return std::map<std::string, double>();
@@ -614,16 +607,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Set gait parameters
-    setGaitParams(gaitType, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+    unpauseGazebo();
+    setGaitParams(gaitType, true, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+    pauseGazebo();
 
+    // Run gait
     if (ros::Time::isSystemTime()) {
         runGaitControllerWithActionMessage(true);
     } else {
-        //pauseGazebo();
+        gz->step(100);
         runGaitWithServiceCalls();
-        //unpauseGazebo();
     }
 
+    // Get results from gaitEvaluator
     std::map<std::string, double> gaitResultsForward = getGaitResults(get_gait_evaluation_client);
 
     // Check for empty results
@@ -633,11 +629,11 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Check for nan values
-    for(auto elem : gaitResultsForward){
+    for(const auto elem : gaitResultsForward){
         if (std::isnan(elem.second)){
             ROS_ERROR("Got NAN value for %s", elem.first.c_str());
 
-            for(auto elem2 : gaitResultsForward){
+            for(const auto elem2 : gaitResultsForward){
                 fprintf(stderr, "  %s: %.2f\n", elem2.first.c_str(), elem2.second);
             }
 
@@ -649,24 +645,31 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     fprintf(logOutput, "  Res F:\n");
     printMap(gaitResultsForward, "    ", logOutput);
 
-    if (ros::Time::isSimTime()){
-        resetSimulation();
-        usleep(1000);
-    }
-
     std::map<std::string, double> gaitResultsReverse;
 
-    // Only evaluate reverse if in the real world:
-    if (ros::Time::isSystemTime() && !skipReverseEvaluation) {
+    if (!skipReverseEvaluation) {
 
         ROS_INFO("Evaluating reverse");
 
+        if (ros::Time::isSimTime()){
+            resetSimulation();
+            usleep(1000);
+        }
+
         // Set gait parameters
-        setGaitParams(gaitType, false, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+        unpauseGazebo();
+        setGaitParams(gaitType, false, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+        pauseGazebo();
 
         resetGaitRecording(get_gait_evaluation_client);
 
-        runGaitControllerWithActionMessage(false);
+        // Run gait
+        if (ros::Time::isSystemTime()) {
+            runGaitControllerWithActionMessage(false);
+        } else {
+            gz->step(100);
+            runGaitWithServiceCalls();
+        }
 
         gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
 
@@ -895,13 +898,6 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                 if (retryCounter < 5) {
                     fprintf(logOutput, "Retrying\n");
                     ROS_WARN("Retrying");
-
-                    if (ros::Time::isSimTime()) {
-                        unpauseGazebo(); // Unpause in case it has become stuck in paused mode
-                        usleep(1000);
-                        resetSimulation();
-                        usleep(1000);
-                    }
 
                     retryCounter += 1;
                     currentIndividual--;
