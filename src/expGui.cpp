@@ -246,7 +246,6 @@ void setGaitParams(std::string gaitName, bool directionForward, bool prepareForG
         parameterNames.push_back(elem.first);
         parametervalues.push_back((float) elem.second);
     }
-
     setGaitParams(gaitName, directionForward, prepareForGait, femurLength, tibiaLength, parameterNames, parametervalues);
 }
 
@@ -1461,35 +1460,35 @@ void experiments_verifyFitness() {
     }
     fclose(verifyLog);
 
+    gaitType = "highLevelSplineGait";
+
     fitnessFunctions.clear();
     fitnessFunctions.emplace_back("MocapSpeed");
     fitnessFunctions.emplace_back("Stability");
 
-
-    ROS_ERROR("Not yet implemented!"); //TODO
-    /*
     for (int i = 0; i < numberOfTests; i++) {
-
-        std::vector<float> fitnessResult = getFitness(individuals::smallRobotSmallControl,
-                                                      get_gait_evaluation_client);
+        std::vector<std::map<std::string, double>> rawFitnesses;
 
 
-        fprintf(logOutput, "Returned fitness (%lu): ", fitnessResult.size());
+        std::map<std::string, double> fitnessResult = getFitness(individuals::smallRobotSmallControl,
+                                                                 get_gait_evaluation_client,
+                                                                 rawFitnesses);
+
+
+        fprintf(logOutput, "  Returned fitness (%lu): \n", fitnessResult.size());
+        printMap(fitnessResult, "    ", logOutput);
+
+        // Save to file:
         FILE *verifyLog = fopen(verifyLogPath.c_str(), "a");
 
         if (i > 0) fprintf(verifyLog, "\n");
 
-        for (int j = 0; j < fitnessResult.size(); j++) {
-            fprintf(logOutput, "%.2f ", fitnessResult[j]);
-
-            if (j > 0) fprintf(verifyLog, ", ");
-            fprintf(verifyLog, "%f", fitnessResult[j]);
-        }
+        printMap(fitnessResult, "", verifyLog);
 
         fclose(verifyLog);
         fprintf(logOutput, "\n");
 
-    }*/
+    }
 }
 
 void experiments_fitnessNoise() {
