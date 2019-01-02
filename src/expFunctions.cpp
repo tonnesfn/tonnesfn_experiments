@@ -37,6 +37,7 @@ namespace gazebo {
 
         pub->Publish(msg);
         ros::spinOnce();
+        //usleep(100000);
     }
 
     bool WorldConnection::reset() {

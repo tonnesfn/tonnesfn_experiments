@@ -83,6 +83,8 @@ const std::string resumeFile = ""; // File to resume. Does not resume if empty
 
 const bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
+const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
+
 //
 
 std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
@@ -606,12 +608,17 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Set gait parameters
-    unpauseGazebo();
+    if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
     setGaitParams(gaitType, true, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
-    pauseGazebo();
+
+    if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
+        ros::spinOnce();
+        pauseGazebo();
+        ros::spinOnce();
+    }
 
     // Run gait
-    if (ros::Time::isSystemTime()) {
+    if (ros::Time::isSystemTime() || useActionMessageInSim) {
         runGaitControllerWithActionMessage(true);
     } else {
         gz->step(100);
@@ -656,14 +663,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
 
         // Set gait parameters
-        unpauseGazebo();
+        if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
         setGaitParams(gaitType, false, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
-        pauseGazebo();
+
+        if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
+            ros::spinOnce();
+            pauseGazebo();
+            ros::spinOnce();
+        }
 
         resetGaitRecording(get_gait_evaluation_client);
 
         // Run gait
-        if (ros::Time::isSystemTime()) {
+        if (ros::Time::isSystemTime() || useActionMessageInSim) {
             runGaitControllerWithActionMessage(false);
         } else {
             gz->step(100);
@@ -1327,7 +1339,9 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         commandQueue.erase(commandQueue.begin());
     }
 
-    pauseGazebo();
+    if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
+        pauseGazebo();
+    }
 
     for (int i = 0; i < numberOfTests; i++) {
         currentIndividual = -1;
@@ -1431,7 +1445,9 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
     }
 
-    unpauseGazebo();
+    if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
+        unpauseGazebo();
+    }
 
 };
 
