@@ -448,8 +448,10 @@ void runGaitControllerWithActionMessage(bool forward){
     startWalking();
 
     // Start bag logging
-    initLog(std::to_string(currentIndividual) + direction);
-    startLogging();
+    if (!ros::Time::isSimTime()) {
+        initLog(std::to_string(currentIndividual) + direction);
+        startLogging();
+    }
 
     // Start fitness recording
     startGaitRecording(get_gait_evaluation_client);
@@ -476,7 +478,9 @@ void runGaitControllerWithActionMessage(bool forward){
     pauseGaitRecording(get_gait_evaluation_client);
 
     // Save and stop bag logging
-    saveLog();
+    if (!ros::Time::isSimTime()) {
+        saveLog();
+    }
 
     // Stop walking
     stopWalking();
