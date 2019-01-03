@@ -1316,7 +1316,7 @@ std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) 
     mkdir(ss.str().c_str(), 0700);
     ss.str(std::string());
 
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "_" << std::setfill('0') << std::setw(3) << int(gaitDifficultyFactor*100.0) << "/";
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "/";
 
     mkdir(ss.str().c_str(), 0700);
     return ss.str();
@@ -1361,7 +1361,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         std::string experimentDirectory = createExperimentDirectory(givenAlgorithm, now);
 
         std::stringstream ss;
-        ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << "_" << std::setfill('0') << std::setw(3) << int(gaitDifficultyFactor*100.0) << ".json";
+        ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << ".json";
 
         evoLogPath = ss.str();
 
@@ -1380,7 +1380,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         fprintf(evoLog, "    \"type\": \"evolution\",\n");
         fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
         fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
-        fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
+        fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
         fprintf(evoLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
         fprintf(evoLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
         fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
@@ -1589,7 +1589,7 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "    \"algorithm\": \"random\",\n");
         fprintf(randomSearchLog, "    \"seed\": \"%u\",\n", randomSeed);
         fprintf(randomSearchLog, "    \"controller\": \"%s\",\n", gaitType.c_str());
-        fprintf(randomSearchLog, "    \"gaitDifficultyFactor\": \"%.1f\",\n", gaitDifficultyFactor);
+        fprintf(randomSearchLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
         fprintf(randomSearchLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
         fprintf(randomSearchLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
         fprintf(randomSearchLog, "    \"machine\": \"%s\",\n", hostname);
@@ -1645,11 +1645,16 @@ void getDifficultyFactor(){
   }
 
   if(difficulty.find_first_not_of("1234567890.-") != std::string::npos){
-    ROS_FATAL("Invalid difficulty factor input");
-    exit(-1);
+
+    // Get random number and limit to 0.xxx
+    gaitDifficultyFactor = ((int)(1000.0 * static_cast <float> (rand()) / static_cast <float> (RAND_MAX))) / 1000.0;
+
+    printf("Did not receive valid complexity number. Setting to random: %3f\n", gaitDifficultyFactor);
+
+  } else {
+    gaitDifficultyFactor = atof(difficulty.c_str());
   }
 
-  gaitDifficultyFactor = atof(difficulty.c_str());
 }
 
 void menu_experiments() {
