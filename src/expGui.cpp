@@ -84,6 +84,7 @@ const std::string resumeFile = ""; // File to resume. Does not resume if empty
 const bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
 const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
+const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
 
 //
 
@@ -264,6 +265,8 @@ bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
 void setLegLengths(float femurLengths, float tibiaLengths) {
     dyret_common::Pose msg;
 
+    msg.header.stamp = ros::Time().now();
+
     msg.prismatic.resize(2);
 
     msg.prismatic[0] = femurLengths;
@@ -275,6 +278,7 @@ void setLegLengths(float femurLengths, float tibiaLengths) {
 void sendAngleCommand(std::vector<float> angles){
     dyret_common::Pose msg;
 
+    msg.header.stamp = ros::Time().now();
     msg.revolute = angles;
 
     poseCommand_pub.publish(msg);
@@ -585,7 +589,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Reset if we are in simulation
-    if (ros::Time::isSimTime()){
+    if (ros::Time::isSimTime() && !skipSimulationReset){
         resetSimulation();
         usleep(1000);
     }
@@ -657,7 +661,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         ROS_INFO("Evaluating reverse");
 
-        if (ros::Time::isSimTime()){
+        if (ros::Time::isSimTime() && !skipSimulationReset){
             resetSimulation();
             usleep(1000);
         }
@@ -711,7 +715,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             mapToReturn["Stability"] = fmax(-1.0, (gaitResultsForward["combImuStab"] + gaitResultsReverse["combImuStab"]) / 2.0);
         }
 
-        if (ros::Time::isSimTime()){
+        if (ros::Time::isSimTime() && !skipSimulationReset){
             mapToReturn["MocapSpeed"] = getMapValue(gaitResultsForward, "sensorSpeedForward");
         } else {
             if (gaitResultsReverse.empty()) {
@@ -726,6 +730,11 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         mapToReturn["Stability"] = -1;
         mapToReturn["MocapSpeed"] = 0;
 
+        if (ros::Time::isSimTime()){
+            resetSimulation();
+            ROS_INFO("Reseting simulation due to fall");
+        }
+
     }
 
     // Print total results
@@ -733,7 +742,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     printMap(mapToReturn, "    ", logOutput);
 
     if (mapToReturn["MocapSpeed"] == 0.0){
-        ROS_ERROR("MocapSpeed 0");
+        ROS_WARN("MocapSpeed 0");
     }
 
     fprintf(logOutput, "\n");
