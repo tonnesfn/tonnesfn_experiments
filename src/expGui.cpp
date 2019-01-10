@@ -47,6 +47,8 @@
 #include "external/sferes_mapelites/stat_map.hpp"
 #include "external/sferes_mapelites/stat_map_binary.hpp"
 
+#include <sound_play/sound_play.h>
+
 #include <boost/program_options.hpp>
 
 #include <sstream>
@@ -71,6 +73,8 @@ ros::Subscriber gaitInferredPos_sub;
 ros::Publisher poseCommand_pub;
 
 gazebo::WorldConnection* gz;
+
+sound_play::SoundClient* sc;
 
 // Configuration:
 const bool skipReverseEvaluation = false; // Only evaluate forwards, not back again
@@ -439,6 +443,10 @@ bool saveLog(){
 
 void runGaitControllerWithActionMessage(bool forward){
 
+    sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
+
+    sleep(1);
+
     resetGaitRecording(get_gait_evaluation_client);
 
     std::string direction;
@@ -485,7 +493,7 @@ void runGaitControllerWithActionMessage(bool forward){
     // Stop walking
     stopWalking();
 
-
+    sc->play(sound_play::SoundRequest::BACKINGUP);
 
 }
 
@@ -1840,6 +1848,8 @@ int main(int argc, char **argv) {
 
     ros::AsyncSpinner spinner(1);
     spinner.start();
+
+    sc = new sound_play::SoundClient();
 
     std::string evoInfo = "testInfo";
 
