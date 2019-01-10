@@ -105,7 +105,7 @@ float evaluationDistance = 1500.0;
 int currentIndividual;
 std::vector<float> servoTemperatures(12);
 
-std::string evoLogPath;
+std::string logDirectoryPath;
 
 float gaitDifficultyFactor = 0.5;
 
@@ -118,6 +118,8 @@ std::string morphology;
 std::string gaitType;
 
 bool robotOnStand = false;
+
+bool enableLogging = true;
 
 char **argv_g;
 
@@ -354,7 +356,7 @@ float getInferredPosition(){
 bool initLog(std::string individual){
     dyret_controller::LoggerCommand srv;
 
-    std::string logPath = evoLogPath.substr(0, evoLogPath.find_last_of("\\/")) + "/bags/";
+    std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/bags/";
 
     mkdir(logPath.c_str(), 0700);
 
@@ -456,7 +458,7 @@ void runGaitControllerWithActionMessage(bool forward){
     startWalking();
 
     // Start bag logging
-    if (!ros::Time::isSimTime()) {
+    if (!ros::Time::isSimTime() && enableLogging) {
         initLog(std::to_string(currentIndividual) + direction);
         startLogging();
     }
@@ -486,7 +488,7 @@ void runGaitControllerWithActionMessage(bool forward){
     pauseGaitRecording(get_gait_evaluation_client);
 
     // Save and stop bag logging
-    if (!ros::Time::isSimTime()) {
+    if (!ros::Time::isSimTime() && enableLogging) {
         saveLog();
     }
 
@@ -1067,7 +1069,7 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        FILE *evoLog = fopen(evoLogPath.c_str(), "a");
+        FILE *evoLog = fopen(logDirectoryPath.c_str(), "a");
         if (evoLog == NULL) {
             ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
         }
@@ -1117,7 +1119,7 @@ public:
 
         for (int i = 0; i < individualData.size(); i++) individualData[i] = ind.gen().data(i);
 
-        FILE *evoLog = fopen(evoLogPath.c_str(), "a");
+        FILE *evoLog = fopen(logDirectoryPath.c_str(), "a");
         if (evoLog == NULL) {
             ROS_ERROR("evoLog couldnt be opened (err%d)\n", errno);
         }
@@ -1237,6 +1239,7 @@ void run_individual(std::string gaitName, std::map<std::string, double> phenoTyp
 }
 
 void menu_demo() {
+    enableLogging = false;
 
     std::string choice;
 
@@ -1306,6 +1309,7 @@ void menu_demo() {
             fprintf(logOutput, "Large morphology requested\n");
         }
     }
+    enableLogging = true;
 };
 
 std::string getDateString(struct tm *givenTime) {
@@ -1375,9 +1379,9 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         std::stringstream ss;
         ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << ".json";
 
-        evoLogPath = ss.str();
+        logDirectoryPath = ss.str();
 
-        FILE *evoLog = fopen(evoLogPath.c_str(), "a");
+        FILE *evoLog = fopen(logDirectoryPath.c_str(), "a");
         if (evoLog == NULL) {
             ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
         }
@@ -1455,13 +1459,13 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         }
         fprintf(stderr, "\n");
 
-        if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, evoLogPath);
-        else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, evoLogPath);
+        if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, logDirectoryPath);
+        else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, logDirectoryPath);
         else {
             ROS_FATAL("Invalid algorithm (%s) and controller (%s) choices", givenAlgorithm.c_str(), givenController.c_str());
             exit(-1);
         }
-        evoLogPath.clear();
+        logDirectoryPath.clear();
 
         fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
     }
@@ -1475,7 +1479,8 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
 void experiments_verifyFitness() {
     currentIndividual = 0;
 
-    std::cout << "How many individuals do you want to test? >";
+    std::cout << "Testing high level control on smallRobotSmallControl:\n";
+    std::cout << "  How many individuals do you want to test? >";
 
     int numberOfTests;
     std::cin >> numberOfTests;
@@ -1489,9 +1494,9 @@ void experiments_verifyFitness() {
     std::stringstream ss;
     ss << logDirectory << getDateString(now) << "_ver.txt";
 
-    std::string verifyLogPath = ss.str();
+    logDirectoryPath = ss.str();
 
-    FILE *verifyLog = fopen(verifyLogPath.c_str(), "a");
+    FILE *verifyLog = fopen(logDirectoryPath.c_str(), "a");
     if (verifyLog == NULL) {
         ROS_ERROR("verifyLog couldnt be opened (err%d)\n", errno);
     }
@@ -1516,11 +1521,16 @@ void experiments_verifyFitness() {
         printMap(fitnessResult, "    ", logOutput);
 
         // Save to file:
-        FILE *verifyLog = fopen(verifyLogPath.c_str(), "a");
-
-        if (i > 0) fprintf(verifyLog, "\n");
+        verifyLog = fopen(logDirectoryPath.c_str(), "a");
 
         printMap(fitnessResult, "", verifyLog);
+        for (int j = 0; j < rawFitnesses.size(); j++) {
+            fprintf(verifyLog, "  rawFitnesses[%d]:\n", j);
+            printMap(rawFitnesses[j], "    ", verifyLog);
+        }
+
+
+        fprintf(verifyLog, "\n");
 
         fclose(verifyLog);
         fprintf(logOutput, "\n");
