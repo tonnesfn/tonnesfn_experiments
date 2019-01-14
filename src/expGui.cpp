@@ -927,19 +927,21 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
-            fprintf(logOutput, "Select action: (c)ontinue, (r)etry, (d)iscard:\n");
+            fprintf(logOutput, "Select action: continue (enter), retry (r), discard (b):\n");
 
-            char choice;
-            scanf(" %c", &choice);
+            std::string temp;
+            std::getline(std::cin, temp);
 
-            if (choice == 'r'){
+            if (temp == "r"){
                 validSolution = false;
                 currentIndividual--;
                 ROS_WARN("Retrying individual");
-            } else if (choice == 'd'){
+            } else if (temp == "b"){
                 fitnessResult["Stability"] = -1;
                 fitnessResult["MocapSpeed"] = 0;
                 ROS_WARN("Discarding individual");
+            } else if (temp.length() > 0){
+                ROS_WARN("Unknown input! Continuing");
             }
         } else {
 
