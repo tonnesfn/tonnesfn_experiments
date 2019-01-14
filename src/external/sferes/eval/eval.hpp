@@ -38,6 +38,8 @@
 #ifndef EVAL_HPP_
 #define EVAL_HPP_
 
+bool sortReverse = false;
+
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include "../dbg/dbg.hpp"
@@ -95,6 +97,13 @@ namespace sferes {
             currentPosition = legLengths[currentIndex];
             sortedOrder.push_back(currentIndex);
           }
+
+          // Reverse order every second generation to save time reconfiguring
+          if (sortReverse){
+            std::reverse(std::begin(sortedOrder), std::end(sortedOrder));
+          }
+
+          sortReverse = !sortReverse;
 
           for (int i = 0; i < legLengths.size(); i++) {
             pop[begin+sortedOrder[i]]->fit().eval(*pop[begin+sortedOrder[i]]);
