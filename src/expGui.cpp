@@ -90,6 +90,8 @@ const bool cooldownPromptEnabled = true; // Prompt for cooldown between each gen
 const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
 const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
 
+bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
+
 //
 
 std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
@@ -915,76 +917,96 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     int retryCounter = 0;
     std::vector<std::map<std::string, double>> rawFitness;
 
+
+
     do {
         validSolution = true;
 
         rawFitness.clear();
         fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
 
-        if (fitnessResult.empty()){
-            ROS_ERROR("Received empty fitness result");
-            validSolution = false;
-        }
+        // Check after each eval if enabled. If not - do regular checks
+        if (promptForConfirmation) {
+            fprintf(logOutput, "Select action: (c)ontinue, (r)etry, (d)iscard:\n");
 
-        // A valid solution could not be found:
-        if (!validSolution || fitnessResult.empty()) {
-            if (automatedRun()) {
-                if (retryCounter < 5) {
-                    fprintf(logOutput, "Retrying\n");
-                    ROS_WARN("Retrying");
+            char choice;
+            scanf(" %c", &choice);
 
-                    retryCounter += 1;
-                    currentIndividual--;
-                    validSolution = false;
-                } else {
-                    fprintf(logOutput, "ABORT - after three retries without results\n");
-                    exit(-1);
-                }
-            } else if (!ros::ok()){
-                ros::shutdown();
-                exit(-1);
-                break;
-            }else {
-                fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
+            if (choice == 'r'){
+                validSolution = false;
+                currentIndividual--;
+                ROS_WARN("Retrying individual");
+            } else if (choice == 'd'){
+                fitnessResult["Stability"] = -1;
+                fitnessResult["MocapSpeed"] = 0;
+                ROS_WARN("Discarding individual");
+            }
+        } else {
 
-                char choice;
-                scanf(" %c", &choice);
+            if (fitnessResult.empty()) {
+                ROS_ERROR("Received empty fitness result");
+                validSolution = false;
+            }
 
-                if (choice == 'd') { // Discard
-                    fitnessResult.clear();
+            // A valid solution could not be found:
+            if (!validSolution || fitnessResult.empty()) {
+                if (automatedRun()) {
+                    if (retryCounter < 5) {
+                        fprintf(logOutput, "Retrying\n");
+                        ROS_WARN("Retrying");
 
-                    fprintf(logOutput, "Discarding\n");
-                    validSolution = true;
-                } else if (choice == 'c') { // Cooldown
-                    ROS_ERROR("Not implemented!"); //TODO: implement this
-                    //disableServos(servoConfigClient, actionMessages_pub);
-                    fprintf(logOutput, "Servos disabled\n");
-
-                    while (getMaxServoTemperature(true) > 50) { sleep(15); }
-
-                    ROS_ERROR("Not implemented!"); //TODO: implement this
-                    //enableServos(actionMessages_pub);
-
-                    std::cout << "Press enter to continue evolution";
-                    std::cin.ignore();
-                    std::cin.ignore();
-
-                    currentIndividual--;
-                    validSolution = false;
-                } else { // Retry
-                    if (ros::Time::isSimTime()){
-                        sleep(5);
-                        resetSimulation();
-                        sleep(5);
+                        retryCounter += 1;
+                        currentIndividual--;
+                        validSolution = false;
+                    } else {
+                        fprintf(logOutput, "ABORT - after three retries without results\n");
+                        exit(-1);
                     }
+                } else if (!ros::ok()) {
+                    ros::shutdown();
+                    exit(-1);
+                    break;
+                } else {
+                    fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
 
-                    fprintf(logOutput, "Retrying\n");
-                    currentIndividual--;
-                    validSolution = false;
+                    char choice;
+                    scanf(" %c", &choice);
+
+                    if (choice == 'd') { // Discard
+                        fitnessResult.clear();
+
+                        fprintf(logOutput, "Discarding\n");
+                        validSolution = true;
+                    } else if (choice == 'c') { // Cooldown
+                        ROS_ERROR("Not implemented!"); //TODO: implement this
+                        //disableServos(servoConfigClient, actionMessages_pub);
+                        fprintf(logOutput, "Servos disabled\n");
+
+                        while (getMaxServoTemperature(true) > 50) { sleep(15); }
+
+                        ROS_ERROR("Not implemented!"); //TODO: implement this
+                        //enableServos(actionMessages_pub);
+
+                        std::cout << "Press enter to continue evolution";
+                        std::cin.ignore();
+                        std::cin.ignore();
+
+                        currentIndividual--;
+                        validSolution = false;
+                    } else { // Retry
+                        if (ros::Time::isSimTime()) {
+                            sleep(5);
+                            resetSimulation();
+                            sleep(5);
+                        }
+
+                        fprintf(logOutput, "Retrying\n");
+                        currentIndividual--;
+                        validSolution = false;
+                    }
                 }
             }
         }
-
     } while (validSolution == false);
 
     FILE *genFile = fopen("generation", "r");
@@ -1745,6 +1767,7 @@ void menu_configure() {
 
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
+    fprintf(logOutput, "    p - enable/disable evaluation prompt\n");
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
     fprintf(logOutput, "    m - enable/disable morphology evolution\n");
     fprintf(logOutput, "    s - enable/disable stand testing\n");
@@ -1771,6 +1794,13 @@ void menu_configure() {
             if (instantFitness == true) fprintf(logOutput, "Instant fitness evaluation now enabled!\n");
             else
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
+        } else if (choice == "p") {
+
+            promptForConfirmation = !promptForConfirmation;
+
+            if (promptForConfirmation) fprintf(logOutput, "   evaluation prompt now enabled!\n");
+            else fprintf(logOutput, "   evaluation prompt now disabled!\n");
+
         } else if (choice == "s") {
             if (robotOnStand == true) {
                 fprintf(logOutput, "   RobotOnStand now disabled!\n");
