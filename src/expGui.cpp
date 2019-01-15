@@ -752,9 +752,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
             mapToReturn["MocapSpeed"] = getMapValue(gaitResultsForward, "sensorSpeedForward");
         } else {
             if (gaitResultsReverse.empty()) {
-                mapToReturn["MocapSpeed"] = gaitResultsForward["sensorSpeed"];
+                mapToReturn["MocapSpeed"] = gaitResultsForward["filteredSpeed"];
             } else {
-                mapToReturn["MocapSpeed"] = (gaitResultsForward["sensorSpeed"] + gaitResultsReverse["sensorSpeed"]) / 2.0;
+                mapToReturn["MocapSpeed"] = (gaitResultsForward["filteredSpeed"] + gaitResultsReverse["filteredSpeed"]) / 2.0;
             }
         }
     } else {
