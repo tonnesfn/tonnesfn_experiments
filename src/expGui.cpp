@@ -784,7 +784,7 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
     phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
     phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
     phenoType["smoothing"]       = givenGenotype[4] * 50.0;          //  0    ->  50
-    phenoType["frequency"]       = (0.25 + givenGenotype[5] * 1.25) * frequencyFactor;   //  0.25 ->   1.5
+    phenoType["frequency"]       = (0.25 + givenGenotype[5] * 0.75) * frequencyFactor;   //  0.25 ->   1.0
     phenoType["wagPhase"]        = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
     phenoType["wagAmplitude_x"]  = givenGenotype[7] * 50.0;          //  0    ->  50
     phenoType["wagAmplitude_y"]  = givenGenotype[8] * 50.0;          //  0    ->  50
@@ -845,7 +845,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = (0.25 + (givenGenotype[3] * 1.25)) * frequencyFactor; // 0.25 ->  1.5
+    phenoType["frequency"]       = (0.25 + (givenGenotype[3] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
 
     if (frequencyFactor != 1.0){
         ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
