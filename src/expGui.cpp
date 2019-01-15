@@ -90,9 +90,10 @@ const bool cooldownPromptEnabled = true; // Prompt for cooldown between each gen
 const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
 const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
 
-bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
-
 //
+
+bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
+bool currentlyLoggingFitness = false; // Whether gaitEvaluator is logging fitness or not
 
 std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
 
@@ -220,6 +221,22 @@ std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluat
     }
 
     return mapToReturn;
+}
+
+bool enableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
+
+    dyret_controller::GetGaitEvaluation srv;
+    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_enableLogging;
+
+    return get_gait_evaluation_client.call(srv);
+}
+
+bool disableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
+
+    dyret_controller::GetGaitEvaluation srv;
+    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_disableLogging;
+
+    return get_gait_evaluation_client.call(srv);
 }
 
 void setGaitParams(std::string gaitName,
@@ -759,6 +776,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
+        sc->say("Mocap warning");
     }
 
     fprintf(logOutput, "\n");
@@ -1770,6 +1788,7 @@ void menu_configure() {
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
     fprintf(logOutput, "    p - enable/disable evaluation prompt\n");
+    fprintf(logOutput, "    l - enable/disable fitness logging\n");
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
     fprintf(logOutput, "    m - enable/disable morphology evolution\n");
     fprintf(logOutput, "    s - enable/disable stand testing\n");
@@ -1802,6 +1821,17 @@ void menu_configure() {
 
             if (promptForConfirmation) fprintf(logOutput, "   evaluation prompt now enabled!\n");
             else fprintf(logOutput, "   evaluation prompt now disabled!\n");
+        } else if (choice == "l") {
+
+            currentlyLoggingFitness = !currentlyLoggingFitness;
+
+            if (currentlyLoggingFitness) {
+                enableFitnessLog(get_gait_evaluation_client);
+                fprintf(logOutput, "   fitness log now enabled!\n");
+            } else {
+                disableFitnessLog(get_gait_evaluation_client);
+                fprintf(logOutput, "   fitness log now disabled!\n");
+            }
 
         } else if (choice == "s") {
             if (robotOnStand == true) {
