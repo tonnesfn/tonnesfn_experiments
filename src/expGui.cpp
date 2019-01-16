@@ -1310,8 +1310,8 @@ void menu_demo() {
         if (choice == "ts") {
 
         std::map<std::string, double> customRobot =
-                {{"femurLength", 0.0}, //{{"femurLength", 1.367467},
-                 {"frequencyFactor", 0.98675},
+                {{"femurLength", 15.0},
+                 {"frequency", 0.1},
                  {"liftDuration", 0.159514},
                  {"p0_x", 0.0},
                  {"p0_y", 102.399856},
@@ -1326,7 +1326,11 @@ void menu_demo() {
                  {"p4_x", 0.0},
                  {"p4_y", -4.313314},
                  {"p4_z", 16.276393},
-                 {"tibiaLength", 0.0}}; //{"tibiaLength", 48.817356}};
+                 {"tibiaLength", 15.0},
+                 {"difficultyFactor", 0.2},
+                 {"wagPhase", 0.0},
+                 {"wagAmplitude_x", 0.0},
+                 {"wagAmplitude_y", 0.0}};
 
             run_individual("lowLevelSplineGait", customRobot);
         } else if (choice == "ss") {
