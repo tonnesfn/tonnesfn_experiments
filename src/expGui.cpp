@@ -1473,6 +1473,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
         argv_tmp[4] = 0;
     }
 
+    mkdir(std::string(experimentDirectory + "video").c_str(), 0700);
 
     mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
 
