@@ -1397,124 +1397,110 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
     fitnessFunctions.emplace_back("Stability");
     if (givenAlgorithm == "nsga2") fitnessFunctions.emplace_back("MocapSpeed");
 
-    std::cout << "How many runs do you want to do? >";
-
-    int numberOfTests;
-
-    if (commandQueue.empty()) {
-        std::cin >> numberOfTests;
-        std::cin.ignore(10000, '\n');
-    } else {
-        numberOfTests = std::stoi(commandQueue[0]);
-        fprintf(logOutput, "*%d*\n", numberOfTests);
-        commandQueue.erase(commandQueue.begin());
-    }
-
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         pauseGazebo();
     }
 
-    for (int i = 0; i < numberOfTests; i++) {
-        currentIndividual = -1;
+    currentIndividual = -1;
 
-        time_t t = time(0);   // get time now
-        struct tm *now = localtime(&t);
+    time_t t = time(0);   // get time now
+    struct tm *now = localtime(&t);
 
-        std::string experimentDirectory = createExperimentDirectory(givenAlgorithm, now);
+    std::string experimentDirectory = createExperimentDirectory(givenAlgorithm, now);
 
-        std::stringstream ss;
-        ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << ".json";
+    std::stringstream ss;
+    ss << experimentDirectory.c_str() << getDateString(now) << "_" << givenAlgorithm << ".json";
 
-        logDirectoryPath = ss.str();
+    logDirectoryPath = ss.str();
 
-        FILE *evoLog = fopen(logDirectoryPath.c_str(), "a");
-        if (evoLog == NULL) {
-            ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
-        }
-
-        char hostname[1024];
-        gethostname(hostname, 1024);
-
-        fprintf(evoLog, "{\n");
-        fprintf(evoLog, "  \"experiment_info\": {\n");
-        fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
-        if (fullCommand.size() != 0) fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
-        fprintf(evoLog, "    \"type\": \"evolution\",\n");
-        fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
-        fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
-        fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
-        fprintf(evoLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
-        fprintf(evoLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
-        fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
-        fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
-
-        if (ros::Time::isSimTime()) fprintf(evoLog, "    \"platform\": \"simulation\",\n");
-        else
-            fprintf(evoLog, "    \"platform\": \"hardware\",\n");
-        fprintf(evoLog, "    \"generations\": %d,\n", generations);
-        fprintf(evoLog, "    \"population\": %d,\n", popSize);
-
-        if (evolveMorph) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
-        else
-            fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
-
-        fprintf(evoLog, "    \"fitness\": [\n");
-        if (instantFitness == false) {
-            for (int i = 0; i < fitnessFunctions.size(); i++) {
-                fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
-                if (i != fitnessFunctions.size() - 1) fprintf(evoLog, ",\n");
-            }
-        } else fprintf(evoLog, "      \"*INSTANT*\"");
-        fprintf(evoLog, "\n");
-        fprintf(evoLog, "    ]\n");
-
-        fprintf(evoLog, "  },\n");
-
-        fprintf(evoLog, "  \"individuals\": [\n");
-
-        fclose(evoLog);
-
-        // Add directory command to argc and argv going into sferes:
-        int argc_tmp;
-        char *argv_tmp[5];
-        argv_tmp[0] = argv_g[0]; // Copy the first reference
-
-        if (resumeFile.empty()) {
-            argc_tmp = 2;
-            argv_tmp[2] = 0;
-        } else {
-            argc_tmp = 4;
-            argv_tmp[4] = 0;
-        }
-
-        mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
-
-        std::string commString = "-d" + experimentDirectory + "sferes";
-        const char *sferesCommand = commString.c_str();
-        argv_tmp[1] = const_cast<char *>(sferesCommand);
-
-        std::string resString = "--resume";
-        const char *res = resString.c_str();
-        argv_tmp[2] = const_cast<char *>(res);
-
-        const char *resName = resumeFile.c_str();
-        argv_tmp[3] = const_cast<char *>(resName);
-
-        for (int i = 0; i < argc_tmp; i++){
-            fprintf(stderr, " %s ", argv_tmp[i]);
-        }
-        fprintf(stderr, "\n");
-
-        if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, logDirectoryPath);
-        else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, logDirectoryPath);
-        else {
-            ROS_FATAL("Invalid algorithm (%s) and controller (%s) choices", givenAlgorithm.c_str(), givenController.c_str());
-            exit(-1);
-        }
-        logDirectoryPath.clear();
-
-        fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
+    FILE *evoLog = fopen(logDirectoryPath.c_str(), "a");
+    if (evoLog == NULL) {
+        ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
     }
+
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
+    fprintf(evoLog, "{\n");
+    fprintf(evoLog, "  \"experiment_info\": {\n");
+    fprintf(evoLog, "    \"time\": \"%s\",\n", getDateString(now).c_str());
+    if (fullCommand.size() != 0) fprintf(evoLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    fprintf(evoLog, "    \"type\": \"evolution\",\n");
+    fprintf(evoLog, "    \"algorithm\": \"%s\",\n", givenAlgorithm.c_str());
+    fprintf(evoLog, "    \"controller\": \"%s\",\n", givenController.c_str());
+    fprintf(evoLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
+    fprintf(evoLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+    fprintf(evoLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
+    fprintf(evoLog, "    \"machine\": \"%s\",\n", hostname);
+    fprintf(evoLog, "    \"user\": \"%s\",\n", getenv("USER"));
+
+    if (ros::Time::isSimTime()) fprintf(evoLog, "    \"platform\": \"simulation\",\n");
+    else
+        fprintf(evoLog, "    \"platform\": \"hardware\",\n");
+    fprintf(evoLog, "    \"generations\": %d,\n", generations);
+    fprintf(evoLog, "    \"population\": %d,\n", popSize);
+
+    if (evolveMorph) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
+    else
+        fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
+
+    fprintf(evoLog, "    \"fitness\": [\n");
+    if (instantFitness == false) {
+        for (int i = 0; i < fitnessFunctions.size(); i++) {
+            fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
+            if (i != fitnessFunctions.size() - 1) fprintf(evoLog, ",\n");
+        }
+    } else fprintf(evoLog, "      \"*INSTANT*\"");
+    fprintf(evoLog, "\n");
+    fprintf(evoLog, "    ]\n");
+
+    fprintf(evoLog, "  },\n");
+
+    fprintf(evoLog, "  \"individuals\": [\n");
+
+    fclose(evoLog);
+
+    // Add directory command to argc and argv going into sferes:
+    int argc_tmp;
+    char *argv_tmp[5];
+    argv_tmp[0] = argv_g[0]; // Copy the first reference
+
+    if (resumeFile.empty()) {
+        argc_tmp = 2;
+        argv_tmp[2] = 0;
+    } else {
+        argc_tmp = 4;
+        argv_tmp[4] = 0;
+    }
+
+
+    mkdir(std::string(experimentDirectory + "sferes").c_str(), 0700);
+
+    std::string commString = "-d" + experimentDirectory + "sferes";
+    const char *sferesCommand = commString.c_str();
+    argv_tmp[1] = const_cast<char *>(sferesCommand);
+
+    std::string resString = "--resume";
+    const char *res = resString.c_str();
+    argv_tmp[2] = const_cast<char *>(res);
+
+    const char *resName = resumeFile.c_str();
+    argv_tmp[3] = const_cast<char *>(resName);
+
+    for (int i = 0; i < argc_tmp; i++){
+        fprintf(stderr, " %s ", argv_tmp[i]);
+    }
+    fprintf(stderr, "\n");
+
+    if (givenAlgorithm == "nsga2") sferes::run_ea(argc_tmp, argv_tmp, sferes_nsga2::ea, logDirectoryPath);
+    else if (givenAlgorithm == "map-elites") sferes::run_ea(argc_tmp, argv_tmp, sferes_mapElites::ea, logDirectoryPath);
+    else {
+        ROS_FATAL("Invalid algorithm (%s) and controller (%s) choices", givenAlgorithm.c_str(), givenController.c_str());
+        exit(-1);
+    }
+    logDirectoryPath.clear();
+
+    fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         unpauseGazebo();
