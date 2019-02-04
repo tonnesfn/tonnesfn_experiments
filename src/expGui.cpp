@@ -1731,6 +1731,7 @@ void menu_experiments() {
     std::cout << "  Please choose one experiment: (enter to go back)\n";
 
     fprintf(logOutput,
+            "      curr - run current experiment\n"
             "    Evolution:\n"
             "      cs - evolve control, small morphology, highLevel\n"
             "      cm - evolve control, medium morphology, highLevel\n"
@@ -1755,7 +1756,11 @@ void menu_experiments() {
     }
 
     if (!choice.empty()) {
-        if (choice == "cs") {
+        if (choice == "curr") {
+            gaitDifficultyFactor = 0.20;
+            evolveMorph = true;
+            experiments_evolve("nsga2", "", "lowLevelSplineGait");
+        } else if (choice == "cs") {
             experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "cm") {
             experiments_evolve("nsga2", "medium", "highLevelSplineGait");
