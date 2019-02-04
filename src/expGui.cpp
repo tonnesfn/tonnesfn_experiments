@@ -590,6 +590,10 @@ void cooldownServos(){
         std::cin.ignore();
 
         enableServos(servoConfigClient);
+        usleep(1000);
+        setServoSpeeds(0.01, servoConfigClient);
+        usleep(1000);
+        sendAngleCommand(restPose);
 
         std::cout << "Press enter to continue evolution";
         std::cin.ignore();
@@ -627,9 +631,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         usleep(1000);
     }
 
-    if (ros::Time::isSystemTime() && cooldownPromptEnabled && currentIndividual == popSize) {
-        // Code to stop for cooldown at the start of each new generation:
-        currentIndividual = 0; // !! This might cause issues !!
+    // Code to stop for cooldown at the start of each new generation:
+    if (ros::Time::isSystemTime() && cooldownPromptEnabled && (currentIndividual % popSize == 0) && (currentIndividual != 0)) {
+
+        sc->say("Generation done");
         cooldownServos();
     }
 
