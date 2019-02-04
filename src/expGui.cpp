@@ -1749,6 +1749,8 @@ void menu_experiments() {
 
     if (!choice.empty()) {
         if (choice == "curr") {
+            promptForConfirmation = true;
+            enableFitnessLog(get_gait_evaluation_client);
             gaitDifficultyFactor = 0.20;
             evolveMorph = true;
             experiments_evolve("nsga2", "", "lowLevelSplineGait");
