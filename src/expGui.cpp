@@ -802,7 +802,7 @@ std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> g
 
     std::map<std::string, double> phenoType;
 
-    phenoType["femurLength"]     = givenGenotype[0] * 25.0;          //  0    ->  25
+    phenoType["femurLength"]     = givenGenotype[0] * 50.0;          //  0    ->  50
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          //  0    ->  95
     phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
     phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
@@ -865,7 +865,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
 
     phenoType["difficultyFactor"] = gaitDifficultyFactor;
 
-    phenoType["femurLength"]     = givenGenotype[0] * 25.0;          // 0    -> 25
+    phenoType["femurLength"]     = givenGenotype[0] * 50.0;          // 0    -> 50
     phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
     phenoType["frequency"]       = (0.25 + (givenGenotype[3] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
@@ -1353,10 +1353,10 @@ void menu_demo() {
             setLegLengths(10.0, 10.0);
             fprintf(logOutput, "10mm morphology requested\n");
         } else if (choice == "mm") {
-            setLegLengths(12.5, 47.5);
+            setLegLengths(25.0, 47.5);
             fprintf(logOutput, "Medium morphology requested\n");
         } else if (choice == "ml") {
-            setLegLengths(25.0, 95.0);
+            setLegLengths(50.0, 95.0);
             fprintf(logOutput, "Large morphology requested\n");
         }
     }

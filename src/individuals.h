@@ -28,7 +28,7 @@ namespace individuals{
          {"wagPhase"        ,   0.000},
          {"wagAmplitude_x"  ,  15.000},
          {"wagAmplitude_y"  ,  10.000},
-         {"femurLength"     ,  20.000},
+         {"femurLength"     ,  25.000},
          {"tibiaLength"     ,  76.000},
          {"liftDuration"    ,   0.200}};
 
@@ -40,7 +40,7 @@ namespace individuals{
          {"wagPhase"        ,   0.00},
          {"wagAmplitude_x"  ,  15.00},
          {"wagAmplitude_y"  ,  10.00},
-         {"femurLength"     ,  25.00},
+         {"femurLength"     ,  50.00},
          {"tibiaLength"     ,  95.00},
          {"liftDuration"    ,   0.20}};
 
