@@ -589,9 +589,9 @@ void cooldownServos(){
         std::cin.ignore();
         std::cin.ignore();
 
-        enableServos(servoConfigClient);
         usleep(1000);
         setServoSpeeds(0.01, servoConfigClient);
+        enableServos(servoConfigClient);
         usleep(1000);
         sendAngleCommand(restPose);
 
