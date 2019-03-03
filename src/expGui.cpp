@@ -103,8 +103,8 @@ FILE *logOutput = stdout;
 
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
-int evaluationTimeout = 15;
-float evaluationDistance = 1500.0;
+int evaluationTimeout = 10;
+float evaluationDistance = 1000.0;
 int currentIndividual;
 std::vector<float> servoTemperatures(12);
 
