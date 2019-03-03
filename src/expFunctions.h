@@ -24,6 +24,7 @@ bool callServoConfigService(dyret_common::Configure givenCall, ros::ServiceClien
 bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClient);
 bool enableServos(ros::ServiceClient givenServoConfigClient);
 bool disableServos(ros::ServiceClient givenServoConfigClient);
+bool restartServos(ros::ServiceClient givenServoConfigClient);
 bool setServoSpeeds(float givenSpeed, ros::ServiceClient givenServoConfigClient);
 
 bool startGaitRecording(ros::ServiceClient get_gait_evaluation_client);

@@ -158,6 +158,15 @@ bool sendServoTorqueMessage(bool enable, ros::ServiceClient givenServoConfigClie
     return callServoConfigService(srv, givenServoConfigClient);
 }
 
+bool restartServos(ros::ServiceClient givenServoConfigClient){
+  dyret_common::Configure srv;
+
+  srv.request.configuration.revolute.type = dyret_common::RevoluteConfig::TYPE_RESTART;
+  srv.request.configuration.revolute.ids = {0,1,2,3,4,5,6,7,8,9,10,11,12};
+
+  return callServoConfigService(srv, givenServoConfigClient);
+}
+
 bool enableServos(ros::ServiceClient givenServoConfigClient){
     return sendServoTorqueMessage(true, givenServoConfigClient);
 }

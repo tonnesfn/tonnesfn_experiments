@@ -950,7 +950,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
-            fprintf(logOutput, "Select action: continue (enter), retry (r), discard (b):\n");
+            fprintf(logOutput, "  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
 
             std::string temp;
             std::getline(std::cin, temp);
@@ -963,8 +963,17 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                 fitnessResult["Stability"] = -1;
                 fitnessResult["MocapSpeed"] = 0;
                 ROS_WARN("Discarding individual");
+            } else if (temp == "d"){
+                restartServos(servoConfigClient);
+                ROS_WARN("Servos restarted");
+                sleep(10);
+                validSolution = false;
+                currentIndividual--;
+                fprintf(logOutput, "  Press enter when ready to retry");
+                std::getline(std::cin, temp);
+
             } else if (temp.length() > 0){
-                ROS_WARN("Unknown input! Continuing");
+                ROS_WARN("Unknown input! Retrying");
             }
         } else {
 
