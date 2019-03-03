@@ -571,12 +571,12 @@ void runGaitWithServiceCalls(){
 
 void cooldownServos(){
     getMaxServoTemperature(true);
-    fprintf(logOutput, "Cooldown to 50C? (y/n) > ");
+    fprintf(logOutput, "Cooldown? TURNS OFF SERVOS! (y/n) > ");
 
-    char choice;
-    scanf(" %c", &choice);
+    std::string input;
+    getline(std::cin, input);
 
-    if (choice == 'y') {
+    if (input == "y") {
         disableServos(servoConfigClient);
         long long int currentTime = getMs();
         fprintf(logOutput, "00.0 ");
@@ -585,9 +585,9 @@ void cooldownServos(){
             fprintf(logOutput, "%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
         }
 
+        std::string input;
         std::cout << "Press enter to enable servos";
-        std::cin.ignore();
-        std::cin.ignore();
+        getline(std::cin, input);
 
         usleep(1000);
         setServoSpeeds(0.01, servoConfigClient);
@@ -596,7 +596,7 @@ void cooldownServos(){
         sendAngleCommand(restPose);
 
         std::cout << "Press enter to continue evolution";
-        std::cin.ignore();
+        getline(std::cin, input);
     }
 }
 
@@ -1001,32 +1001,16 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     exit(-1);
                     break;
                 } else {
-                    fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard/(c)ooldown): ");
+                    fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard: ");
 
-                    char choice;
-                    scanf(" %c", &choice);
+                    std::string choice;
+                    getline(std::cin, choice);
 
-                    if (choice == 'd') { // Discard
+                    if (choice == "d") { // Discard
                         fitnessResult.clear();
 
                         fprintf(logOutput, "Discarding\n");
                         validSolution = true;
-                    } else if (choice == 'c') { // Cooldown
-                        ROS_ERROR("Not implemented!"); //TODO: implement this
-                        //disableServos(servoConfigClient, actionMessages_pub);
-                        fprintf(logOutput, "Servos disabled\n");
-
-                        while (getMaxServoTemperature(true) > 50) { sleep(15); }
-
-                        ROS_ERROR("Not implemented!"); //TODO: implement this
-                        //enableServos(actionMessages_pub);
-
-                        std::cout << "Press enter to continue evolution";
-                        std::cin.ignore();
-                        std::cin.ignore();
-
-                        currentIndividual--;
-                        validSolution = false;
                     } else { // Retry
                         if (ros::Time::isSimTime()) {
                             sleep(5);
@@ -1531,6 +1515,7 @@ void experiments_verifyFitness() {
 
     int numberOfTests;
     std::cin >> numberOfTests;
+    std::cin.clear();
     std::cin.ignore(10000, '\n');
 
     time_t t = time(0);   // get time now
@@ -1623,6 +1608,7 @@ void experiments_randomSearch() {
     if (commandQueue.empty()) {
         std::cin >> numberOfTests;
         std::cin.ignore(10000, '\n');
+        std::cin.clear();
     } else {
         numberOfTests = std::stoi(commandQueue[0]);
         fprintf(logOutput, "*%d*\n", numberOfTests);
@@ -1862,6 +1848,7 @@ void menu_configure() {
         } else if (choice == "f") {
             fprintf(logOutput, "  Frequency factor> ");
             std::cin >> frequencyFactor;
+            std::cin.clear();
             std::cin.ignore(10000, '\n');
             fprintf(logOutput, "  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "r") {
