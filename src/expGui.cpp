@@ -514,7 +514,7 @@ void runGaitControllerWithActionMessage(bool forward){
     // Stop walking
     stopWalking();
 
-    sc->play(sound_play::SoundRequest::BACKINGUP);
+    sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
 
 }
 
@@ -1785,6 +1785,7 @@ void menu_configure() {
 
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
+    fprintf(logOutput, "    y - test sound node\n");
     fprintf(logOutput, "    p - enable/disable evaluation prompt\n");
     fprintf(logOutput, "    l - enable/disable fitness logging\n");
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
@@ -1813,6 +1814,13 @@ void menu_configure() {
             if (instantFitness == true) fprintf(logOutput, "Instant fitness evaluation now enabled!\n");
             else
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
+        } else if (choice == "y") {
+          while(true) {
+            sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
+            sleep(1);
+            //sc->play(sound_play::SoundRequest::BACKINGUP);
+            sleep(3);
+          }
         } else if (choice == "p") {
 
             promptForConfirmation = !promptForConfirmation;
