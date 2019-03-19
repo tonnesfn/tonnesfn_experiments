@@ -296,3 +296,10 @@ void stopVideo() {
   }
 
 }
+
+void playSound(std::string soundName){
+
+  std::string path = ros::package::getPath("tonnesfn_experiments");
+  std::string command = "canberra-gtk-play -f " + path + "/sound/" + soundName + ".wav";
+
+}

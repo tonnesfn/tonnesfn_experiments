@@ -1307,7 +1307,8 @@ void menu_demo() {
                        "    mm - Request medium morphology\n"
                        "    ml - Request large morphology\n"
                        "    cs - Start camera\n"
-                       "    ch - Stop camera\n");
+                       "    ch - Stop camera\n"
+                       "    b - Test beeps\n");
     fprintf(logOutput, "\n> ");
 
     if (commandQueue.empty()) {
@@ -1369,6 +1370,8 @@ void menu_demo() {
         } else if (choice == "ch") { // Stop camera
           printf("Stop camera:\n");
           stopVideo();
+        } else if (choice == "b"){ // Test beep
+          playSound("beep-01");
         }
     }
     enableLogging = true;

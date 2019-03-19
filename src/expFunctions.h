@@ -3,6 +3,7 @@
 
 #include <string>
 #include "ros/ros.h"
+#include <ros/package.h>
 
 #include <gazebo/transport/transport.hh>
 
@@ -41,6 +42,8 @@ void unpauseGazebo();
 
 void startVideo(std::string fileName);
 void stopVideo();
+
+void playSound(std::string soundName);
 
 namespace gazebo {
     class WorldConnection {
