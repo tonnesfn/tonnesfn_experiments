@@ -28,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
   dyret_hardware
   dyret_controller
   rosbag
+  camera_recorder
 )
 
 find_package(Boost REQUIRED COMPONENTS 

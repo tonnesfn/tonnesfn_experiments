@@ -2,4 +2,5 @@
   <include file="$(find dyret_controller)/launch/fullController.launch" />
   <include file="$(find dyret_hardware)/launch/standalone.launch" />
   <node name="soundplay_node" pkg="sound_play" type="soundplay_node.py"/>
+  <include file="$(find camera_recorder)/launch/init.launch" />
 </launch>

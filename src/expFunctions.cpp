@@ -269,3 +269,30 @@ bool setServoPIDs(std::vector<double> givenPIDs, ros::ServiceClient givenConfigu
     callConfigurationService(msg, givenConfigurationService);
 
 }
+
+void startVideo(std::string fileName) {
+
+  ROS_INFO("Starting video and saving to %s", fileName.c_str());
+
+  camera_recorder::Record srv;
+  srv.request.output = fileName;
+  srv.request.overwrite = true;
+
+  // First pause physics:
+  ros::service::call("/camera_recorder/start", srv);
+
+  if (!srv.response.success){
+    ROS_ERROR("Start recording not successful: %s", srv.response.message.c_str());
+  }
+}
+
+void stopVideo() {
+  std_srvs::Trigger srv;
+
+  ros::service::call("/camera_recorder/stop", srv);
+
+  if (!srv.response.success){
+    ROS_ERROR("Stop recording not successful: %s", srv.response.message.c_str());
+  }
+
+}

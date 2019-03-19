@@ -12,6 +12,7 @@
 
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
+#include <std_srvs/Trigger.h>
 
 #include <dynamic_reconfigure/DoubleParameter.h>
 #include <dynamic_reconfigure/Reconfigure.h>
@@ -32,6 +33,9 @@
 #include "dyret_controller/GetInferredPosition.h"
 #include "dyret_controller/GaitControllerCommandService.h"
 #include "dyret_controller/LoggerCommand.h"
+
+#include "camera_recorder/Configure.h"
+#include "camera_recorder/Record.h"
 
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
@@ -480,6 +484,12 @@ void runGaitControllerWithActionMessage(bool forward){
     if (!ros::Time::isSimTime() && enableLogging) {
         initLog(std::to_string(currentIndividual) + direction);
         startLogging();
+
+        std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/video/";
+        mkdir(logPath.c_str(), 0700);
+
+        startVideo(logPath + std::to_string(currentIndividual) + direction + ".mp4");
+
     }
 
     // Start fitness recording
@@ -509,6 +519,7 @@ void runGaitControllerWithActionMessage(bool forward){
     // Save and stop bag logging
     if (!ros::Time::isSimTime() && enableLogging) {
         saveLog();
+        stopVideo();
     }
 
     // Stop walking
@@ -658,6 +669,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         pauseGazebo();
         ros::spinOnce();
     }
+
+    //start
 
     // Run gait
     if (ros::Time::isSystemTime() || useActionMessageInSim) {
@@ -1289,11 +1302,12 @@ void menu_demo() {
                        "    ss - Test small robot (small HLSC)\n"
                        "    ls - Test large robot (small HLSC)\n"
                        "    ll - Test large robot (large HLSC)\n"
-                       "    cs - Test low level spline control (small LLSC)\n"
                        "    ms - Request small morphology\n"
                        "    mx - Request 10mm morphology\n"
                        "    mm - Request medium morphology\n"
-                       "    ml - Request large morphology\n");
+                       "    ml - Request large morphology\n"
+                       "    cs - Start camera\n"
+                       "    ch - Stop camera\n");
     fprintf(logOutput, "\n> ");
 
     if (commandQueue.empty()) {
@@ -1337,8 +1351,6 @@ void menu_demo() {
             run_individual("highLevelSplineGait", individuals::largeRobotSmallControl);
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
-        } else if (choice == "cs") {
-            ROS_ERROR("Not implemented!"); //TODO: implement this
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
@@ -1351,6 +1363,12 @@ void menu_demo() {
         } else if (choice == "ml") {
             setLegLengths(50.0, 95.0);
             fprintf(logOutput, "Large morphology requested\n");
+        } else if (choice == "cs") { // Start camera
+          printf("Start camera:\n");
+          startVideo("/home/tonnesfn/test.mp4");
+        } else if (choice == "ch") { // Stop camera
+          printf("Stop camera:\n");
+          stopVideo();
         }
     }
     enableLogging = true;

@@ -15,6 +15,11 @@
 #include "dyret_controller/GetGaitEvaluation.h"
 #include "dyret_controller/GetGaitControllerStatus.h"
 
+#include "camera_recorder/Configure.h"
+#include "camera_recorder/Record.h"
+
+#include <std_srvs/Trigger.h>
+
 std::string trim(std::string& str);
 void printMap(std::map<std::string, double> givenMap, std::string givenLeadingString, FILE * givenDestination);
 
@@ -33,6 +38,9 @@ bool pauseGaitRecording(ros::ServiceClient get_gait_evaluation_client);
 
 void pauseGazebo();
 void unpauseGazebo();
+
+void startVideo(std::string fileName);
+void stopVideo();
 
 namespace gazebo {
     class WorldConnection {
