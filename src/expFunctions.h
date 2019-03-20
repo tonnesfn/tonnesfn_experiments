@@ -43,7 +43,7 @@ void unpauseGazebo();
 void startVideo(std::string fileName);
 void stopVideo();
 
-void playSound(std::string soundName);
+void playSound(std::string soundName, int number = 1);
 
 namespace gazebo {
     class WorldConnection {

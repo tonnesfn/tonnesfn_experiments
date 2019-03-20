@@ -21,7 +21,6 @@
   <build_depend>dyret_controller</build_depend>
   <build_depend>gazebo_dev</build_depend>
   <build_depend>gazebo_msgs</build_depend>
-  <build_depend>sound_play</build_depend>
   <build_depend>camera_recorder</build_depend>
 
   <run_depend>message_runtime</run_depend>

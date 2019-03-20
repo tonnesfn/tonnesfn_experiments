@@ -51,8 +51,6 @@
 #include "external/sferes_mapelites/stat_map.hpp"
 #include "external/sferes_mapelites/stat_map_binary.hpp"
 
-#include <sound_play/sound_play.h>
-
 #include <boost/program_options.hpp>
 
 #include <sstream>
@@ -77,8 +75,6 @@ ros::Subscriber gaitInferredPos_sub;
 ros::Publisher poseCommand_pub;
 
 gazebo::WorldConnection* gz;
-
-sound_play::SoundClient* sc;
 
 // Configuration:
 const bool skipReverseEvaluation = false; // Only evaluate forwards, not back again
@@ -468,7 +464,7 @@ bool saveLog(){
 
 void runGaitControllerWithActionMessage(bool forward){
 
-    sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
+    playSound("beep_01");
 
     sleep(1);
 
@@ -525,7 +521,7 @@ void runGaitControllerWithActionMessage(bool forward){
     // Stop walking
     stopWalking();
 
-    sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
+    playSound("beep_02");
 
 }
 
@@ -644,8 +640,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Code to stop for cooldown at the start of each new generation:
     if (ros::Time::isSystemTime() && cooldownPromptEnabled && (currentIndividual % popSize == 0) && (currentIndividual != 0)) {
-
-        sc->say("Generation done");
+        playSound("info_generationdone");
         cooldownServos();
     }
 
@@ -794,7 +789,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
-        sc->say("Mocap warning");
+        playSound("warning_mocap");
     }
 
     fprintf(logOutput, "\n");
@@ -1371,7 +1366,7 @@ void menu_demo() {
           printf("Stop camera:\n");
           stopVideo();
         } else if (choice == "b"){ // Test beep
-          playSound("beep-01");
+          playSound("beep-01", 3);
         }
     }
     enableLogging = true;
@@ -1837,9 +1832,9 @@ void menu_configure() {
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
         } else if (choice == "y") {
           while(true) {
-            sc->play(sound_play::SoundRequest::NEEDS_PLUGGING);
+            playSound("beep-03", 3);
             sleep(1);
-            //sc->play(sound_play::SoundRequest::BACKINGUP);
+            playSound("beep-01", 3);
             sleep(3);
           }
         } else if (choice == "p") {
@@ -1948,8 +1943,6 @@ int main(int argc, char **argv) {
 
     ros::AsyncSpinner spinner(1);
     spinner.start();
-
-    sc = new sound_play::SoundClient();
 
     std::string evoInfo = "testInfo";
 

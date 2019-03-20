@@ -297,9 +297,12 @@ void stopVideo() {
 
 }
 
-void playSound(std::string soundName){
+void playSound(std::string soundName, int number){
 
   std::string path = ros::package::getPath("tonnesfn_experiments");
   std::string command = "canberra-gtk-play -f " + path + "/sound/" + soundName + ".wav";
 
+  for (int i = 0; i < number; i++){
+    system(command.c_str());
+  }
 }
