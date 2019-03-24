@@ -1,5 +1,15 @@
 <launch>
   <include file="$(find dyret_controller)/launch/fullController.launch" />
   <include file="$(find dyret_hardware)/launch/standalone.launch" />
-  <include file="$(find camera_recorder)/launch/init.launch" />
+
+  <include file="$(find camera_recorder)/launch/init.launch">
+    <param name="source" value="$(arg source)" type="str" />
+    <param name="size" value="$(arg size)" type="str" />
+    <param name="format" value="$(arg format)" type="str" />
+    <param name="framerate" value="$(arg rate)" type="int" />
+    <param name="vflip" value="$(arg vflip)" type="bool" />
+    <param name="hflip" value="$(arg hflip)" type="bool" />
+    <param name="copy" value="$(arg copy)" type="bool" />
+  </include>
+
 </launch>
