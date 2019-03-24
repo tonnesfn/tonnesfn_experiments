@@ -300,6 +300,18 @@ void setLegLengths(float femurLengths, float tibiaLengths) {
     poseCommand_pub.publish(msg);
 }
 
+void setLegLengths(float lengths) {
+  dyret_common::Pose msg;
+
+  msg.header.stamp = ros::Time().now();
+
+  msg.prismatic.resize(1);
+
+  msg.prismatic[0] = lengths;
+
+  poseCommand_pub.publish(msg);
+}
+
 void sendAngleCommand(std::vector<float> angles){
     dyret_common::Pose msg;
 
@@ -1801,7 +1813,7 @@ void menu_configure() {
 
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
-    fprintf(logOutput, "    y - test sound node\n");
+    fprintf(logOutput, "    z - zero prismatic joints\n");
     fprintf(logOutput, "    p - enable/disable evaluation prompt\n");
     fprintf(logOutput, "    l - enable/disable fitness logging\n");
     fprintf(logOutput, "    i - enable/disable instant fitness\n");
@@ -1830,6 +1842,8 @@ void menu_configure() {
             if (instantFitness == true) fprintf(logOutput, "Instant fitness evaluation now enabled!\n");
             else
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
+        } else if (choice == "z") { // Zero prismatic joints
+          setLegLengths(-1000.0);
         } else if (choice == "y") {
           while(true) {
             playSound("beep-03", 3);
