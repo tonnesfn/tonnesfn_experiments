@@ -476,7 +476,7 @@ bool saveLog(){
 
 void runGaitControllerWithActionMessage(bool forward){
 
-    playSound("beep_01");
+    playSound("beep_low");
 
     sleep(1);
 
@@ -533,7 +533,7 @@ void runGaitControllerWithActionMessage(bool forward){
     // Stop walking
     stopWalking();
 
-    playSound("beep_02");
+    playSound("beep_high");
 
 }
 
@@ -1378,7 +1378,7 @@ void menu_demo() {
           printf("Stop camera:\n");
           stopVideo();
         } else if (choice == "b"){ // Test beep
-          playSound("beep-01", 3);
+          playSound("beep_low", 3);
         }
     }
     enableLogging = true;
@@ -1846,9 +1846,9 @@ void menu_configure() {
           setLegLengths(-1000.0);
         } else if (choice == "y") {
           while(true) {
-            playSound("beep-03", 3);
+            playSound("beep_high", 3);
             sleep(1);
-            playSound("beep-01", 3);
+            playSound("beep_low", 3);
             sleep(3);
           }
         } else if (choice == "p") {
