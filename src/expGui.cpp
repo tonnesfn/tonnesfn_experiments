@@ -77,7 +77,7 @@ ros::Publisher poseCommand_pub;
 gazebo::WorldConnection* gz;
 
 // Configuration:
-const bool skipReverseEvaluation = false; // Only evaluate forwards, not back again
+const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
 const int numberOfEvalsInTesting = 1;
 
 const bool useStopCondition = false;    // Use stop condition in evolution
