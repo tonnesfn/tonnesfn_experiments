@@ -137,6 +137,20 @@ std::vector<std::string> fitnessFunctions; // Used to specify which fitness func
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
 std::string fullCommand; // Used to store commands from the arguments permanently
 
+std::string getInputFromTerminal(std::string output){
+
+  printf("%s> ", output.c_str());
+
+  std::cin.sync();
+  std::cin.clear();
+
+  std::string input;
+  getline(std::cin, input);
+
+  return input;
+
+}
+
 bool legsAtRest(){
   for (int i = 0; i < 8; i++){
     if (prismaticActuatorStates[i] != 0){
@@ -1010,29 +1024,28 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
-            fprintf(logOutput, "  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
+            //fprintf(logOutput, "  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
 
-            std::string temp;
-            std::getline(std::cin, temp);
+            std::string input = getInputFromTerminal("  Select action: continue (enter), retry (r), discard (b), restart servos (d):");
 
-            if (temp == "r"){
+            if (input == "r"){
                 validSolution = false;
                 currentIndividual--;
                 ROS_WARN("Retrying individual");
-            } else if (temp == "b"){
+            } else if (input == "b"){
                 fitnessResult["Stability"] = -1;
                 fitnessResult["MocapSpeed"] = 0;
                 ROS_WARN("Discarding individual");
-            } else if (temp == "d"){
+            } else if (input == "d"){
                 restartServos(servoConfigClient);
                 ROS_WARN("Servos restarted");
                 sleep(10);
                 validSolution = false;
                 currentIndividual--;
                 fprintf(logOutput, "  Press enter when ready to retry");
-                std::getline(std::cin, temp);
+                std::getline(std::cin, input);
 
-            } else if (temp.length() > 0){
+            } else if (input.length() > 0){
                 ROS_WARN("Unknown input! Retrying");
             }
         } else {
