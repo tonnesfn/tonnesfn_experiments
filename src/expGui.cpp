@@ -37,6 +37,8 @@
 #include "camera_recorder/Configure.h"
 #include "camera_recorder/Record.h"
 
+#include "dyret_hardware/ActuatorBoardState.h"
+
 #include "external/sferes/phen/parameters.hpp"
 #include "external/sferes/gen/evo_float.hpp"
 #include "external/sferes/ea/nsga2.hpp"
@@ -71,6 +73,7 @@ ros::ServiceClient gaitConfiguration_client;
 ros::ServiceClient gaitCommandService_client;
 ros::ServiceClient loggerCommandService_client;
 ros::Subscriber dyretState_sub;
+ros::Subscriber actuator_boardState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher poseCommand_pub;
 
@@ -91,6 +94,8 @@ const bool useActionMessageInSim = true; // Use action message (or manual steppi
 const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
 
 //
+
+int prismaticActuatorStates[8];
 
 bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
 bool currentlyLoggingFitness = false; // Whether gaitEvaluator is logging fitness or not
@@ -131,6 +136,58 @@ std::vector<std::vector<float>> lastOptimalParents;
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
 std::string fullCommand; // Used to store commands from the arguments permanently
+
+bool legsAtRest(){
+  for (int i = 0; i < 8; i++){
+    if (prismaticActuatorStates[i] != 0){
+      return false;
+    }
+  }
+  return true;
+}
+
+void setLegLengths(float femurLengths, float tibiaLengths) {
+  dyret_common::Pose msg;
+
+  msg.header.stamp = ros::Time().now();
+
+  msg.prismatic.resize(2);
+
+  msg.prismatic[0] = femurLengths;
+  msg.prismatic[1] = tibiaLengths;
+
+  poseCommand_pub.publish(msg);
+}
+
+void setLegLengths(float lengths) {
+  dyret_common::Pose msg;
+
+  msg.header.stamp = ros::Time().now();
+
+  msg.prismatic.resize(1);
+
+  msg.prismatic[0] = lengths;
+
+  poseCommand_pub.publish(msg);
+}
+
+void zeroPrismaticActuators(){
+  // Set all lengths to 5mm
+  setLegLengths(5.0, 5.0);
+
+  // Wait for actuators to go to rest
+  sleep(1);
+  while(!legsAtRest()){}
+  sleep(1);
+
+  // Set all lengths to -100mm
+  setLegLengths(-100.0, -100.0);
+
+  // Wait for actuators to go to rest
+  sleep(1);
+  while(!legsAtRest()){}
+  sleep(1);
+}
 
 bool automatedRun() {
     return !fullCommand.empty();
@@ -287,31 +344,6 @@ bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
     return false;
 }
 
-void setLegLengths(float femurLengths, float tibiaLengths) {
-    dyret_common::Pose msg;
-
-    msg.header.stamp = ros::Time().now();
-
-    msg.prismatic.resize(2);
-
-    msg.prismatic[0] = femurLengths;
-    msg.prismatic[1] = tibiaLengths;
-
-    poseCommand_pub.publish(msg);
-}
-
-void setLegLengths(float lengths) {
-  dyret_common::Pose msg;
-
-  msg.header.stamp = ros::Time().now();
-
-  msg.prismatic.resize(1);
-
-  msg.prismatic[0] = lengths;
-
-  poseCommand_pub.publish(msg);
-}
-
 void sendAngleCommand(std::vector<float> angles){
     dyret_common::Pose msg;
 
@@ -332,6 +364,14 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
     for (int i = 0; i < msg->revolute.size(); i++){
         servoTemperatures[i] = msg->revolute[i].temperature;
     }
+
+}
+
+void actuator_boardStateCallback(const dyret_hardware::ActuatorBoardState::ConstPtr &msg) {
+
+  for (int i = 0; i < 8; i++){
+    prismaticActuatorStates[i] = msg->status[i];
+  }
 
 }
 
@@ -1776,6 +1816,13 @@ void menu_experiments() {
             enableFitnessLog(get_gait_evaluation_client);
             gaitDifficultyFactor = 0.20;
             evolveMorph = true;
+
+            printf("  Press enter when robot is ready and on the ground>");
+            std::string input;
+            getline(std::cin, input);
+
+            zeroPrismaticActuators();
+
             experiments_evolve("nsga2", "", "lowLevelSplineGait");
         } else if (choice == "cs") {
             experiments_evolve("nsga2", "small", "highLevelSplineGait");
@@ -1843,7 +1890,7 @@ void menu_configure() {
             else
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
         } else if (choice == "z") { // Zero prismatic joints
-          setLegLengths(-1000.0);
+          zeroPrismaticActuators();
         } else if (choice == "y") {
           while(true) {
             playSound("beep_high", 3);
@@ -1951,6 +1998,7 @@ int main(int argc, char **argv) {
 
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
+    actuator_boardState_sub = rch.subscribe("/dyret/actuator_board/state", 1, actuator_boardStateCallback);
 
     waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
     waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
