@@ -530,8 +530,6 @@ bool saveLog(){
 
 void runGaitControllerWithActionMessage(bool forward){
 
-    playSound("beep_low");
-
     sleep(1);
 
     resetGaitRecording(get_gait_evaluation_client);
@@ -732,6 +730,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     //start
+    playSound("beep_low");
+    getInputFromTerminal("  Press enter when ready");
 
     // Run gait
     if (ros::Time::isSystemTime() || useActionMessageInSim) {
