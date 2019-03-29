@@ -4,13 +4,13 @@
   <include file="$(find dyret_hardware)/launch/monitor.launch" />
 
   <include file="$(find camera_recorder)/launch/init.launch">
-    <param name="source" value="$(arg source)" type="str" />
-    <param name="size" value="$(arg size)" type="str" />
-    <param name="format" value="$(arg format)" type="str" />
-    <param name="framerate" value="$(arg rate)" type="int" />
-    <param name="vflip" value="$(arg vflip)" type="bool" />
-    <param name="hflip" value="$(arg hflip)" type="bool" />
-    <param name="copy" value="$(arg copy)" type="bool" />
+    <param name="source" value="/dev/video0" type="str" />
+    <param name="size" value="1280x720" type="str" />
+    <param name="format" value="mjpeg" type="str" />
+    <param name="framerate" value="90" type="int" />
+    <param name="vflip" value="false" type="bool" />
+    <param name="hflip" value="false" type="bool" />
+    <param name="copy" value="true" type="bool" />
   </include>
 
 </launch>
