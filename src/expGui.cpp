@@ -311,6 +311,7 @@ bool disableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
 }
 
 void setGaitParams(std::string gaitName,
+                   std::string logFilePath,
                    bool directionForward,
                    bool prepareForGait,
                    float femurLength,
@@ -321,6 +322,7 @@ void setGaitParams(std::string gaitName,
     dyret_controller::ConfigureGait srv;
 
     srv.request.gaitConfiguration.gaitName           = gaitName;
+    srv.request.gaitConfiguration.logFilePath        = logFilePath;
     srv.request.gaitConfiguration.directionForward   = directionForward;
     srv.request.gaitConfiguration.prepareForGait     = prepareForGait;
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
@@ -337,7 +339,7 @@ void setGaitParams(std::string gaitName,
     gaitConfiguration_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName, bool directionForward, bool prepareForGait, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitName, std::string logFilePath, bool directionForward, bool prepareForGait, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -345,7 +347,8 @@ void setGaitParams(std::string gaitName, bool directionForward, bool prepareForG
         parameterNames.push_back(elem.first);
         parametervalues.push_back((float) elem.second);
     }
-    setGaitParams(gaitName, directionForward, prepareForGait, femurLength, tibiaLength, parameterNames, parametervalues);
+
+    setGaitParams(gaitName, logFilePath, directionForward, prepareForGait, femurLength, tibiaLength, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -719,9 +722,13 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
     }
 
+
+    std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/splines/";
+    mkdir(logPath.c_str(), 0700);
+
     // Set gait parameters
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-    setGaitParams(gaitType, true, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -780,7 +787,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         // Set gait parameters
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-        setGaitParams(gaitType, false, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+        setGaitParams(gaitType, "", false, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
 
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
             ros::spinOnce();
