@@ -3,6 +3,8 @@
   <include file="$(find dyret_hardware)/launch/labSetup.launch" />
   <include file="$(find dyret_hardware)/launch/monitor.launch" />
 
+    <node pkg="dyret_hardware" name="mocapMonitor" type="mocapMonitor.py" required="false" />
+
   <include file="$(find camera_recorder)/launch/init.launch">
     <arg name="source" value="/dev/video0" />
     <arg name="size" value="1280x720" />
