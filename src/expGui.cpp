@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "ros/ros.h"
+#include "ros/package.h"
 
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
@@ -338,6 +339,8 @@ void setGaitParams(std::string gaitName,
 
     gaitConfiguration_client.call(srv);
 }
+
+
 
 void setGaitParams(std::string gaitName, std::string logFilePath, bool directionForward, bool prepareForGait, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
@@ -1470,6 +1473,40 @@ std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) 
     return ss.str();
 }
 
+std::string getCommitHash(std::string packageName) {
+
+    std::string path = ros::package::getPath(packageName.c_str());
+    std::string command = ("git -C " + path + " rev-parse HEAD").c_str();
+
+    std::array<char, 128> buffer;
+    std::string result = packageName + ": ";
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(command.c_str(), "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
+}
+
+void writeVersionLog(std::string givenLogDirectory){
+
+
+  fprintf(stderr, "Writing version info to %s\n", givenLogDirectory.c_str());
+
+  FILE *versionLog = fopen((givenLogDirectory + "versions.txt").c_str(), "w");
+
+  std::string packages[] = {"tonnesfn_experiments", "dyret_common", "dyret_controller", "dyret_hardware", "camera_recorder", "xsens_driver", "mocap_optitrack", "rosserial_arduino"};
+
+  for (const std::string &package : packages){
+    fprintf(versionLog, "%s", getCommitHash(package).c_str());
+  }
+
+  fclose(versionLog);
+
+}
+
 void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, const std::string givenController) {
     if (givenAlgorithm != "map-elites" && givenAlgorithm != "nsga2") {
         ROS_ERROR("Unknown evolution algorithm: %s", givenAlgorithm.c_str());
@@ -1503,6 +1540,8 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
     if (evoLog == NULL) {
         ROS_ERROR("evoLog could not be opened (err%d)\n", errno);
     }
+
+    writeVersionLog(experimentDirectory);
 
     char hostname[1024];
     gethostname(hostname, 1024);
