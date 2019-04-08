@@ -7,9 +7,9 @@
 
   <include file="$(find camera_recorder)/launch/init.launch">
     <arg name="source" value="/dev/video0" />
-    <arg name="size" value="1280x720" />
+    <arg name="size" value="1920x1080" />
     <arg name="format" value="mjpeg" />
-    <arg name="rate" value="90" />
+    <arg name="rate" value="24" />
     <arg name="vflip" value="false"  />
     <arg name="hflip" value="false" />
     <arg name="copy" value="true" />
