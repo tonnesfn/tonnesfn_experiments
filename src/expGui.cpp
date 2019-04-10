@@ -186,14 +186,17 @@ void setLegLengths(float lengths) {
   poseCommand_pub.publish(msg);
 }
 
-void zeroPrismaticActuators(){
-  // Set all lengths to 5mm
-  setLegLengths(5.0, 5.0);
+void zeroPrismaticActuators(bool runOutFirst){
 
-  // Wait for actuators to go to rest
-  sleep(1);
-  while(!legsAtRest()){}
-  sleep(1);
+  if (runOutFirst) {
+    // Set all lengths to 5mm
+    setLegLengths(5.0, 5.0);
+
+    // Wait for actuators to go to rest
+    sleep(1);
+    while (!legsAtRest() && ros::ok()) {}
+    sleep(1);
+  }
 
   // Set all lengths to -100mm
   setLegLengths(-100.0, -100.0);
@@ -1036,7 +1039,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         if (promptForConfirmation) {
             //fprintf(logOutput, "  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
 
-            std::string input = getInputFromTerminal("  Select action: continue (enter), retry (r), discard (b), restart servos (d):");
+            std::string input = getInputFromTerminal("  Action: continue (enter), retry (r), discard (b), restart servos (d), zero linear actuators (z):");
 
             if (input == "r"){
                 validSolution = false;
@@ -1054,7 +1057,9 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                 currentIndividual--;
                 fprintf(logOutput, "  Press enter when ready to retry");
                 std::getline(std::cin, input);
-
+            } else if (input == "z"){
+                fprintf(logOutput, "  Zeroing actuators\n");
+                zeroPrismaticActuators(false);
             } else if (input.length() > 0){
                 ROS_WARN("Unknown input! Retrying");
             }
@@ -1880,7 +1885,7 @@ void menu_experiments() {
             std::string input;
             getline(std::cin, input);
 
-            zeroPrismaticActuators();
+            zeroPrismaticActuators(true);
 
             experiments_evolve("nsga2", "", "lowLevelSplineGait");
         } else if (choice == "cs") {
@@ -1949,7 +1954,7 @@ void menu_configure() {
             else
                 fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
         } else if (choice == "z") { // Zero prismatic joints
-          zeroPrismaticActuators();
+          zeroPrismaticActuators(true);
         } else if (choice == "y") {
           while(true) {
             playSound("beep_high", 3);
