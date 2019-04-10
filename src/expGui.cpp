@@ -1381,6 +1381,7 @@ void menu_demo() {
                        "    mx - Request 10mm morphology\n"
                        "    mm - Request medium morphology\n"
                        "    ml - Request large morphology\n"
+                       "    mt - Test morphology changes\n"
                        "    cs - Start camera\n"
                        "    ch - Stop camera\n"
                        "    b - Test beeps\n");
@@ -1439,6 +1440,19 @@ void menu_demo() {
         } else if (choice == "ml") {
             setLegLengths(50.0, 95.0);
             fprintf(logOutput, "Large morphology requested\n");
+        }else if (choice == "mt") {
+            while(ros::ok()) {
+              setLegLengths(40.0, 40.0);
+              printf("  Leg lengths set to 40/40\n");
+              sleep(1);
+              while (!legsAtRest() && ros::ok()) {}
+              sleep(1);
+              setLegLengths(5.0, 5.0);
+              printf("  Leg lengths set to 5/5\n");
+              sleep(1);
+              while (!legsAtRest() && ros::ok()) {}
+              sleep(1);
+            }
         } else if (choice == "cs") { // Start camera
           printf("Start camera:\n");
           startVideo("/home/tonnesfn/test.mp4");
