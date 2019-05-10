@@ -60,6 +60,7 @@
 #include <iostream>
 
 #include "individuals.h"
+#include "individuals_journal2019.h"
 
 #include "evoSettings.h"
 
@@ -89,10 +90,12 @@ const int evalsWithoutImprovement = 64; // Number of individuals without improve
 
 const std::string resumeFile = ""; // File to resume. Does not resume if empty
 
-const bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
-
 const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
 const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
+
+const int verificationEvals = 30;
+
+bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
 //
 
@@ -1442,8 +1445,8 @@ void menu_demo() {
             fprintf(logOutput, "Large morphology requested\n");
         }else if (choice == "mt") {
             while(ros::ok()) {
-              setLegLengths(40.0, 40.0);
-              printf("  Leg lengths set to 40/40\n");
+              setLegLengths(10.0, 10.0);
+              printf("  Leg lengths set to 10/10\n");
               sleep(1);
               while (!legsAtRest() && ros::ok()) {}
               sleep(1);
@@ -1653,24 +1656,43 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
 
 };
 
+bool directoryExists(std::string givenPath){
+  struct stat info;
+
+  if(stat(givenPath.c_str(), &info ) != 0 ) {
+    return false;
+  } else if( info.st_mode & S_IFDIR ) {
+    return true;
+  }
+  return false;
+}
+
 void experiments_verifyFitness() {
     currentIndividual = 0;
+    cooldownPromptEnabled = false;
 
-    std::cout << "Testing high level control on smallRobotSmallControl:\n";
-    std::cout << "  How many individuals do you want to test? >";
+    std::cout << "  Which ID do you want to test? > ";
 
-    int numberOfTests;
-    std::cin >> numberOfTests;
-    std::cin.clear();
+    int individualId;
+
+    std::cin >> individualId;
     std::cin.ignore(10000, '\n');
 
-    time_t t = time(0);   // get time now
-    struct tm *now = localtime(&t);
-
-    std::string logDirectory = createExperimentDirectory("ver", now);
+    char originalSurface = individuals_journal2019_names[individualId].c_str()[20];
 
     std::stringstream ss;
-    ss << logDirectory << getDateString(now) << "_ver.txt";
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/verification/";
+
+    mkdir(ss.str().c_str(), 0700);
+    ss << individuals_journal2019_names[individualId] << "/";
+
+    if (directoryExists(ss.str())){
+      fprintf(stderr, "  Directory for individual %s already exists. Will not overwrite verify fitness experiment.\n", individuals_journal2019_names[individualId].c_str());
+      return;
+    }
+
+    mkdir(ss.str().c_str(), 0700);
+    ss << individuals_journal2019_names[individualId] << "_ver.txt";
 
     logDirectoryPath = ss.str();
 
@@ -1678,22 +1700,62 @@ void experiments_verifyFitness() {
     if (verifyLog == NULL) {
         ROS_ERROR("verifyLog couldnt be opened (err%d)\n", errno);
     }
+
+    fprintf(verifyLog,
+        "{\n"
+        "  \"experiment_info\": {\n"
+        "    \"type\": \"verification\",\n"
+    );
+    fprintf(verifyLog, "    \"originalSpeed\": \"%f\",\n", individuals_journal2019[individualId]["originalSpeed"]);
+    fprintf(verifyLog, "    \"originalStability\": \"%f\",\n", individuals_journal2019[individualId]["originalStability"]);
+    fprintf(verifyLog, "    \"originalSurface\": \"%c\"\n", originalSurface);
+
+    fprintf(verifyLog,
+        "  },\n"
+        "  \"individuals\": ["
+    );
+
     fclose(verifyLog);
 
-    gaitType = "highLevelSplineGait";
+    gaitType = "lowLevelSplineGait";
 
     fitnessFunctions.clear();
     fitnessFunctions.emplace_back("MocapSpeed");
     fitnessFunctions.emplace_back("Stability");
 
-    for (int i = 0; i < numberOfTests; i++) {
+    char currentSurface = originalSurface;
+
+    for (int i = 0; i < verificationEvals*2; i++) {
+
+        if (i == 0){
+          if (originalSurface == 'b'){
+            playSound("basic", 1);
+            ROS_ERROR("Run robot on BASIC surface");
+          } else if (originalSurface == 'f'){
+            playSound("fuzzy", 1);
+            ROS_ERROR("Run robot on FUZZY surface");
+          } else {
+            ROS_ERROR("Unknown original surface: %c", originalSurface);
+          }
+        } else if (i == verificationEvals){
+          if (originalSurface == 'b'){
+            currentSurface = 'f';
+            playSound("fuzzy", 1);
+            ROS_ERROR("Run robot on FUZZY surface");
+          } else if (originalSurface == 'f'){
+            currentSurface = 'b';
+            playSound("basic", 1);
+            ROS_ERROR("Run robot on BASIC surface");
+          } else {
+            ROS_ERROR("Unknown original surface: %c", originalSurface);
+          }
+        }
+
         std::vector<std::map<std::string, double>> rawFitnesses;
 
-
-        std::map<std::string, double> fitnessResult = getFitness(individuals::smallRobotSmallControl,
+        std::map<std::string, double> fitnessResult = getFitness(individuals_journal2019[individualId],
                                                                  get_gait_evaluation_client,
                                                                  rawFitnesses);
-
 
         fprintf(logOutput, "  Returned fitness (%lu): \n", fitnessResult.size());
         printMap(fitnessResult, "    ", logOutput);
@@ -1701,19 +1763,34 @@ void experiments_verifyFitness() {
         // Save to file:
         verifyLog = fopen(logDirectoryPath.c_str(), "a");
 
-        printMap(fitnessResult, "", verifyLog);
-        for (int j = 0; j < rawFitnesses.size(); j++) {
-            fprintf(verifyLog, "  rawFitnesses[%d]:\n", j);
-            printMap(rawFitnesses[j], "    ", verifyLog);
+        if (i != 0){
+          fprintf(verifyLog, ",");
         }
 
+        fprintf(verifyLog, "\n    {\n      \"id\": %d,\n", i);
+        fprintf(verifyLog, "      \"surface\": \"%c\",\n", currentSurface);
 
-        fprintf(verifyLog, "\n");
+        fprintf(verifyLog, "      \"fitness\": {\n");
+        printMap(fitnessResult, "        ", verifyLog);
+        fprintf(verifyLog, "      },\n");
+
+        for (int j = 0; j < rawFitnesses.size(); j++) {
+            fprintf(verifyLog, "      \"raw_fitness\": {\n");
+            printMap(rawFitnesses[j], "        ", verifyLog);
+            fprintf(verifyLog, "      }");
+        }
+
+        fprintf(verifyLog, "\n    }");
 
         fclose(verifyLog);
         fprintf(logOutput, "\n");
-
     }
+
+    verifyLog = fopen(logDirectoryPath.c_str(), "a");
+    fprintf(verifyLog, "\n  ]\n}");
+    fclose(verifyLog);
+
+    cooldownPromptEnabled = true;
 }
 
 void experiments_fitnessNoise() {
@@ -1875,6 +1952,7 @@ void menu_experiments() {
             "    Random:\n"
             "      rh - random search, highLevel\n"
             "      rl - random search, lowLevel\n"
+            "    Verify:\n"
             "      vf - verify fitness on single individual\n"
             "    Misc:\n"
             "      vn - check noise in stability fitness\n");
