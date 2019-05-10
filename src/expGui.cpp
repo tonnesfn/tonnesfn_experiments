@@ -93,7 +93,7 @@ const std::string resumeFile = ""; // File to resume. Does not resume if empty
 const bool useActionMessageInSim = true; // Use action message (or manual stepping) in simulation
 const bool skipSimulationReset = true;   // Skip reseting simulation between evaluations
 
-const int verificationEvals = 30;
+const int verificationEvals = 20;
 
 bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
@@ -1725,7 +1725,7 @@ void experiments_verifyFitness() {
 
     char currentSurface = originalSurface;
 
-    for (int i = 0; i < verificationEvals*2; i++) {
+    for (int i = 0; i < verificationEvals*4; i++) {
 
         if (i == 0){
           if (originalSurface == 'b'){
@@ -1749,6 +1749,14 @@ void experiments_verifyFitness() {
           } else {
             ROS_ERROR("Unknown original surface: %c", originalSurface);
           }
+        } else if (i == verificationEvals * 2){
+          currentSurface = 'g';
+          playSound("grass", 1);
+          ROS_ERROR("Run robot on GRASS surface");
+        } else if (i == verificationEvals * 3){
+          currentSurface = 'r';
+          playSound("rough", 1);
+          ROS_ERROR("Run robot on ROUGH surface");
         }
 
         std::vector<std::map<std::string, double>> rawFitnesses;
