@@ -1,6 +1,6 @@
 <launch>
   <include file="$(find dyret_controller)/launch/fullController.launch" />
-  <include file="$(find dyret_hardware)/launch/labSetup.launch" />
+  <include file="$(find dyret_hardware)/launch/lab_optitrack.launch" />
   <include file="$(find dyret_hardware)/launch/monitor.launch" />
 
     <node pkg="dyret_hardware" name="mocapMonitor" type="mocapMonitor.py" required="false" />
