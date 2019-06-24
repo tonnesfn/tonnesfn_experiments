@@ -164,6 +164,20 @@ bool legsAtRest(){
   return true;
 }
 
+void setLegLengths(std::vector<float> lengths) {
+    dyret_common::Pose msg;
+
+    msg.header.stamp = ros::Time().now();
+
+    msg.prismatic.resize(lengths.size());
+
+    for (int i = 0; i < lengths.size(); i++){
+        msg.prismatic[i] = lengths[i];
+    }
+
+    poseCommand_pub.publish(msg);
+}
+
 void setLegLengths(float femurLengths, float tibiaLengths) {
   dyret_common::Pose msg;
 
@@ -1385,6 +1399,7 @@ void menu_demo() {
                        "    mm - Request medium morphology\n"
                        "    ml - Request large morphology\n"
                        "    mt - Test morphology changes\n"
+                       "    mu - Request uneven length morphology\n"
                        "    cs - Start camera\n"
                        "    ch - Stop camera\n"
                        "    b - Test beeps\n");
@@ -1434,6 +1449,9 @@ void menu_demo() {
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
+        } else if (choice == "mu") {
+            setLegLengths(std::vector<float>{25, 25, 25, 25, 5, 5, 5, 5});
+            fprintf(logOutput, "Uneven length morphology requested\n");
         } else if (choice == "mx") {
             setLegLengths(10.0, 10.0);
             fprintf(logOutput, "10mm morphology requested\n");
