@@ -121,7 +121,6 @@ std::string logDirectoryPath;
 
 float gaitDifficultyFactor = 0.5;
 
-bool evolveMorph = true;
 bool instantFitness = false;
 
 float frequencyFactor = 1.0;
@@ -335,8 +334,8 @@ void setGaitParams(std::string gaitName,
                    std::string logFilePath,
                    bool directionForward,
                    bool prepareForGait,
-                   float femurLength,
-                   float tibiaLength,
+                   std::vector<float> femurLengths,
+                   std::vector<float> tibiaLengths,
                    std::vector<std::string> parameterNames,
                    std::vector<float> parameterValues){
 
@@ -349,20 +348,13 @@ void setGaitParams(std::string gaitName,
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
     srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
 
-    if (evolveMorph){
-        srv.request.gaitConfiguration.femurLength = femurLength;
-        srv.request.gaitConfiguration.tibiaLength = tibiaLength;
-    } else {
-        srv.request.gaitConfiguration.femurLength = 0.0;
-        srv.request.gaitConfiguration.tibiaLength = 0.0;
-    }
+    srv.request.gaitConfiguration.femurLengths = femurLengths;
+    srv.request.gaitConfiguration.tibiaLengths = tibiaLengths;
 
     gaitConfiguration_client.call(srv);
 }
 
-
-
-void setGaitParams(std::string gaitName, std::string logFilePath, bool directionForward, bool prepareForGait, float femurLength, float tibiaLength, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitName, std::string logFilePath, bool directionForward, bool prepareForGait, std::vector<float> femurLengths, std::vector<float> tibiaLengths, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -371,7 +363,7 @@ void setGaitParams(std::string gaitName, std::string logFilePath, bool direction
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitName, logFilePath, directionForward, prepareForGait, femurLength, tibiaLength, parameterNames, parametervalues);
+    setGaitParams(gaitName, logFilePath, directionForward, prepareForGait, femurLengths, tibiaLengths, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -745,13 +737,27 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
     }
 
-
     std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/splines/";
     mkdir(logPath.c_str(), 0700);
 
     // Set gait parameters
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+
+    std::vector<float> femurLengths;
+    if (phenoType.count("femurLength")){
+        femurLengths = {(float) phenoType.at("femurLength")};
+    } else {
+        femurLengths = {(float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_back")};
+    }
+
+    std::vector<float> tibiaLengths;
+    if (phenoType.count("tibiaLength")){
+        tibiaLengths = {(float) phenoType.at("tibiaLength")};
+    } else {
+        tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_back")};
+    }
+
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -810,7 +816,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         // Set gait parameters
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-        setGaitParams(gaitType, "", false, true, phenoType.at("femurLength"), phenoType.at("tibiaLength"), phenoType);
+        setGaitParams(gaitType, "", false, true, femurLengths, tibiaLengths, phenoType);
 
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
             ros::spinOnce();
@@ -1011,22 +1017,6 @@ void stopEa();
 bool stopCondition();
 
 std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndividualGenotype, FILE *logFile) {
-
-    // Set length of individual if not evolving morphology:
-    if (evolveMorph == false) {
-        if (morphology == "small") {
-            givenIndividualGenotype[0] = 0.0;
-            givenIndividualGenotype[8] = 0.0;
-        } else if (morphology == "medium") {
-            givenIndividualGenotype[0] = 0.5;
-            givenIndividualGenotype[1] = 0.5;
-        } else if (morphology == "large") {
-            givenIndividualGenotype[0] = 1.0;
-            givenIndividualGenotype[1] = 1.0;
-        } else {
-            ROS_ERROR("Morphology \"%s\" not recognized!\n", morphology.c_str());
-        }
-    }
 
     std::map<std::string, double> individualParameters;
     if (gaitType == "highLevelSplineGait") {
@@ -1394,6 +1384,7 @@ void menu_demo() {
                        "    ss - Test small robot (small HLSC)\n"
                        "    ls - Test large robot (small HLSC)\n"
                        "    ll - Test large robot (large HLSC)\n"
+                       "    lu - Test uneven robot (LLSC)\n"
                        "    ms - Request small morphology\n"
                        "    mx - Request 10mm morphology\n"
                        "    mm - Request medium morphology\n"
@@ -1446,6 +1437,37 @@ void menu_demo() {
             run_individual("highLevelSplineGait", individuals::largeRobotSmallControl);
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
+        } else if (choice == "lu") {
+
+             static std::map<std::string, double> lowLevelUnevenIndividual = {
+                    {"originalSpeed", 14.559952},
+                    {"originalStability", -0.185659},
+                    {"frequency", 0.7995},
+                    {"liftDuration", 0.182437},
+                    {"p0_x", 0.0},
+                    {"p0_y", 27.205533},
+                    {"p1_x", 0.0},
+                    {"p1_y", -130.956925},
+                    {"p2_x", 0.907779},
+                    {"p2_y", 105.398715},
+                    {"p2_z", 33.367528},
+                    {"p3_x", -1.821296},
+                    {"p3_y", 11.47728},
+                    {"p3_z", 51.076677},
+                    {"p4_x", -3.272923},
+                    {"p4_y", -76.049644},
+                    {"p4_z", 27.204622},
+                    {"difficultyFactor", 0.2},
+                    {"wagPhase", 0.051088},
+                    {"wagAmplitude_x", 6.14355},
+                    {"wagAmplitude_y", 2.793298},
+                    {"femurLength_front", 0.0},
+                    {"femurLength_back", 5.0},
+                    {"tibiaLength_front", 0.0},
+                    {"tibiaLength_back", 5.0}
+            };
+
+            run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
@@ -1605,9 +1627,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
     fprintf(evoLog, "    \"generations\": %d,\n", generations);
     fprintf(evoLog, "    \"population\": %d,\n", popSize);
 
-    if (evolveMorph) fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
-    else
-        fprintf(evoLog, "    \"morphology\": \"%s\",\n", givenMorphology.c_str());
+    fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
 
     fprintf(evoLog, "    \"fitness\": [\n");
     if (instantFitness == false) {
@@ -1997,7 +2017,6 @@ void menu_experiments() {
             promptForConfirmation = true;
             enableFitnessLog(get_gait_evaluation_client);
             gaitDifficultyFactor = 0.20;
-            evolveMorph = true;
 
             printf("  Press enter when robot is ready and on the ground>");
             std::string input;
@@ -2125,9 +2144,6 @@ void menu_configure() {
                 setServoSpeeds(0.01, servoConfigClient);
             }
             sendAngleCommand(restPose);
-        } else if (choice == "m") {
-            evolveMorph = !evolveMorph;
-            if (evolveMorph) fprintf(logOutput, "Now evolving morphology\n"); else fprintf(logOutput, "Now NOT evolving morphology\n");
         } else if (choice == "x") {
             resetSimulation();
         } else if (choice == "q") {
