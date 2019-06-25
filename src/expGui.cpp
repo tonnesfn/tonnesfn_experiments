@@ -1524,9 +1524,9 @@ void menu_demo() {
                     {"wagAmplitude_x", 6.14355},
                     {"wagAmplitude_y", 2.793298},
                     {"femurLength_front", 0.0},
-                    {"femurLength_back", 40.0},
+                    {"femurLength_back", 30.0},
                     {"tibiaLength_front", 0.0},
-                    {"tibiaLength_back", 80.0}
+                    {"tibiaLength_back", 40.0}
             };
 
             run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
