@@ -747,14 +747,14 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (phenoType.count("femurLength")){
         femurLengths = {(float) phenoType.at("femurLength")};
     } else {
-        femurLengths = {(float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_back")};
+        femurLengths = {(float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_back"), (float) phenoType.at("femurLength_back")};
     }
 
     std::vector<float> tibiaLengths;
     if (phenoType.count("tibiaLength")){
         tibiaLengths = {(float) phenoType.at("tibiaLength")};
     } else {
-        tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_back")};
+        tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_back"), (float) phenoType.at("tibiaLength_back")};
     }
 
     setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType);
@@ -1384,6 +1384,7 @@ void menu_demo() {
                        "    ss - Test small robot (small HLSC)\n"
                        "    ls - Test large robot (small HLSC)\n"
                        "    ll - Test large robot (large HLSC)\n"
+                       "    re - Test even robot (LLSC)\n"
                        "    ru - Test uneven robot (LLSC)\n"
                        "    rs - Test uneven robot sim (LLSC)\n"
                        "    ms - Request small morphology\n"
@@ -1443,7 +1444,7 @@ void menu_demo() {
              static std::map<std::string, double> lowLevelUnevenIndividual = {
                     {"originalSpeed", 14.559952},
                     {"originalStability", -0.185659},
-                    {"frequency", 0.7995},
+                    {"frequency", 0.1},
                     {"liftDuration", 0.182437},
                     {"p0_x", 0.0},
                     {"p0_y", 27.205533},
@@ -1469,12 +1470,41 @@ void menu_demo() {
             };
 
             run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
+        } else if (choice == "re") {
+
+            static std::map<std::string, double> lowLevelUnevenIndividual = {
+                    {"originalSpeed", 14.559952},
+                    {"originalStability", -0.185659},
+                    {"frequency", 0.1},
+                    {"liftDuration", 0.182437},
+                    {"p0_x", 0.0},
+                    {"p0_y", 27.205533},
+                    {"p1_x", 0.0},
+                    {"p1_y", -130.956925},
+                    {"p2_x", 0.907779},
+                    {"p2_y", 105.398715},
+                    {"p2_z", 33.367528},
+                    {"p3_x", -1.821296},
+                    {"p3_y", 11.47728},
+                    {"p3_z", 51.076677},
+                    {"p4_x", -3.272923},
+                    {"p4_y", -76.049644},
+                    {"p4_z", 27.204622},
+                    {"difficultyFactor", 0.2},
+                    {"wagPhase", 0.051088},
+                    {"wagAmplitude_x", 6.14355},
+                    {"wagAmplitude_y", 2.793298},
+                    {"femurLength", 10.0},
+                    {"tibiaLength", 10.0},
+            };
+
+            run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
         } else if (choice == "rs") {
 
             static std::map<std::string, double> lowLevelUnevenIndividual = {
                     {"originalSpeed", 14.559952},
                     {"originalStability", -0.185659},
-                    {"frequency", 0.7995},
+                    {"frequency", 0.1},
                     {"liftDuration", 0.182437},
                     {"p0_x", 0.0},
                     {"p0_y", 27.205533},
@@ -1494,9 +1524,9 @@ void menu_demo() {
                     {"wagAmplitude_x", 6.14355},
                     {"wagAmplitude_y", 2.793298},
                     {"femurLength_front", 0.0},
-                    {"femurLength_back", 25.0},
+                    {"femurLength_back", 40.0},
                     {"tibiaLength_front", 0.0},
-                    {"tibiaLength_back", 25.0}
+                    {"tibiaLength_back", 80.0}
             };
 
             run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
