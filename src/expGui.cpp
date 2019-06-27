@@ -330,7 +330,7 @@ bool disableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
     return get_gait_evaluation_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName,
+void setGaitParams(std::string gaitType,
                    std::string logFilePath,
                    bool directionForward,
                    bool prepareForGait,
@@ -341,7 +341,7 @@ void setGaitParams(std::string gaitName,
 
     dyret_controller::ConfigureGait srv;
 
-    srv.request.gaitConfiguration.gaitName           = gaitName;
+    srv.request.gaitConfiguration.gaitType           = gaitType;
     srv.request.gaitConfiguration.logFilePath        = logFilePath;
     srv.request.gaitConfiguration.directionForward   = directionForward;
     srv.request.gaitConfiguration.prepareForGait     = prepareForGait;
@@ -354,7 +354,7 @@ void setGaitParams(std::string gaitName,
     gaitConfiguration_client.call(srv);
 }
 
-void setGaitParams(std::string gaitName, std::string logFilePath, bool directionForward, bool prepareForGait, std::vector<float> femurLengths, std::vector<float> tibiaLengths, std::map<std::string, double> phenoTypeMap){
+void setGaitParams(std::string gaitType, std::string logFilePath, bool directionForward, bool prepareForGait, std::vector<float> femurLengths, std::vector<float> tibiaLengths, std::map<std::string, double> phenoTypeMap){
     std::vector<std::string> parameterNames;
     std::vector<float> parametervalues;
 
@@ -363,7 +363,7 @@ void setGaitParams(std::string gaitName, std::string logFilePath, bool direction
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitName, logFilePath, directionForward, prepareForGait, femurLengths, tibiaLengths, parameterNames, parametervalues);
+    setGaitParams(gaitType, logFilePath, directionForward, prepareForGait, femurLengths, tibiaLengths, parameterNames, parametervalues);
 }
 
 bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
@@ -1013,7 +1013,7 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     return phenoType;
 }
 
-std::map<std::string, double> genToAdvancedLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
+std::map<std::string, double> genToLowLevelAdvancedSplineGaitPhen(std::vector<double> givenGenotype) {
 
     if (givenGenotype.size() < 20){
         ROS_ERROR("givenGenotype.size() < 20: %lu", givenGenotype.size());
@@ -1087,6 +1087,8 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
     } else if (gaitType == "lowLevelSplineGait"){
         individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype);
+    } else if (gaitType == "lowLevelAdvancedSplineGait"){
+        individualParameters = genToLowLevelAdvancedSplineGaitPhen(givenIndividualGenotype);
     } else {
         ROS_FATAL("Unknown controller: %s", gaitType.c_str());
         exit(-1);
@@ -1421,9 +1423,9 @@ bool stopCondition(){
     return false;
 }
 
-void run_individual(std::string gaitName, std::map<std::string, double> phenoTypeMap) {
+void run_individual(std::string givenGaitType, std::map<std::string, double> givenPhenoTypeMap) {
 
-    gaitType = gaitName;
+    gaitType = givenGaitType;
 
     fitnessFunctions.clear();
     fitnessFunctions.emplace_back("MocapSpeed");
@@ -1431,7 +1433,7 @@ void run_individual(std::string gaitName, std::map<std::string, double> phenoTyp
 
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
-        std::map<std::string, double> fitnessResult = getFitness(phenoTypeMap,
+        std::map<std::string, double> fitnessResult = getFitness(givenPhenoTypeMap,
                                                                  get_gait_evaluation_client,
                                                                  rawFitnesses);
     }
@@ -1478,16 +1480,16 @@ void menu_demo() {
             run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotSmallControl);
         } else if (choice == "ll") {
             run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotLargeControl);
-        } else if (choice == "ru") {
-            run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rz") {
             run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
         } else if (choice == "rm") {
             run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::mediumHeight);
+        } else if (choice == "ru") {
+            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rf") {
-            run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
         } else if (choice == "rb") {
-           run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
+           run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
