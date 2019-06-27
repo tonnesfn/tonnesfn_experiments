@@ -1013,6 +1013,70 @@ std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> gi
     return phenoType;
 }
 
+std::map<std::string, double> genToAdvancedLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
+
+    if (givenGenotype.size() < 20){
+        ROS_ERROR("givenGenotype.size() < 20: %lu", givenGenotype.size());
+        exit(-1);
+    }
+
+    std::map<std::string, double> phenoType;
+
+    phenoType["difficultyFactor"] = gaitDifficultyFactor;
+
+    phenoType["femurLength_front"]    = givenGenotype[0] * 50.0;          // 0    -> 50
+    phenoType["femurLength_back"]     = givenGenotype[1] * 50.0;          // 0    -> 50
+    phenoType["tibiaLength_front"]    = givenGenotype[2] * 95.0;          // 0    -> 95
+    phenoType["tibiaLength_back"]     = givenGenotype[3] * 95.0;          // 0    -> 95
+    phenoType["liftDuration"]    = getPoint(givenGenotype[4], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
+    phenoType["frequency"]       = (0.25 + (givenGenotype[5] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
+
+    if (frequencyFactor != 1.0){
+        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
+    }
+
+    phenoType["wagPhase"]        = getPoint(givenGenotype[6], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
+    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[7],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
+    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[8],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
+
+    // StepLength 25 -> 300, p0 center around 75, p1 center around -75
+    phenoType["p0_y"] = getPoint(givenGenotype[10], -150.0, 150.0,   50.0, 50.0, gaitDifficultyFactor);
+    phenoType["p1_y"] = getPoint(givenGenotype[12], -150.0, 150.0, -100.0, 50.0, gaitDifficultyFactor);
+
+    // Make sure the front point is actually in front:
+    float gnd_min = fmin(phenoType["p0_y"], phenoType["p1_y"]);
+    float gnd_max = fmax(phenoType["p0_y"], phenoType["p1_y"]);
+
+    phenoType["p0_y"] = gnd_max;
+    phenoType["p1_y"] = gnd_min;
+
+    // (potential) Front air point:
+    phenoType["p2_x_front"] = getPoint(givenGenotype[13],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p2_y_front"] = getPoint(givenGenotype[14], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
+    phenoType["p2_z_front"] = getPoint(givenGenotype[15],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+    phenoType["p2_x_back"]  = getPoint(givenGenotype[16],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p2_y_back"]  = getPoint(givenGenotype[17], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
+    phenoType["p2_z_back"]  = getPoint(givenGenotype[18],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+
+    // (potential) Top air point:
+    phenoType["p3_x_front"] = getPoint(givenGenotype[19],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p3_y_front"] = getPoint(givenGenotype[20], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
+    phenoType["p3_z_front"] = getPoint(givenGenotype[21],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
+    phenoType["p3_x_back"]  = getPoint(givenGenotype[22],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p3_y_back"]  = getPoint(givenGenotype[23], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
+    phenoType["p3_z_back"]  = getPoint(givenGenotype[24],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
+
+    // (potential) Back air point:
+    phenoType["p4_x_front"] = getPoint(givenGenotype[25],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p4_y_front"] = getPoint(givenGenotype[26], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
+    phenoType["p4_z_front"] = getPoint(givenGenotype[27],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+    phenoType["p4_x_back"]  = getPoint(givenGenotype[28],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p4_y_back"]  = getPoint(givenGenotype[29], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
+    phenoType["p4_z_back"]  = getPoint(givenGenotype[30],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+
+    return phenoType;
+}
+
 void stopEa();
 bool stopCondition();
 
@@ -1380,14 +1444,14 @@ void menu_demo() {
 
     std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-    fprintf(logOutput, "    ts - test hard coded robot\n"
-                       "    ss - Test small robot (small HLSC)\n"
+    fprintf(logOutput, "    ss - Test small robot (small HLSC)\n"
                        "    ls - Test large robot (small HLSC)\n"
                        "    ll - Test large robot (large HLSC)\n"
-                       "    re - Test even robot (LLSC)\n"
-                       "    ru - Test uneven robot (LLSC)\n"
-                       "    rs - Test uneven robot sim (LLSC)\n"
-                       "    rd - Test uneven robot sim (opposite) (LLSC)\n"
+                       "    rz - Test zero robot (LLSC)\n"
+                       "    rm - Test medium robot (LLSC)\n"
+                       "    ru - Test uneven robot (LLASC)\n"
+                       "    rf - Test uneven robot sim (leaning front) (LLASC)\n"
+                       "    rb - Test uneven robot sim (leaning back) (LLASC)\n"
                        "    ms - Request small morphology\n"
                        "    mx - Request 10mm morphology\n"
                        "    mm - Request medium morphology\n"
@@ -1408,160 +1472,22 @@ void menu_demo() {
     }
 
     if (choice.empty() == false) {
-        if (choice == "ts") {
-
-        std::map<std::string, double> customRobot =
-                {{"femurLength", 15.0},
-                 {"frequency", 0.1},
-                 {"liftDuration", 0.159514},
-                 {"p0_x", 0.0},
-                 {"p0_y", 102.399856},
-                 {"p1_x", 0.0},
-                 {"p1_y", 55.270207},
-                 {"p2_x", 0.0},
-                 {"p2_y", -125.971046},
-                 {"p2_z", 69.163904},
-                 {"p3_x", 0.0},
-                 {"p3_y", 43.958044},
-                 {"p3_z", 49.316892},
-                 {"p4_x", 0.0},
-                 {"p4_y", -4.313314},
-                 {"p4_z", 16.276393},
-                 {"tibiaLength", 15.0},
-                 {"difficultyFactor", 0.2},
-                 {"wagPhase", 0.0},
-                 {"wagAmplitude_x", 0.0},
-                 {"wagAmplitude_y", 0.0}};
-
-            run_individual("lowLevelSplineGait", customRobot);
-        } else if (choice == "ss") {
-            run_individual("highLevelSplineGait", individuals::smallRobotSmallControl);
+        if (choice == "ss") {
+            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::smallRobotSmallControl);
         } else if (choice == "ls") {
-            run_individual("highLevelSplineGait", individuals::largeRobotSmallControl);
+            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotSmallControl);
         } else if (choice == "ll") {
-            run_individual("highLevelSplineGait", individuals::largeRobotLargeControl);
+            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotLargeControl);
         } else if (choice == "ru") {
-
-             static std::map<std::string, double> lowLevelUnevenIndividual = {
-                    {"originalSpeed", 14.559952},
-                    {"originalStability", -0.185659},
-                    {"frequency", 0.1},
-                    {"liftDuration", 0.182437},
-                    {"p0_x", 0.0},
-                    {"p0_y", 27.205533},
-                    {"p1_x", 0.0},
-                    {"p1_y", -130.956925},
-                    {"p2_x", 0.907779},
-                    {"p2_y", 105.398715},
-                    {"p2_z", 33.367528},
-                    {"p3_x", -1.821296},
-                    {"p3_y", 11.47728},
-                    {"p3_z", 51.076677},
-                    {"p4_x", -3.272923},
-                    {"p4_y", -76.049644},
-                    {"p4_z", 27.204622},
-                    {"difficultyFactor", 0.2},
-                    {"wagPhase", 0.051088},
-                    {"wagAmplitude_x", 6.14355},
-                    {"wagAmplitude_y", 2.793298},
-                    {"femurLength_front", 0.0},
-                    {"femurLength_back", 5.0},
-                    {"tibiaLength_front", 0.0},
-                    {"tibiaLength_back", 5.0}
-            };
-
-            run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
-        } else if (choice == "re") {
-
-            static std::map<std::string, double> lowLevelUnevenIndividual = {
-                    {"originalSpeed", 14.559952},
-                    {"originalStability", -0.185659},
-                    {"frequency", 0.1},
-                    {"liftDuration", 0.182437},
-                    {"p0_x", 0.0},
-                    {"p0_y", 27.205533},
-                    {"p1_x", 0.0},
-                    {"p1_y", -130.956925},
-                    {"p2_x", 0.907779},
-                    {"p2_y", 105.398715},
-                    {"p2_z", 33.367528},
-                    {"p3_x", -1.821296},
-                    {"p3_y", 11.47728},
-                    {"p3_z", 51.076677},
-                    {"p4_x", -3.272923},
-                    {"p4_y", -76.049644},
-                    {"p4_z", 27.204622},
-                    {"difficultyFactor", 0.2},
-                    {"wagPhase", 0.051088},
-                    {"wagAmplitude_x", 6.14355},
-                    {"wagAmplitude_y", 2.793298},
-                    {"femurLength", 10.0},
-                    {"tibiaLength", 10.0},
-            };
-
-            run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
-        } else if (choice == "rd") {
-
-            static std::map<std::string, double> lowLevelUnevenIndividual = {
-                    {"originalSpeed",     14.559952},
-                    {"originalStability", -0.185659},
-                    {"frequency",         0.1},
-                    {"liftDuration",      0.182437},
-                    {"p0_x",              0.0},
-                    {"p0_y",              27.205533},
-                    {"p1_x",              0.0},
-                    {"p1_y",              -130.956925},
-                    {"p2_x",              0.907779},
-                    {"p2_y",              105.398715},
-                    {"p2_z",              33.367528},
-                    {"p3_x",              -1.821296},
-                    {"p3_y",              11.47728},
-                    {"p3_z",              51.076677},
-                    {"p4_x",              -3.272923},
-                    {"p4_y",              -76.049644},
-                    {"p4_z",              27.204622},
-                    {"difficultyFactor",  0.2},
-                    {"wagPhase",          0.051088},
-                    {"wagAmplitude_x",    6.14355},
-                    {"wagAmplitude_y",    2.793298},
-                    {"femurLength_front", 30.0},
-                    {"femurLength_back",  0.0},
-                    {"tibiaLength_front", 40.0},
-                    {"tibiaLength_back",  0.0}
-            };
-
-            run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
-        } else if (choice == "rs") {
-
-                static std::map<std::string, double> lowLevelUnevenIndividual = {
-                        {"originalSpeed", 14.559952},
-                        {"originalStability", -0.185659},
-                        {"frequency", 0.1},
-                        {"liftDuration", 0.182437},
-                        {"p0_x", 0.0},
-                        {"p0_y", 27.205533},
-                        {"p1_x", 0.0},
-                        {"p1_y", -130.956925},
-                        {"p2_x", 0.907779},
-                        {"p2_y", 105.398715},
-                        {"p2_z", 33.367528},
-                        {"p3_x", -1.821296},
-                        {"p3_y", 11.47728},
-                        {"p3_z", 51.076677},
-                        {"p4_x", -3.272923},
-                        {"p4_y", -76.049644},
-                        {"p4_z", 27.204622},
-                        {"difficultyFactor", 0.2},
-                        {"wagPhase", 0.051088},
-                        {"wagAmplitude_x", 6.14355},
-                        {"wagAmplitude_y", 2.793298},
-                        {"femurLength_front", 0.0},
-                        {"femurLength_back", 30.0},
-                        {"tibiaLength_front", 0.0},
-                        {"tibiaLength_back", 40.0}
-                };
-
-                run_individual("lowLevelSplineGait", lowLevelUnevenIndividual);
+            run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
+        } else if (choice == "rz") {
+            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
+        } else if (choice == "rm") {
+            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::mediumHeight);
+        } else if (choice == "rf") {
+            run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
+        } else if (choice == "rb") {
+           run_individual("lowLevelSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0);
             fprintf(logOutput, "Small morphology requested\n");
