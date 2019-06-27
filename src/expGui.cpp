@@ -747,14 +747,14 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     if (phenoType.count("femurLength")){
         femurLengths = {(float) phenoType.at("femurLength")};
     } else {
-        femurLengths = {(float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_back"), (float) phenoType.at("femurLength_back")};
+        femurLengths = {(float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_front"), (float) phenoType.at("femurLength_rear"), (float) phenoType.at("femurLength_rear")};
     }
 
     std::vector<float> tibiaLengths;
     if (phenoType.count("tibiaLength")){
         tibiaLengths = {(float) phenoType.at("tibiaLength")};
     } else {
-        tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_back"), (float) phenoType.at("tibiaLength_back")};
+        tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_rear"), (float) phenoType.at("tibiaLength_rear")};
     }
 
     setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType);
@@ -1025,9 +1025,9 @@ std::map<std::string, double> genToLowLevelAdvancedSplineGaitPhen(std::vector<do
     phenoType["difficultyFactor"] = gaitDifficultyFactor;
 
     phenoType["femurLength_front"]    = givenGenotype[0] * 50.0;          // 0    -> 50
-    phenoType["femurLength_back"]     = givenGenotype[1] * 50.0;          // 0    -> 50
+    phenoType["femurLength_rear"]     = givenGenotype[1] * 50.0;          // 0    -> 50
     phenoType["tibiaLength_front"]    = givenGenotype[2] * 95.0;          // 0    -> 95
-    phenoType["tibiaLength_back"]     = givenGenotype[3] * 95.0;          // 0    -> 95
+    phenoType["tibiaLength_rear"]     = givenGenotype[3] * 95.0;          // 0    -> 95
     phenoType["liftDuration"]    = getPoint(givenGenotype[4], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
     phenoType["frequency"]       = (0.25 + (givenGenotype[5] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
 
@@ -1054,25 +1054,25 @@ std::map<std::string, double> genToLowLevelAdvancedSplineGaitPhen(std::vector<do
     phenoType["p2_x_front"] = getPoint(givenGenotype[13],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
     phenoType["p2_y_front"] = getPoint(givenGenotype[14], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
     phenoType["p2_z_front"] = getPoint(givenGenotype[15],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-    phenoType["p2_x_back"]  = getPoint(givenGenotype[16],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p2_y_back"]  = getPoint(givenGenotype[17], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
-    phenoType["p2_z_back"]  = getPoint(givenGenotype[18],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+    phenoType["p2_x_rear"]  = getPoint(givenGenotype[16],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p2_y_rear"]  = getPoint(givenGenotype[17], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
+    phenoType["p2_z_rear"]  = getPoint(givenGenotype[18],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
 
     // (potential) Top air point:
     phenoType["p3_x_front"] = getPoint(givenGenotype[19],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
     phenoType["p3_y_front"] = getPoint(givenGenotype[20], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
     phenoType["p3_z_front"] = getPoint(givenGenotype[21],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
-    phenoType["p3_x_back"]  = getPoint(givenGenotype[22],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p3_y_back"]  = getPoint(givenGenotype[23], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
-    phenoType["p3_z_back"]  = getPoint(givenGenotype[24],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
+    phenoType["p3_x_rear"]  = getPoint(givenGenotype[22],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p3_y_rear"]  = getPoint(givenGenotype[23], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
+    phenoType["p3_z_rear"]  = getPoint(givenGenotype[24],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
 
     // (potential) Back air point:
     phenoType["p4_x_front"] = getPoint(givenGenotype[25],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
     phenoType["p4_y_front"] = getPoint(givenGenotype[26], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
     phenoType["p4_z_front"] = getPoint(givenGenotype[27],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-    phenoType["p4_x_back"]  = getPoint(givenGenotype[28],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p4_y_back"]  = getPoint(givenGenotype[29], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
-    phenoType["p4_z_back"]  = getPoint(givenGenotype[30],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
+    phenoType["p4_x_rear"]  = getPoint(givenGenotype[28],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
+    phenoType["p4_y_rear"]  = getPoint(givenGenotype[29], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
+    phenoType["p4_z_rear"]  = getPoint(givenGenotype[30],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
 
     return phenoType;
 }
@@ -1451,6 +1451,7 @@ void menu_demo() {
                        "    ll - Test large robot (large HLSC)\n"
                        "    rz - Test zero robot (LLSC)\n"
                        "    rm - Test medium robot (LLSC)\n"
+                       "    rd - Test doubleUneven robot (LLASC)\n"
                        "    ru - Test uneven robot (LLASC)\n"
                        "    rf - Test uneven robot sim (leaning front) (LLASC)\n"
                        "    rb - Test uneven robot sim (leaning back) (LLASC)\n"
@@ -1484,6 +1485,8 @@ void menu_demo() {
             run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
         } else if (choice == "rm") {
             run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::mediumHeight);
+        } else if (choice == "rd") {
+            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::doubleUneven);
         } else if (choice == "ru") {
             run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rf") {
