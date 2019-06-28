@@ -24,7 +24,6 @@
 #include "dyret_common/Pose.h"
 #include "dyret_common/State.h"
 
-#include "dyret_common/timeHandling.h"
 #include "dyret_common/wait_for_ros.h"
 
 #include "dyret_controller/GetGaitEvaluation.h"
@@ -99,7 +98,7 @@ bool cooldownPromptEnabled = true; // Prompt for cooldown between each generatio
 
 //
 
-int prismaticActuatorStates[8];
+std::array<int, 8> prismaticActuatorStates;
 
 bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
 bool currentlyLoggingFitness = false; // Whether gaitEvaluator is logging fitness or not
@@ -108,14 +107,12 @@ std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.199272
 
 unsigned int randomSeed;
 
-FILE *logOutput = stdout;
-
 double currentFemurLength = 0.0;
 double currentTibiaLength = 0.0;
 int evaluationTimeout = 10;
 float evaluationDistance = 1000.0;
 int currentIndividual;
-std::vector<float> servoTemperatures(12);
+std::array<float, 12> servoTemperatures;
 
 std::string logDirectoryPath;
 
@@ -139,555 +136,6 @@ std::vector<std::vector<float>> lastOptimalParents;
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
 std::string fullCommand; // Used to store commands from the arguments permanently
-
-std::string getInputFromTerminal(std::string output){
-
-  printf("%s> ", output.c_str());
-
-  std::cin.sync();
-  std::cin.clear();
-
-  std::string input;
-  getline(std::cin, input);
-
-  return input;
-
-}
-
-bool legsAtRest(){
-  for (int i = 0; i < 8; i++){
-    if (prismaticActuatorStates[i] != 0){
-      return false;
-    }
-  }
-  return true;
-}
-
-void setLegLengths(std::vector<float> lengths) {
-    dyret_common::Pose msg;
-
-    msg.header.stamp = ros::Time().now();
-
-    msg.prismatic.resize(lengths.size());
-
-    for (int i = 0; i < lengths.size(); i++){
-        msg.prismatic[i] = lengths[i];
-    }
-
-    poseCommand_pub.publish(msg);
-}
-
-void setLegLengths(float femurLengths, float tibiaLengths) {
-  dyret_common::Pose msg;
-
-  msg.header.stamp = ros::Time().now();
-
-  msg.prismatic.resize(2);
-
-  msg.prismatic[0] = femurLengths;
-  msg.prismatic[1] = tibiaLengths;
-
-  poseCommand_pub.publish(msg);
-}
-
-void setLegLengths(float lengths) {
-  dyret_common::Pose msg;
-
-  msg.header.stamp = ros::Time().now();
-
-  msg.prismatic.resize(1);
-
-  msg.prismatic[0] = lengths;
-
-  poseCommand_pub.publish(msg);
-}
-
-void zeroPrismaticActuators(bool runOutFirst){
-
-  if (runOutFirst) {
-    // Set all lengths to 5mm
-    setLegLengths(5.0, 5.0);
-
-    // Wait for actuators to go to rest
-    sleep(1);
-    while (!legsAtRest() && ros::ok()) {}
-    sleep(1);
-  }
-
-  // Set all lengths to -100mm
-  setLegLengths(-100.0, -100.0);
-
-  // Wait for actuators to go to rest
-  sleep(1);
-  while(!legsAtRest()){}
-  sleep(1);
-}
-
-bool automatedRun() {
-    return !fullCommand.empty();
-}
-
-void resetSimulation(){
-/*
-    usleep(1000);
-
-    std_srvs::Empty empty;
-
-    // First pause physics:
-    ros::service::call("/gazebo/pause_physics", empty);
-
-    usleep(1000);
-
-    // Then reset world:
-    ros::service::call("/gazebo/reset_world", empty);
-
-    usleep(1000);
-
-    // Then reset DyRET:
-    std_srvs::SetBool setBool;
-    setBool.request.data = true; // Reset prismatic joints
-    ros::service::call("/dyret/simulation/reset", setBool);
-
-    usleep(1000);
-
-    // Unpause physics:
-    ros::service::call("/gazebo/unpause_physics", empty);
-
-    // Run a few ticks
-    usleep(1000);
-
-    ROS_INFO("Simulation reset");*/
-
-    if (gz->reset() == false){
-        ROS_ERROR("Could not reset simulation");
-    }
-
-}
-
-void setRandomRawFitness(ros::ServiceClient get_gait_evaluation_client, std::vector<std::map<std::string, double>> &rawFitnesses) {
-    dyret_controller::GetGaitEvaluation srv;
-    std::vector<std::string> descriptorsToReturn;
-
-    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getDescriptors;
-
-    if (get_gait_evaluation_client.call(srv)) {
-        for (int i = 0; i <= 1; i++) {
-            std::map<std::string, double> fitnessMap;
-
-            for (int i = 0; i < srv.response.descriptors.size(); i++) {
-                float randNumber = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-                fitnessMap[srv.response.descriptors[i]] = randNumber;
-            }
-
-            rawFitnesses.push_back(fitnessMap);
-        }
-    } else {
-        ROS_ERROR("Error while calling GaitRecording service with t_getDescriptors!\n");
-    }
-
-}
-
-std::map<std::string, double> getGaitResults(ros::ServiceClient get_gait_evaluation_client){
-
-    std::map<std::string, double> mapToReturn;
-
-    dyret_controller::GetGaitEvaluation srv;
-    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_getResults;
-
-    if (get_gait_evaluation_client.call(srv)) {
-
-        // Make sure the response is valid
-        if (srv.response.descriptors.size() != srv.response.results.size()) {
-            ROS_ERROR("Result (%lu) and descriptor (%lu) sizes not equal. Cannot process results!", srv.response.results.size(), srv.response.descriptors.size());
-            return std::map<std::string, double>();
-        }
-
-        // Go through all responses and insert into map
-        for (int i  = 0; i < srv.response.descriptors.size(); i++){
-            mapToReturn[srv.response.descriptors[i]] = srv.response.results[i];
-            //if (srv.response.descriptors[i] == "linAcc_z" && srv.response.results[i] < 2.0) *hasFallen = true;
-        }
-    } else {
-        ROS_ERROR("Error while calling GaitRecording service with t_getResults!\n");
-    }
-
-    return mapToReturn;
-}
-
-bool enableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
-
-    dyret_controller::GetGaitEvaluation srv;
-    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_enableLogging;
-
-    return get_gait_evaluation_client.call(srv);
-}
-
-bool disableFitnessLog(ros::ServiceClient get_gait_evaluation_client){
-
-    dyret_controller::GetGaitEvaluation srv;
-    srv.request.givenCommand = dyret_controller::GetGaitEvaluation::Request::t_disableLogging;
-
-    return get_gait_evaluation_client.call(srv);
-}
-
-void setGaitParams(std::string gaitType,
-                   std::string logFilePath,
-                   bool directionForward,
-                   bool prepareForGait,
-                   std::vector<float> femurLengths,
-                   std::vector<float> tibiaLengths,
-                   std::vector<std::string> parameterNames,
-                   std::vector<float> parameterValues){
-
-    dyret_controller::ConfigureGait srv;
-
-    srv.request.gaitConfiguration.gaitType           = gaitType;
-    srv.request.gaitConfiguration.logFilePath        = logFilePath;
-    srv.request.gaitConfiguration.directionForward   = directionForward;
-    srv.request.gaitConfiguration.prepareForGait     = prepareForGait;
-    srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
-    srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
-
-    srv.request.gaitConfiguration.femurLengths = femurLengths;
-    srv.request.gaitConfiguration.tibiaLengths = tibiaLengths;
-
-    gaitConfiguration_client.call(srv);
-}
-
-void setGaitParams(std::string gaitType, std::string logFilePath, bool directionForward, bool prepareForGait, std::vector<float> femurLengths, std::vector<float> tibiaLengths, std::map<std::string, double> phenoTypeMap){
-    std::vector<std::string> parameterNames;
-    std::vector<float> parametervalues;
-
-    for(auto elem : phenoTypeMap){
-        parameterNames.push_back(elem.first);
-        parametervalues.push_back((float) elem.second);
-    }
-
-    setGaitParams(gaitType, logFilePath, directionForward, prepareForGait, femurLengths, tibiaLengths, parameterNames, parametervalues);
-}
-
-bool gaitControllerDone(ros::ServiceClient gaitControllerStatus_client) {
-    dyret_controller::GetGaitControllerStatus srv;
-
-    if (gaitControllerStatus_client.call(srv)) {
-        if (srv.response.gaitControllerStatus.actionType == srv.response.gaitControllerStatus.t_idle) return true;
-    }
-
-    return false;
-}
-
-void sendAngleCommand(std::vector<float> angles){
-    dyret_common::Pose msg;
-
-    msg.header.stamp = ros::Time().now();
-    msg.revolute = angles;
-
-    poseCommand_pub.publish(msg);
-}
-
-void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
-    currentFemurLength = (msg->prismatic[0].position + msg->prismatic[2].position + msg->prismatic[4].position +
-                          msg->prismatic[6].position) / 4.0;
-    currentTibiaLength = (msg->prismatic[1].position + msg->prismatic[3].position + msg->prismatic[5].position +
-                          msg->prismatic[7].position) / 4.0;
-
-    // Find and fill out max temperature variable used for cooldown
-
-    for (int i = 0; i < msg->revolute.size(); i++){
-        servoTemperatures[i] = msg->revolute[i].temperature;
-    }
-
-}
-
-void actuator_boardStateCallback(const dyret_hardware::ActuatorBoardState::ConstPtr &msg) {
-
-  for (int i = 0; i < 8; i++){
-    prismaticActuatorStates[i] = msg->status[i];
-  }
-
-}
-
-bool legsAreLength(float femurLengths, float tibiaLengths) {
-    return ((fabs(femurLengths - currentFemurLength) < 1.0f) && (fabs(tibiaLengths - currentTibiaLength) < 1.0f));
-}
-
-float getServoVoltage() {
-  ROS_ERROR("getServoVoltage not implemented!");
-
-  /*
-  dyret_common::GetServoStatuses  gssres;
-  servoStatus_client.call(gssres);
-
-  float voltages = 0.0;
-  float counter = 0.0;
-
-  for (int i = 0; i < gssres.response.servoStatuses.size(); i++){
-    voltages += gssres.response.servoStatuses[i].voltage;
-    counter += 1.0;
-  }
-
-  return voltages / counter;*/
-    return 0.0;
-}
-
-float getMaxServoTemperature(bool printAllTemperatures = false) {
-  float maxTemp = -1.0f;
-
-  if (printAllTemperatures) printf("Servo temperatures: ");
-  for (int i = 0; i < servoTemperatures.size(); i++){
-    if (servoTemperatures[i] > maxTemp) maxTemp = servoTemperatures[i];
-    if (printAllTemperatures) printf("%.2f ", servoTemperatures[i]);
-  }
-  if (printAllTemperatures) printf("\n");
-
-  return maxTemp;
-}
-
-float getInferredPosition(){
-    dyret_controller::GetInferredPosition srv;
-
-    if (!inferredPositionClient.call(srv)){
-        printf("Error while calling GetInferredPosition service\n");
-        ROS_ERROR("Error while calling GetInferredPosition service");
-
-        return 0.0;
-    }
-
-    return srv.response.currentInferredPosition.distance;
-}
-
-bool initLog(std::string individual){
-    dyret_controller::LoggerCommand srv;
-
-    std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/bags/";
-
-    mkdir(logPath.c_str(), 0700);
-
-    srv.request.command = srv.request.INIT_LOG;
-    srv.request.logPath = logPath;
-    srv.request.individual = individual;
-
-    if (!loggerCommandService_client.call(srv)) {
-        printf("Error while calling LoggerCommand service\n");
-        ROS_ERROR("Error while calling LoggerCommand service");
-        return false;
-    }
-
-    ROS_INFO("Log initialized");
-
-    return true;
-}
-
-void adjustGaitPose(){
-    dyret_controller::GaitControllerCommandService srv;
-
-    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_adjustGaitPose;
-
-    if (gaitCommandService_client.call(srv) == false) {
-        ROS_ERROR("Error while calling gaitControllerCommand service for adjustGaitPose");
-    }
-}
-
-void adjustRestPose(){
-    dyret_controller::GaitControllerCommandService srv;
-
-    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_adjustRestPose;
-
-    if (gaitCommandService_client.call(srv) == false) {
-        ROS_ERROR("Error while calling gaitControllerCommand service for adjustRestPose");
-    }
-}
-
-void startWalking(){
-    dyret_controller::GaitControllerCommandService srv;
-
-    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_startWalking;
-
-    if (gaitCommandService_client.call(srv) == false) {
-        ROS_ERROR("Error while calling gaitControllerCommand service for startWalking");
-    }
-}
-
-void stopWalking(){
-    dyret_controller::GaitControllerCommandService srv;
-
-    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_stopWalking;
-
-    if (gaitCommandService_client.call(srv) == false) {
-        ROS_ERROR("Error while calling gaitControllerCommand service for stopWalking");
-    }
-}
-
-bool startLogging(){
-    dyret_controller::LoggerCommand srv;
-
-    srv.request.command = srv.request.ENABLE_LOGGING;
-
-    if (!loggerCommandService_client.call(srv)) {
-        printf("Error while calling LoggerCommand service\n");
-        ROS_ERROR("Error while calling LoggerCommand service");
-        return false;
-    }
-
-    return true;
-}
-
-bool saveLog(){
-    dyret_controller::LoggerCommand srv;
-
-    srv.request.command = srv.request.SAVE_LOG;
-
-    if (!loggerCommandService_client.call(srv)) {
-        printf("Error while calling LoggerCommand service\n");
-        ROS_ERROR("Error while calling LoggerCommand service");
-        return false;
-    }
-
-    return true;
-}
-
-void runGaitControllerWithActionMessage(bool forward){
-
-    sleep(1);
-
-    resetGaitRecording(get_gait_evaluation_client);
-
-    std::string direction;
-    if (forward) direction = "F"; else direction = "R";
-
-    // Start walking
-    startWalking();
-
-    // Start bag logging
-    if (!ros::Time::isSimTime() && enableLogging) {
-        initLog(std::to_string(currentIndividual) + direction);
-        startLogging();
-
-        std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/video/";
-        mkdir(logPath.c_str(), 0700);
-
-        startVideo(logPath + std::to_string(currentIndividual) + direction + ".mp4");
-
-    }
-
-    // Start fitness recording
-    startGaitRecording(get_gait_evaluation_client);
-
-    // Wait until the robot is done walking
-    ros::Time startTime = ros::Time::now();
-    while (ros::ok()) {
-        usleep(100);
-
-        float currentPos = getInferredPosition();
-
-        if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
-            printf("  Timed out at %ds/%ds (dist %.0fmm/%.0fmm)\n", (ros::Time::now() - startTime).sec, evaluationTimeout, currentPos, evaluationDistance);
-            break;
-        }
-
-        if (currentPos > evaluationDistance){
-            printf("  Reached position with %.2fmm / %.2fmm (time %ds/%ds)\n", currentPos, evaluationDistance, (ros::Time::now() - startTime).sec, evaluationTimeout);
-            break;
-        }
-    }
-
-    // Pause fitness recording
-    pauseGaitRecording(get_gait_evaluation_client);
-
-    // Save and stop bag logging
-    if (!ros::Time::isSimTime() && enableLogging) {
-        saveLog();
-        stopVideo();
-    }
-
-    // Stop walking
-    stopWalking();
-
-    playSound("beep_high");
-
-}
-
-void spinGaitControllerOnce(){
-
-    dyret_controller::GaitControllerCommandService srv;
-
-    srv.request.gaitControllerCommand.gaitControllerCommand = srv.request.gaitControllerCommand.t_spinOnce;
-
-    if (gaitCommandService_client.call(srv) == false) {
-        ROS_ERROR("Error while calling gaitControllerCommand service");
-    }
-
-}
-
-void runGaitWithServiceCalls(){
-    resetGaitRecording(get_gait_evaluation_client);
-    startGaitRecording(get_gait_evaluation_client);
-
-    if (!ros::Time::isSimTime()) {
-        ROS_ERROR("In runGaitWithServiceCalls in hardware experiments!");
-    }
-
-
-    ros::Time startTime_sim = ros::Time::now();
-    ros::WallTime startTime_rw = ros::WallTime::now();
-    while (ros::ok() && (getInferredPosition() < evaluationDistance)) {
-        gz->step(30);
-        spinGaitControllerOnce();
-
-        // Timeout in sim time
-        if ((ros::Time::now() - startTime_sim).sec > (evaluationTimeout)) {
-            printf("  Timed out (sim) forward at %ds\n", (ros::Time::now() - startTime_sim).sec);
-            break;
-        }
-
-        // Timeout in realtime
-        if ((ros::WallTime::now() - startTime_rw).sec > 120) {
-            printf("  Timed out (forward) at %ds\n", (ros::WallTime::now() - startTime_rw).sec);
-            return;
-        }
-
-
-    }
-
-    pauseGaitRecording(get_gait_evaluation_client);
-
-    auto current_time = std::chrono::high_resolution_clock::now();
-
-    std::cout << "Program has been running for " << (ros::WallTime::now() - startTime_rw).sec << " seconds in realtime" << std::endl;
-    std::cout << "Program has been running for " << (ros::Time::now() - startTime_sim).sec << " seconds in sim time" << std::endl;
-
-}
-
-void cooldownServos(){
-    getMaxServoTemperature(true);
-    fprintf(logOutput, "Cooldown? TURNS OFF SERVOS! (y/n) > ");
-
-    std::string input;
-    getline(std::cin, input);
-
-    if (input == "y") {
-        disableServos(servoConfigClient);
-        long long int currentTime = getMs();
-        fprintf(logOutput, "00.0 ");
-        while (getMaxServoTemperature(true) > 50) {
-            sleep(10);
-            fprintf(logOutput, "%3.1f: ", ((getMs() - currentTime) / 1000.0) / 60.0);
-        }
-
-        std::string input;
-        std::cout << "Press enter to enable servos";
-        getline(std::cin, input);
-
-        usleep(1000);
-        setServoSpeeds(0.01, servoConfigClient);
-        enableServos(servoConfigClient);
-        usleep(1000);
-        sendAngleCommand(restPose);
-
-        std::cout << "Press enter to continue evolution";
-        getline(std::cin, input);
-    }
-}
 
 // This function takes in a phenotype, and returns the fitness for the individual
 std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
@@ -716,23 +164,23 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Reset if we are in simulation
     if (ros::Time::isSimTime() && !skipSimulationReset){
-        resetSimulation();
+        resetSimulation(gz);
         usleep(1000);
     }
 
     // Code to stop for cooldown at the start of each new generation:
     if (ros::Time::isSystemTime() && cooldownPromptEnabled && (currentIndividual % popSize == 0) && (currentIndividual != 0)) {
         playSound("info_generationdone");
-        cooldownServos();
+        cooldownServos(servoConfigClient, servoTemperatures, poseCommand_pub, restPose);
     }
 
-    fprintf(logOutput, "\n  %03u: Evaluating individual:\n", currentIndividual);
-    printMap(phenoType, "    ", logOutput);
+    printf("\n  %03u: Evaluating individual:\n", currentIndividual);
+    printMap(phenoType, "    ");
 
     // Check servo temperature and consider fitness invalid if too high (due to DC motor characterics)
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
-        if (getMaxServoTemperature() > 70.0) {
-            ROS_ERROR("  Temperature is too high at %.1f\n", getMaxServoTemperature());
+        if (getMaxServoTemperature(servoTemperatures) > 70.0) {
+            ROS_ERROR("  Temperature is too high at %.1f\n", getMaxServoTemperature(servoTemperatures));
             return std::map<std::string, double>();
         }
     }
@@ -757,7 +205,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_rear"), (float) phenoType.at("tibiaLength_rear")};
     }
 
-    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType);
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -771,10 +219,20 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     // Run gait
     if (ros::Time::isSystemTime() || useActionMessageInSim) {
-        runGaitControllerWithActionMessage(true);
+        runGaitControllerWithActionMessage(true,
+                                           currentIndividual,
+                                           get_gait_evaluation_client,
+                                           loggerCommandService_client,
+                                           gaitCommandService_client,
+                                           inferredPositionClient,
+                                           enableLogging,
+                                           evaluationTimeout,
+                                           evaluationDistance,
+                                           logDirectoryPath);
+
     } else {
         gz->step(100);
-        runGaitWithServiceCalls();
+        runGaitWithServiceCalls(evaluationDistance, evaluationTimeout, gz, get_gait_evaluation_client, inferredPositionClient, gaitCommandService_client);
     }
 
     // Get results from gaitEvaluator
@@ -800,8 +258,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Print forward results
-    fprintf(logOutput, "  Res F:\n");
-    printMap(gaitResultsForward, "    ", logOutput);
+    printf("  Res F:\n");
+    printMap(gaitResultsForward, "    ");
 
     std::map<std::string, double> gaitResultsReverse;
 
@@ -810,13 +268,13 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         ROS_INFO("Evaluating reverse");
 
         if (ros::Time::isSimTime() && !skipSimulationReset){
-            resetSimulation();
+            resetSimulation(gz);
             usleep(1000);
         }
 
         // Set gait parameters
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-        setGaitParams(gaitType, "", false, true, femurLengths, tibiaLengths, phenoType);
+        setGaitParams(gaitType, "", false, true, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
             ros::spinOnce();
@@ -828,10 +286,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         // Run gait
         if (ros::Time::isSystemTime() || useActionMessageInSim) {
-            runGaitControllerWithActionMessage(false);
+            runGaitControllerWithActionMessage(false,
+                                               currentIndividual,
+                                               get_gait_evaluation_client,
+                                               loggerCommandService_client,
+                                               gaitCommandService_client,
+                                               inferredPositionClient,
+                                               enableLogging,
+                                               evaluationTimeout,
+                                               evaluationDistance,
+                                               logDirectoryPath);
         } else {
             gz->step(100);
-            runGaitWithServiceCalls();
+            runGaitWithServiceCalls(evaluationDistance, evaluationTimeout, gz, get_gait_evaluation_client, inferredPositionClient, gaitCommandService_client);
         }
 
         gaitResultsReverse = getGaitResults(get_gait_evaluation_client);
@@ -851,8 +318,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
 
         // Print reverse results
-        fprintf(logOutput, "  Res R:\n");
-        printMap(gaitResultsReverse, "    ", logOutput);
+        printf("  Res R:\n");
+        printMap(gaitResultsReverse, "    ");
     }
 
     // Handle robots that fell
@@ -879,22 +346,22 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         mapToReturn["MocapSpeed"] = 0;
 
         if (ros::Time::isSimTime()){
-            resetSimulation();
+            resetSimulation(gz);
             ROS_INFO("Reseting simulation due to fall");
         }
 
     }
 
     // Print total results
-    fprintf(logOutput, "  Res total: \n");
-    printMap(mapToReturn, "    ", logOutput);
+    printf("  Res total: \n");
+    printMap(mapToReturn, "    ");
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
         playSound("warning_mocap");
     }
 
-    fprintf(logOutput, "\n");
+    printf("\n");
 
     // Add raw fitnesses to container
     rawFitnesses.push_back(gaitResultsForward);
@@ -906,175 +373,19 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
 }
 
-std::map<std::string, double> genToHighLevelSplineGaitPhen(std::vector<double> givenGenotype) {
+void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
+    currentFemurLength = (msg->prismatic[0].position + msg->prismatic[2].position + msg->prismatic[4].position +
+                          msg->prismatic[6].position) / 4.0;
+    currentTibiaLength = (msg->prismatic[1].position + msg->prismatic[3].position + msg->prismatic[5].position +
+                          msg->prismatic[7].position) / 4.0;
 
-    assert(givenGenotype.size() >= 10);
-
-    std::map<std::string, double> phenoType;
-
-    phenoType["femurLength"]     = givenGenotype[0] * 50.0;          //  0    ->  50
-    phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          //  0    ->  95
-    phenoType["stepLength"]      = givenGenotype[2] * 300.0;         //  0    -> 300
-    phenoType["stepHeight"]      = 25.0 + (givenGenotype[3] * 50.0); // 25    ->  75
-    phenoType["smoothing"]       = givenGenotype[4] * 50.0;          //  0    ->  50
-    phenoType["frequency"]       = (0.25 + givenGenotype[5] * 0.75) * frequencyFactor;   //  0.25 ->   1.0
-    phenoType["wagPhase"]        = (givenGenotype[6] * 0.4) - 0.2;   // -0.2  ->   0.2
-    phenoType["wagAmplitude_x"]  = givenGenotype[7] * 50.0;          //  0    ->  50
-    phenoType["wagAmplitude_y"]  = givenGenotype[8] * 50.0;          //  0    ->  50
-    phenoType["liftDuration"]    = (givenGenotype[9] * 0.15) + 0.05; //  0.05 ->   0.20
-
-    if (frequencyFactor != 1.0){
-        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
+    for (int i = 0; i < msg->revolute.size(); i++){
+        servoTemperatures[i] = msg->revolute[i].temperature;
     }
-
-    return phenoType;
 }
 
-double mapNumber(double value, double start1, double stop1, double start2, double stop2) {
-    return start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));
-}
-
-double getPoint(double givenNumber, double givenMinValue, double givenMaxValue, double givenOffset, double givenMinRange, double difficultyLevel) {
-    //printf("  getPoint(givenNumber=%.2f, minValue=%.2f, maxvalue=%.2f, offset=%.2f, difficultyLevel=%.2f", givenNumber, givenMinValue, givenMaxValue, givenOffset, difficultyLevel);
-
-    double oldRange = givenMaxValue - givenMinValue;
-    double newRange = (((givenMaxValue - givenMinValue) - givenMinRange) * (difficultyLevel)) + givenMinRange;
-
-    double newMax = (newRange / 2) + givenOffset;
-    double newMin = (-newRange / 2) + givenOffset;
-
-    //printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f",oldRange, newRange, newMax, newMin);
-
-    if (newMax > givenMaxValue) {
-        newMin = newMin - (newMax - givenMaxValue);
-        newMax = givenMaxValue;
-    }
-
-    if (newMin < givenMinValue) {
-        newMax = newMax - (newMin - givenMinValue);
-        newMin = givenMinValue;
-    }
-
-    //printf("  oldRange: %.2f, newRange: %.2f, newMax: %.2f, newMin: %.2f", oldRange, newRange, newMax, newMin);
-
-    double numberToReturn = mapNumber(givenNumber, 0, 1, newMin, newMax);
-
-    //printf("  giveNumber: %.2f, new number: %.2f", givenNumber, numberToReturn);
-
-    return numberToReturn;
-}
-
-std::map<std::string, double> genToLowLevelSplineGaitPhen(std::vector<double> givenGenotype) {
-
-    if (givenGenotype.size() < 20){
-        ROS_ERROR("givenGenotype.size() < 20: %lu", givenGenotype.size());
-        exit(-1);
-    }
-
-    std::map<std::string, double> phenoType;
-
-    phenoType["difficultyFactor"] = gaitDifficultyFactor;
-
-    phenoType["femurLength"]     = givenGenotype[0] * 50.0;          // 0    -> 50
-    phenoType["tibiaLength"]     = givenGenotype[1] * 95.0;          // 0    -> 95
-    phenoType["liftDuration"]    = getPoint(givenGenotype[2], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = (0.25 + (givenGenotype[3] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
-
-    if (frequencyFactor != 1.0){
-        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
-    }
-
-    phenoType["wagPhase"]        = getPoint(givenGenotype[4], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
-    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[5],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
-    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[6],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
-
-    phenoType["p0_x"] =   givenGenotype[7] * 0.0;
-    phenoType["p1_x"] =   givenGenotype[9] * 0.0;
-
-    // StepLength 25 -> 300, p0 center around 75, p1 center around -75
-    phenoType["p0_y"] = getPoint(fmax(givenGenotype[8], givenGenotype[10]), -150.0, 150.0,   50.0, 50.0, gaitDifficultyFactor);
-    phenoType["p1_y"] = getPoint(fmin(givenGenotype[8], givenGenotype[10]), -150.0, 150.0, -100.0, 50.0, gaitDifficultyFactor);
-
-    // (potential) Front air point:
-    phenoType["p2_x"] = getPoint(givenGenotype[11],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p2_y"] = getPoint(givenGenotype[12], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
-    phenoType["p2_z"] = getPoint(givenGenotype[13],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-
-    // (potential) Top air point:
-    phenoType["p3_x"] = getPoint(givenGenotype[14],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p3_y"] = getPoint(givenGenotype[15], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
-    phenoType["p3_z"] = getPoint(givenGenotype[16],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
-
-    // (potential) Back air point:
-    phenoType["p4_x"] = getPoint(givenGenotype[17],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p4_y"] = getPoint(givenGenotype[18], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
-    phenoType["p4_z"] = getPoint(givenGenotype[19],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-
-    return phenoType;
-}
-
-std::map<std::string, double> genToLowLevelAdvancedSplineGaitPhen(std::vector<double> givenGenotype) {
-
-    if (givenGenotype.size() < 20){
-        ROS_ERROR("givenGenotype.size() < 20: %lu", givenGenotype.size());
-        exit(-1);
-    }
-
-    std::map<std::string, double> phenoType;
-
-    phenoType["difficultyFactor"] = gaitDifficultyFactor;
-
-    phenoType["femurLength_front"]    = givenGenotype[0] * 50.0;          // 0    -> 50
-    phenoType["femurLength_rear"]     = givenGenotype[1] * 50.0;          // 0    -> 50
-    phenoType["tibiaLength_front"]    = givenGenotype[2] * 95.0;          // 0    -> 95
-    phenoType["tibiaLength_rear"]     = givenGenotype[3] * 95.0;          // 0    -> 95
-    phenoType["liftDuration"]    = getPoint(givenGenotype[4], 0.05, 0.20, 0.175, 0.05, gaitDifficultyFactor); // 0.15, 0.2 -> 0.05, 0.2
-    phenoType["frequency"]       = (0.25 + (givenGenotype[5] * 0.75)) * frequencyFactor; // 0.25 ->  1.0
-
-    if (frequencyFactor != 1.0){
-        ROS_WARN("Using frequencyFactor %.2f", frequencyFactor);
-    }
-
-    phenoType["wagPhase"]        = getPoint(givenGenotype[6], -M_PI/2.0, M_PI/2.0, 0.0, 0.2, gaitDifficultyFactor);
-    phenoType["wagAmplitude_x"]  = getPoint(givenGenotype[7],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
-    phenoType["wagAmplitude_y"]  = getPoint(givenGenotype[8],         0,     50.0, 0.0, 5.0, gaitDifficultyFactor);
-
-    // StepLength 25 -> 300, p0 center around 75, p1 center around -75
-    phenoType["p0_y"] = getPoint(givenGenotype[10], -150.0, 150.0,   50.0, 50.0, gaitDifficultyFactor);
-    phenoType["p1_y"] = getPoint(givenGenotype[12], -150.0, 150.0, -100.0, 50.0, gaitDifficultyFactor);
-
-    // Make sure the front point is actually in front:
-    float gnd_min = fmin(phenoType["p0_y"], phenoType["p1_y"]);
-    float gnd_max = fmax(phenoType["p0_y"], phenoType["p1_y"]);
-
-    phenoType["p0_y"] = gnd_max;
-    phenoType["p1_y"] = gnd_min;
-
-    // (potential) Front air point:
-    phenoType["p2_x_front"] = getPoint(givenGenotype[13],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p2_y_front"] = getPoint(givenGenotype[14], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
-    phenoType["p2_z_front"] = getPoint(givenGenotype[15],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-    phenoType["p2_x_rear"]  = getPoint(givenGenotype[16],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p2_y_rear"]  = getPoint(givenGenotype[17], -150.0, 150.0, 75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> 50, 100
-    phenoType["p2_z_rear"]  = getPoint(givenGenotype[18],   10.0,  80.0, 30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-
-    // (potential) Top air point:
-    phenoType["p3_x_front"] = getPoint(givenGenotype[19],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p3_y_front"] = getPoint(givenGenotype[20], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
-    phenoType["p3_z_front"] = getPoint(givenGenotype[21],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
-    phenoType["p3_x_rear"]  = getPoint(givenGenotype[22],  -25.0,  25.0,  0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p3_y_rear"]  = getPoint(givenGenotype[23], -150.0, 150.0,  0.0,  0.0, gaitDifficultyFactor); // -150, 150 -> 0, 0
-    phenoType["p3_z_rear"]  = getPoint(givenGenotype[24],   10.0,  80.0, 50.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 45, 55
-
-    // (potential) Back air point:
-    phenoType["p4_x_front"] = getPoint(givenGenotype[25],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p4_y_front"] = getPoint(givenGenotype[26], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
-    phenoType["p4_z_front"] = getPoint(givenGenotype[27],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-    phenoType["p4_x_rear"]  = getPoint(givenGenotype[28],  -25.0,  25.0,   0.0,  0.0, gaitDifficultyFactor); // -25, 25 -> 0, 0
-    phenoType["p4_y_rear"]  = getPoint(givenGenotype[29], -150.0, 150.0, -75.0, 50.0, gaitDifficultyFactor); // -150, 150 -> -50, -100
-    phenoType["p4_z_rear"]  = getPoint(givenGenotype[30],   10.0,  80.0,  30.0, 10.0, gaitDifficultyFactor); // 10, 80 -> 25, 35
-
-    return phenoType;
+void actuator_boardStateCallback(const dyret_hardware::ActuatorBoardState::ConstPtr &msg) {
+    for (int i = 0; i < 8; i++) prismaticActuatorStates[i] = msg->status[i];
 }
 
 void stopEa();
@@ -1084,11 +395,11 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
     std::map<std::string, double> individualParameters;
     if (gaitType == "highLevelSplineGait") {
-        individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype);
+        individualParameters = genToHighLevelSplineGaitPhen(givenIndividualGenotype, frequencyFactor);
     } else if (gaitType == "lowLevelSplineGait"){
-        individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype);
+        individualParameters = genToLowLevelSplineGaitPhen(givenIndividualGenotype, frequencyFactor, gaitDifficultyFactor);
     } else if (gaitType == "lowLevelAdvancedSplineGait"){
-        individualParameters = genToLowLevelAdvancedSplineGaitPhen(givenIndividualGenotype);
+        individualParameters = genToLowLevelAdvancedSplineGaitPhen(givenIndividualGenotype, frequencyFactor, gaitDifficultyFactor);
     } else {
         ROS_FATAL("Unknown controller: %s", gaitType.c_str());
         exit(-1);
@@ -1110,7 +421,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
-            //fprintf(logOutput, "  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
+            //printf("  Select action: continue (enter), retry (r), discard (b), restart servos (d):\n");
 
             std::string input = getInputFromTerminal("  Action: continue (enter), retry (r), discard (b), restart servos (d), zero linear actuators (z):");
 
@@ -1128,11 +439,11 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                 sleep(10);
                 validSolution = false;
                 currentIndividual--;
-                fprintf(logOutput, "  Press enter when ready to retry");
+                printf("  Press enter when ready to retry");
                 std::getline(std::cin, input);
             } else if (input == "z"){
-                fprintf(logOutput, "  Zeroing actuators\n");
-                zeroPrismaticActuators(false);
+                printf("  Zeroing actuators\n");
+                zeroPrismaticActuators(false, poseCommand_pub, prismaticActuatorStates);
             } else if (input.length() > 0){
                 ROS_WARN("Unknown input! Retrying");
             }
@@ -1145,16 +456,16 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
 
             // A valid solution could not be found:
             if (!validSolution || fitnessResult.empty()) {
-                if (automatedRun()) {
+                if (!fullCommand.empty()) {
                     if (retryCounter < 5) {
-                        fprintf(logOutput, "Retrying\n");
+                        printf("Retrying\n");
                         ROS_WARN("Retrying");
 
                         retryCounter += 1;
                         currentIndividual--;
                         validSolution = false;
                     } else {
-                        fprintf(logOutput, "ABORT - after three retries without results\n");
+                        printf("ABORT - after three retries without results\n");
                         exit(-1);
                     }
                 } else if (!ros::ok()) {
@@ -1162,7 +473,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     exit(-1);
                     break;
                 } else {
-                    fprintf(logOutput, "Got invalid fitness: choose action ((r)etry/(d)iscard: ");
+                    printf("Got invalid fitness: choose action ((r)etry/(d)iscard: ");
 
                     std::string choice;
                     getline(std::cin, choice);
@@ -1170,23 +481,23 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
                     if (choice == "d") { // Discard
                         fitnessResult.clear();
 
-                        fprintf(logOutput, "Discarding\n");
+                        printf("Discarding\n");
                         validSolution = true;
                     } else { // Retry
                         if (ros::Time::isSimTime()) {
                             sleep(5);
-                            resetSimulation();
+                            resetSimulation(gz);
                             sleep(5);
                         }
 
-                        fprintf(logOutput, "Retrying\n");
+                        printf("Retrying\n");
                         currentIndividual--;
                         validSolution = false;
                     }
                 }
             }
         }
-    } while (validSolution == false);
+    } while (!validSolution);
 
     FILE *genFile = fopen("generation", "r");
 
@@ -1195,10 +506,10 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     fclose(genFile);
 
     if (currentIndividual != 0) {
-        fprintf(logFile, ",\n");
+        printf(",\n");
     }
 
-    fprintf(logFile, "    {\n");
+    printf("    {\n");
 
     fprintf(logFile, "      \"id\": %d,\n", currentIndividual);
     fprintf(logFile, "      \"generation\": %d,\n", currentGeneration);
@@ -1239,18 +550,8 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
     }
 
     fprintf(logFile, "        }\n");
-
     fprintf(logFile, "      ]\n");
-
     fprintf(logFile, "    }");
-
-/*    if (currentIndividual != -1) { // If last individual
-        fprintf(logFile, "\n");
-        fprintf(logFile, "  ]\n");
-        fprintf(logFile, "}");
-    } else {
-        fprintf(logFile, ",\n");
-    }*/
 
     return fitnessResult;
 
@@ -1280,15 +581,15 @@ public:
         // Run at end of generations:
         if ((currentIndividual != 0) && ((currentIndividual+1) != popSize) &&  ((currentIndividual+1) % (popSize)) == 0){
             if(currentIndividual == ((popSize * generations)-1)) { // Check for end without stop condition
-                fprintf(stdout, "Printing at end of run (individual %d)!\n", currentIndividual);
+                printf("Printing at end of run (individual %d)!\n", currentIndividual);
                 fprintf(evoLog, "\n");
                 fprintf(evoLog, "  ]\n");
                 fprintf(evoLog, "}");
             } else if (stopCondition()){
                 stopEa();
 
-                fprintf(stdout, "Printing at stop condition (individual %d)!\n", currentIndividual);
-                fprintf(stdout, "currentIndividual: %d, popSize: %d\n", currentIndividual, popSize);
+                printf("Printing at stop condition (individual %d)!\n", currentIndividual);
+                printf("currentIndividual: %d, popSize: %d\n", currentIndividual, popSize);
 
                 fprintf(evoLog, "\n");
                 fprintf(evoLog, "  ]\n");
@@ -1446,31 +747,31 @@ void menu_demo() {
 
     std::cout << "  Please choose one demonstration: (enter to go back)\n";
 
-    fprintf(logOutput, "    ss - Test small robot (small HLSC)\n"
-                       "    ls - Test large robot (small HLSC)\n"
-                       "    ll - Test large robot (large HLSC)\n"
-                       "    rz - Test zero robot (LLSC)\n"
-                       "    rm - Test medium robot (LLSC)\n"
-                       "    rd - Test doubleUneven robot (LLASC)\n"
-                       "    ru - Test uneven robot (LLASC)\n"
-                       "    rf - Test uneven robot sim (leaning front) (LLASC)\n"
-                       "    rb - Test uneven robot sim (leaning back) (LLASC)\n"
-                       "    ms - Request small morphology\n"
-                       "    mx - Request 10mm morphology\n"
-                       "    mm - Request medium morphology\n"
-                       "    ml - Request large morphology\n"
-                       "    mt - Test morphology changes\n"
-                       "    mu - Request uneven length morphology\n"
-                       "    cs - Start camera\n"
-                       "    ch - Stop camera\n"
-                       "    b - Test beeps\n");
-    fprintf(logOutput, "\n> ");
+    printf("    ss - Test small robot (small HLSC)\n"
+           "    ls - Test large robot (small HLSC)\n"
+           "    ll - Test large robot (large HLSC)\n"
+           "    rz - Test zero robot (LLSC)\n"
+           "    rm - Test medium robot (LLSC)\n"
+           "    rd - Test doubleUneven robot (LLASC)\n"
+           "    ru - Test uneven robot (LLASC)\n"
+           "    rf - Test uneven robot sim (leaning front) (LLASC)\n"
+           "    rb - Test uneven robot sim (leaning back) (LLASC)\n"
+           "    ms - Request small morphology\n"
+           "    mx - Request 10mm morphology\n"
+           "    mm - Request medium morphology\n"
+           "    ml - Request large morphology\n"
+           "    mt - Test morphology changes\n"
+           "    mu - Request uneven length morphology\n"
+           "    cs - Start camera\n"
+           "    ch - Stop camera\n"
+           "    b - Test beeps\n");
+    printf("\n> ");
 
     if (commandQueue.empty()) {
         getline(std::cin, choice);
     } else {
         choice = commandQueue[0];
-        fprintf(logOutput, "*%s*\n", choice.c_str());
+        printf("*%s*\n", choice.c_str());
         commandQueue.erase(commandQueue.begin());
     }
 
@@ -1494,31 +795,31 @@ void menu_demo() {
         } else if (choice == "rb") {
            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "ms") {
-            setLegLengths(0.0, 0.0);
-            fprintf(logOutput, "Small morphology requested\n");
+            setLegLengths(0.0, 0.0, poseCommand_pub);
+            printf("Small morphology requested\n");
         } else if (choice == "mu") {
-            setLegLengths(std::vector<float>{25, 25, 25, 25, 5, 5, 5, 5});
-            fprintf(logOutput, "Uneven length morphology requested\n");
+            setLegLengths(std::vector<float>{25, 25, 25, 25, 5, 5, 5, 5}, poseCommand_pub);
+            printf("Uneven length morphology requested\n");
         } else if (choice == "mx") {
-            setLegLengths(10.0, 10.0);
-            fprintf(logOutput, "10mm morphology requested\n");
+            setLegLengths(10.0, 10.0, poseCommand_pub);
+            printf("10mm morphology requested\n");
         } else if (choice == "mm") {
-            setLegLengths(25.0, 47.5);
-            fprintf(logOutput, "Medium morphology requested\n");
+            setLegLengths(25.0, 47.5, poseCommand_pub);
+            printf("Medium morphology requested\n");
         } else if (choice == "ml") {
-            setLegLengths(50.0, 95.0);
-            fprintf(logOutput, "Large morphology requested\n");
+            setLegLengths(50.0, 95.0, poseCommand_pub);
+            printf("Large morphology requested\n");
         }else if (choice == "mt") {
             while(ros::ok()) {
-              setLegLengths(10.0, 10.0);
+              setLegLengths(10.0, 10.0, poseCommand_pub);
               printf("  Leg lengths set to 10/10\n");
               sleep(1);
-              while (!legsAtRest() && ros::ok()) {}
+              while (!legsAtRest(prismaticActuatorStates) && ros::ok()) {}
               sleep(1);
-              setLegLengths(5.0, 5.0);
+              setLegLengths(5.0, 5.0, poseCommand_pub);
               printf("  Leg lengths set to 5/5\n");
               sleep(1);
-              while (!legsAtRest() && ros::ok()) {}
+              while (!legsAtRest(prismaticActuatorStates) && ros::ok()) {}
               sleep(1);
             }
         } else if (choice == "cs") { // Start camera
@@ -1533,66 +834,6 @@ void menu_demo() {
     }
     enableLogging = true;
 };
-
-std::string getDateString(struct tm *givenTime) {
-    std::stringstream ss;
-
-    ss << givenTime->tm_year + 1900
-       << std::setw(2) << std::setfill('0') << givenTime->tm_mon + 1
-       << std::setw(2) << std::setfill('0') << givenTime->tm_mday
-       << std::setw(2) << std::setfill('0') << givenTime->tm_hour
-       << std::setw(2) << std::setfill('0') << givenTime->tm_min
-       << std::setw(2) << std::setfill('0') << givenTime->tm_sec;
-
-    return ss.str();
-
-}
-
-std::string createExperimentDirectory(std::string prefix, struct tm *givenTime) {
-    std::stringstream ss;
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/";
-    mkdir(ss.str().c_str(), 0700);
-    ss.str(std::string());
-
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/" << getDateString(givenTime) << "_" << prefix << "/";
-
-    mkdir(ss.str().c_str(), 0700);
-    return ss.str();
-}
-
-std::string getCommitHash(std::string packageName) {
-
-    std::string path = ros::package::getPath(packageName.c_str());
-    std::string command = ("git -C " + path + " rev-parse HEAD").c_str();
-
-    std::array<char, 128> buffer;
-    std::string result = packageName + ": ";
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(command.c_str(), "r"), pclose);
-    if (!pipe) {
-        throw std::runtime_error("popen() failed!");
-    }
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        result += buffer.data();
-    }
-    return result;
-}
-
-void writeVersionLog(std::string givenLogDirectory){
-
-
-  fprintf(stderr, "Writing version info to %s\n", givenLogDirectory.c_str());
-
-  FILE *versionLog = fopen((givenLogDirectory + "versions.txt").c_str(), "w");
-
-  std::string packages[] = {"tonnesfn_experiments", "dyret_common", "dyret_controller", "dyret_hardware", "camera_recorder", "xsens_driver", "mocap_optitrack", "rosserial_arduino"};
-
-  for (const std::string &package : packages){
-    fprintf(versionLog, "%s", getCommitHash(package).c_str());
-  }
-
-  fclose(versionLog);
-
-}
 
 void experiments_evolve(const std::string givenAlgorithm, const std::string givenMorphology, const std::string givenController) {
     if (givenAlgorithm != "map-elites" && givenAlgorithm != "nsga2") {
@@ -1655,7 +896,7 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
     fprintf(evoLog, "    \"morphology\": \"*evolved*\",\n");
 
     fprintf(evoLog, "    \"fitness\": [\n");
-    if (instantFitness == false) {
+    if (!instantFitness) {
         for (int i = 0; i < fitnessFunctions.size(); i++) {
             fprintf(evoLog, "      \"%s\"", fitnessFunctions[i].c_str());
             if (i != fitnessFunctions.size() - 1) fprintf(evoLog, ",\n");
@@ -1711,24 +952,13 @@ void experiments_evolve(const std::string givenAlgorithm, const std::string give
     }
     logDirectoryPath.clear();
 
-    fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
+    printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         unpauseGazebo();
     }
 
 };
-
-bool directoryExists(std::string givenPath){
-  struct stat info;
-
-  if(stat(givenPath.c_str(), &info ) != 0 ) {
-    return false;
-  } else if( info.st_mode & S_IFDIR ) {
-    return true;
-  }
-  return false;
-}
 
 void experiments_verifyFitness() {
     currentIndividual = 0;
@@ -1828,8 +1058,8 @@ void experiments_verifyFitness() {
                                                                  get_gait_evaluation_client,
                                                                  rawFitnesses);
 
-        fprintf(logOutput, "  Returned fitness (%lu): \n", fitnessResult.size());
-        printMap(fitnessResult, "    ", logOutput);
+        printf("  Returned fitness (%lu): \n", fitnessResult.size());
+        printMap(fitnessResult, "    ");
 
         // Save to file:
         verifyLog = fopen(logDirectoryPath.c_str(), "a");
@@ -1854,7 +1084,7 @@ void experiments_verifyFitness() {
         fprintf(verifyLog, "\n    }");
 
         fclose(verifyLog);
-        fprintf(logOutput, "\n");
+        printf("\n");
     }
 
     verifyLog = fopen(logDirectoryPath.c_str(), "a");
@@ -1873,22 +1103,14 @@ void experiments_fitnessNoise() {
 
         std::map<std::string, double> gaitResults = getGaitResults(get_gait_evaluation_client);
 
-        fprintf(logOutput, "  Res: ");
+        printf("  Res: ");
         for(auto elem : gaitResults){
-            fprintf(logOutput, "        \"%s\": %f", elem.first.c_str(), elem.second);
-            if (i != gaitResults.size()-1) fprintf(logOutput, ",\n"); else fprintf(logOutput, "\n");
+            printf("        \"%s\": %f", elem.first.c_str(), elem.second);
+            if (i != gaitResults.size()-1) printf(",\n"); else printf("\n");
             i++;
         }
 
     }
-}
-
-std::vector<double> getRandomIndividual() {
-    std::vector<double> individual(20);
-
-    for (int j = 0; j < individual.size(); j++) individual[j] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-
-    return individual;
 }
 
 void experiments_randomSearch() {
@@ -1905,7 +1127,7 @@ void experiments_randomSearch() {
         std::cin.clear();
     } else {
         numberOfTests = std::stoi(commandQueue[0]);
-        fprintf(logOutput, "*%d*\n", numberOfTests);
+        printf("*%d*\n", numberOfTests);
         commandQueue.erase(commandQueue.begin());
     }
 
@@ -1950,7 +1172,7 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "    \"population\": %d,\n", popSize);
 
         fprintf(randomSearchLog, "    \"fitness\": [\n");
-        if (instantFitness == false) {
+        if (!instantFitness) {
             for (int i = 0; i < fitnessFunctions.size(); i++) {
                 fprintf(randomSearchLog, "      \"%s\"", fitnessFunctions[i].c_str());
                 if (i != fitnessFunctions.size() - 1) fprintf(randomSearchLog, ",\n");
@@ -1976,34 +1198,8 @@ void experiments_randomSearch() {
         fprintf(randomSearchLog, "\n]}\n");
         fclose(randomSearchLog);
 
-        fprintf(logOutput, "Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
+        printf("Experiment finished. Log written to:\n  %s\n", ss.str().c_str());
     }
-}
-
-void getDifficultyFactor(){
-  printf("Difficulty?> ");
-
-  std::string difficulty;
-
-  if (commandQueue.empty()) {
-    getline(std::cin, difficulty);
-  } else {
-    difficulty = commandQueue[0];
-    fprintf(logOutput, "*%s*\n", difficulty.c_str());
-    commandQueue.erase(commandQueue.begin());
-  }
-
-  if(difficulty.find_first_not_of("1234567890.-") != std::string::npos){
-
-    // Get random number and limit to 0.xxx
-    gaitDifficultyFactor = ((int)(1000.0 * static_cast <float> (rand()) / static_cast <float> (RAND_MAX))) / 1000.0;
-
-    printf("Did not receive valid complexity number. Setting to random: %3f\n", gaitDifficultyFactor);
-
-  } else {
-    gaitDifficultyFactor = atof(difficulty.c_str());
-  }
-
 }
 
 void menu_experiments() {
@@ -2011,29 +1207,28 @@ void menu_experiments() {
 
     std::cout << "  Please choose one experiment: (enter to go back)\n";
 
-    fprintf(logOutput,
-            "      curr - run current experiment\n"
-            "    Evolution:\n"
-            "      cs - evolve control, small morphology, highLevel\n"
-            "      cm - evolve control, medium morphology, highLevel\n"
-            "      cl - evolve control, large morphology, highLevel\n"
-            "      mn - evolve cont+morph, highLevel\n"
-            "      me - evolve map-elites, highLevel\n"
-            "      el - evolve cont+morph, lowLevel\n"
-            "    Random:\n"
-            "      rh - random search, highLevel\n"
-            "      rl - random search, lowLevel\n"
-            "    Verify:\n"
-            "      vf - verify fitness on single individual\n"
-            "    Misc:\n"
-            "      vn - check noise in stability fitness\n");
-    fprintf(logOutput, "\n> ");
+    printf("      curr - run current experiment\n"
+           "    Evolution:\n"
+           "      cs - evolve control, small morphology, highLevel\n"
+           "      cm - evolve control, medium morphology, highLevel\n"
+           "      cl - evolve control, large morphology, highLevel\n"
+           "      mn - evolve cont+morph, highLevel\n"
+           "      me - evolve map-elites, highLevel\n"
+           "      el - evolve cont+morph, lowLevel\n"
+           "    Random:\n"
+           "      rh - random search, highLevel\n"
+           "      rl - random search, lowLevel\n"
+           "    Verify:\n"
+           "      vf - verify fitness on single individual\n"
+           "    Misc:\n"
+           "      vn - check noise in stability fitness\n");
+    printf("\n> ");
 
     if (commandQueue.empty()) {
         getline(std::cin, choice);
     } else {
         choice = commandQueue[0];
-        fprintf(logOutput, "*%s*\n", choice.c_str());
+        printf("*%s*\n", choice.c_str());
         commandQueue.erase(commandQueue.begin());
     }
 
@@ -2047,7 +1242,7 @@ void menu_experiments() {
             std::string input;
             getline(std::cin, input);
 
-            zeroPrismaticActuators(true);
+            zeroPrismaticActuators(true, poseCommand_pub, prismaticActuatorStates);
 
             experiments_evolve("nsga2", "", "lowLevelSplineGait");
         } else if (choice == "cs") {
@@ -2059,7 +1254,7 @@ void menu_experiments() {
         } else if (choice == "mn") {
             experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "el") {
-            getDifficultyFactor();
+            gaitDifficultyFactor = getDifficultyFactor(commandQueue);
 
             experiments_evolve("nsga2", "small", "lowLevelSplineGait");
         } else if (choice == "me") {
@@ -2071,7 +1266,7 @@ void menu_experiments() {
         } else if (choice == "rl") {
             gaitType = "lowLevelSplineGait";
 
-            getDifficultyFactor();
+            gaitDifficultyFactor = getDifficultyFactor(commandQueue);
 
             experiments_randomSearch();
         } else if (choice == "rh") {
@@ -2086,37 +1281,36 @@ void menu_configure() {
 
     std::cout << "  Please choose a setting to change: (enter to go back)\n";
 
-    fprintf(logOutput, "    z - zero prismatic joints\n");
-    fprintf(logOutput, "    p - enable/disable evaluation prompt\n");
-    fprintf(logOutput, "    l - enable/disable fitness logging\n");
-    fprintf(logOutput, "    i - enable/disable instant fitness\n");
-    fprintf(logOutput, "    m - enable/disable morphology evolution\n");
-    fprintf(logOutput, "    s - enable/disable stand testing\n");
-    fprintf(logOutput, "    f - set frequency factor\n");
-    fprintf(logOutput, "    e - enable servo torques\n");
-    fprintf(logOutput, "    d - disable servo torques\n");
-    fprintf(logOutput, "    r - restPose, adjusted\n");
-    fprintf(logOutput, "    t - restPose, directly\n");
-    fprintf(logOutput, "    q - set random seed\n");
-    fprintf(logOutput, "    x - reset simulation\n");
-    fprintf(logOutput, "\n> ");
+    printf("    z - zero prismatic joints\n");
+    printf("    p - enable/disable evaluation prompt\n");
+    printf("    l - enable/disable fitness logging\n");
+    printf("    i - enable/disable instant fitness\n");
+    printf("    m - enable/disable morphology evolution\n");
+    printf("    s - enable/disable stand testing\n");
+    printf("    f - set frequency factor\n");
+    printf("    e - enable servo torques\n");
+    printf("    d - disable servo torques\n");
+    printf("    r - restPose, adjusted\n");
+    printf("    t - restPose, directly\n");
+    printf("    q - set random seed\n");
+    printf("    x - reset simulation\n");
+    printf("\n> ");
 
     if (commandQueue.empty()) {
         getline(std::cin, choice);
     } else {
         choice = commandQueue[0];
-        fprintf(logOutput, "*%s*\n", choice.c_str());
+        printf("*%s*\n", choice.c_str());
         commandQueue.erase(commandQueue.begin());
     }
 
     if (choice.empty() != true) {
         if (choice == "i") {
             instantFitness = !instantFitness;
-            if (instantFitness == true) fprintf(logOutput, "Instant fitness evaluation now enabled!\n");
-            else
-                fprintf(logOutput, "Instant fitness evaluation now disabled!\n");
+            if (instantFitness) printf("Instant fitness evaluation now enabled!\n");
+            else printf("Instant fitness evaluation now disabled!\n");
         } else if (choice == "z") { // Zero prismatic joints
-          zeroPrismaticActuators(true);
+          zeroPrismaticActuators(true, poseCommand_pub, prismaticActuatorStates);
         } else if (choice == "y") {
           while(true) {
             playSound("beep_high", 3);
@@ -2128,56 +1322,56 @@ void menu_configure() {
 
             promptForConfirmation = !promptForConfirmation;
 
-            if (promptForConfirmation) fprintf(logOutput, "   evaluation prompt now enabled!\n");
-            else fprintf(logOutput, "   evaluation prompt now disabled!\n");
+            if (promptForConfirmation) printf("   evaluation prompt now enabled!\n");
+            else printf("   evaluation prompt now disabled!\n");
         } else if (choice == "l") {
 
             currentlyLoggingFitness = !currentlyLoggingFitness;
 
             if (currentlyLoggingFitness) {
                 enableFitnessLog(get_gait_evaluation_client);
-                fprintf(logOutput, "   fitness log now enabled!\n");
+                printf("   fitness log now enabled!\n");
             } else {
                 disableFitnessLog(get_gait_evaluation_client);
-                fprintf(logOutput, "   fitness log now disabled!\n");
+                printf("   fitness log now disabled!\n");
             }
 
         } else if (choice == "s") {
-            if (robotOnStand == true) {
-                fprintf(logOutput, "   RobotOnStand now disabled!\n");
+            if (robotOnStand) {
+                printf("   RobotOnStand now disabled!\n");
             } else {
-                fprintf(logOutput, "   RobotOnStand now enabled!\n");
+                printf("   RobotOnStand now enabled!\n");
             }
 
             robotOnStand = !robotOnStand;
         } else if (choice == "e") {
             enableServos(servoConfigClient);
-            fprintf(logOutput, "Torque enabled!\n");
+            printf("Torque enabled!\n");
         } else if (choice == "d") {
             disableServos(servoConfigClient);
-            fprintf(logOutput, "Torque disabled!\n");
+            printf("Torque disabled!\n");
         } else if (choice == "f") {
-            fprintf(logOutput, "  Frequency factor> ");
+            printf("  Frequency factor> ");
             std::cin >> frequencyFactor;
             std::cin.clear();
             std::cin.ignore(10000, '\n');
-            fprintf(logOutput, "  FrequencyFactor set to %f\n", frequencyFactor);
+            printf("  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "r") {
-            adjustRestPose();
+            adjustRestPose(gaitCommandService_client);
         } else if (choice == "t"){
             if (ros::Time::isSystemTime()){
                 setServoSpeeds(0.01, servoConfigClient);
             }
-            sendAngleCommand(restPose);
+            sendAngleCommand(restPose, poseCommand_pub);
         } else if (choice == "x") {
-            resetSimulation();
+            resetSimulation(gz);
         } else if (choice == "q") {
             randomSeed = 0;
             srand(randomSeed);
         }
 
     }
-    fprintf(logOutput, "\n");
+    printf("\n");
 }
 
 int main(int argc, char **argv) {
@@ -2231,7 +1425,7 @@ int main(int argc, char **argv) {
 
     std::string evoInfo = "testInfo";
 
-    if (resetGaitRecording(get_gait_evaluation_client) == false) {
+    if (!resetGaitRecording(get_gait_evaluation_client)) {
         spinner.stop();
         ros::shutdown();
         exit(-2);
@@ -2240,16 +1434,16 @@ int main(int argc, char **argv) {
     currentIndividual = -1;
 
     if (ros::Time::isSimTime()) {
-        fprintf(logOutput, "Currently running in simulation mode\n");
+        printf("Currently running in simulation mode\n");
 
         gz = &gazebo::WorldConnection::instance();
     } else {
-        fprintf(logOutput, "Currently running in hardware mode\n");
+        printf("Currently running in hardware mode\n");
     }
 
-    fprintf(logOutput, "Evo settings: %d generations of %d individuals\n", generations, popSize);
+    printf("Evo settings: %d generations of %d individuals\n", generations, popSize);
 
-    fprintf(logOutput, "\n");
+    printf("\n");
 
     sleep(1);
 
@@ -2257,7 +1451,7 @@ int main(int argc, char **argv) {
         setServoSpeeds(0.01, servoConfigClient);
     }
 
-    sendAngleCommand(restPose);
+    sendAngleCommand(restPose, poseCommand_pub);
 
     std::map<std::string, boost::function<void()> > menu;
     menu["demo"] = &menu_demo;
@@ -2271,15 +1465,15 @@ int main(int argc, char **argv) {
         while (it != menu.end()) {
             std::cout << "  " << (it++)->first << std::endl;
         }
-        fprintf(logOutput, "\n> ");
+        printf("\n> ");
 
-        if (commandQueue.empty() && !automatedRun()) {
+        if (commandQueue.empty() && fullCommand.empty()) {
             getline(std::cin, choice);
-        } else if (commandQueue.empty() && automatedRun()) {
+        } else if (commandQueue.empty() && !fullCommand.empty()) {
             choice = "exit";
         } else {
             choice = commandQueue[0];
-            fprintf(logOutput, "*%s*\n", choice.c_str());
+            printf("*%s*\n", choice.c_str());
             commandQueue.erase(commandQueue.begin());
         }
 
@@ -2289,7 +1483,7 @@ int main(int argc, char **argv) {
             ros::shutdown();
             exit(0);
         } else if (menu.find(choice) == menu.end()) {
-            fprintf(logOutput, "Unknown choice!\n");
+            printf("Unknown choice!\n");
             continue;
         }
 
