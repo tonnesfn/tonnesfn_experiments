@@ -56,6 +56,10 @@ add_executable(expGui
 target_link_libraries(expGui ${catkin_LIBRARIES})
 target_link_libraries(expGui ${Boost_LIBRARIES})
 target_link_libraries(expGui ${TBB_LIBRARIES})
-add_dependencies(expGui
-  ${catkin_EXPORTED_TARGETS})
+add_dependencies(expGui ${catkin_EXPORTED_TARGETS})
 
+add_executable(gaitAdaptationController
+               src/gaitAdaptationController.cpp
+              )
+target_link_libraries(gaitAdaptationController ${catkin_LIBRARIES})
+add_dependencies(gaitAdaptationController ${catkin_EXPORTED_TARGETS})
