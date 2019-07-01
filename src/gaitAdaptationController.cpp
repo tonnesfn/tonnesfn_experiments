@@ -1,3 +1,5 @@
+#include <thread>
+#include <chrono>
 
 #include "ros/ros.h"
 
@@ -47,9 +49,17 @@ int main(int argc, char **argv) {
             printf("  Sent gait configuration message with lowLevelSplineGait::zeroHeight individual\n");
 
         } else if (choice == "rzf") {
-            std::map<std::string, double> tmpIndividual = individuals_lowLevelSplineGait::zeroHeight;
-            tmpIndividual["frequency"] = 0.5;
-            updateGaitConfiguration("lowLevelSplineGait", tmpIndividual, gaitConfiguration_client);
+
+
+            for (int i = 10; i < 50; i++){
+                std::map<std::string, double> tmpIndividual = individuals_lowLevelSplineGait::zeroHeight;
+                tmpIndividual["frequency"] = i / 100.0;
+                updateGaitConfiguration("lowLevelSplineGait", tmpIndividual, gaitConfiguration_client);
+                printf("%.2f\n", tmpIndividual["frequency"]);
+
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            }
 
             printf("  Sent gait configuration message with faster lowLevelSplineGait::zeroHeight individual\n");
         } else if (choice == "") {
