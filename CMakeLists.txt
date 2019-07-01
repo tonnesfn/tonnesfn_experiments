@@ -60,6 +60,7 @@ add_dependencies(expGui ${catkin_EXPORTED_TARGETS})
 
 add_executable(gaitAdaptationController
                src/gaitAdaptationController.cpp
+	       src/expFunctions.cpp
               )
 target_link_libraries(gaitAdaptationController ${catkin_LIBRARIES})
 add_dependencies(gaitAdaptationController ${catkin_EXPORTED_TARGETS})

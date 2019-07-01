@@ -548,6 +548,7 @@ void setGaitParams(std::string gaitType,
                    std::string logFilePath,
                    bool directionForward,
                    bool prepareForGait,
+                   bool liveUpdate,
                    std::vector<float> femurLengths,
                    std::vector<float> tibiaLengths,
                    std::vector<std::string> parameterNames,
@@ -563,6 +564,8 @@ void setGaitParams(std::string gaitType,
     srv.request.gaitConfiguration.gaitParameterName  = parameterNames;
     srv.request.gaitConfiguration.gaitParameterValue = parameterValues;
 
+    srv.request.gaitConfiguration.liveUpdate = liveUpdate;
+
     srv.request.gaitConfiguration.femurLengths = femurLengths;
     srv.request.gaitConfiguration.tibiaLengths = tibiaLengths;
 
@@ -573,6 +576,7 @@ void setGaitParams(std::string gaitType,
                    std::string logFilePath,
                    bool directionForward,
                    bool prepareForGait,
+                   bool liveUpdate,
                    std::vector<float> femurLengths,
                    std::vector<float> tibiaLengths,
                    std::map<std::string, double> phenoTypeMap,
@@ -585,7 +589,7 @@ void setGaitParams(std::string gaitType,
         parametervalues.push_back((float) elem.second);
     }
 
-    setGaitParams(gaitType, logFilePath, directionForward, prepareForGait, femurLengths, tibiaLengths, parameterNames, parametervalues, gaitConfiguration_client);
+    setGaitParams(gaitType, logFilePath, directionForward, prepareForGait, liveUpdate, femurLengths, tibiaLengths, parameterNames, parametervalues, gaitConfiguration_client);
 }
 
 void sendAngleCommand(std::vector<float> angles, ros::Publisher poseCommand_pub){

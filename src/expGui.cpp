@@ -205,7 +205,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_rear"), (float) phenoType.at("tibiaLength_rear")};
     }
 
-    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, false, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -274,7 +274,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         // Set gait parameters
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-        setGaitParams(gaitType, "", false, true, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
+        setGaitParams(gaitType, "", false, true, false, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
             ros::spinOnce();
@@ -1358,11 +1358,16 @@ void menu_configure() {
             std::cin.ignore(10000, '\n');
             printf("  FrequencyFactor set to %f\n", frequencyFactor);
         } else if (choice == "t") {
-                printf("  Evaluation timeout> ");
-                std::cin >> evaluationTimeout;
-                std::cin.clear();
-                std::cin.ignore(10000, '\n');
-                printf("  Evaluation timeout set to %d\n", evaluationTimeout);
+            printf("  Evaluation timeout (in s)> ");
+            std::cin >> evaluationTimeout;
+            std::cin.clear();
+            std::cin.ignore(10000, '\n');
+            printf("  Evaluation timeout set to %d\n", evaluationTimeout);
+            printf("  Evaluation distance (in mm)> ");
+            std::cin >> evaluationDistance;
+            std::cin.clear();
+            std::cin.ignore(10000, '\n');
+            printf("  Evaluation distance set to %.0f\n", evaluationDistance);
         } else if (choice == "r") {
             adjustRestPose(gaitCommandService_client);
         } else if (choice == "t"){
