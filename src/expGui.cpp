@@ -1288,6 +1288,7 @@ void menu_configure() {
     printf("    m - enable/disable morphology evolution\n");
     printf("    s - enable/disable stand testing\n");
     printf("    f - set frequency factor\n");
+    printf("    t - set evaluation timeout\n");
     printf("    e - enable servo torques\n");
     printf("    d - disable servo torques\n");
     printf("    r - restPose, adjusted\n");
@@ -1356,6 +1357,12 @@ void menu_configure() {
             std::cin.clear();
             std::cin.ignore(10000, '\n');
             printf("  FrequencyFactor set to %f\n", frequencyFactor);
+        } else if (choice == "t") {
+                printf("  Evaluation timeout> ");
+                std::cin >> evaluationTimeout;
+                std::cin.clear();
+                std::cin.ignore(10000, '\n');
+                printf("  Evaluation timeout set to %d\n", evaluationTimeout);
         } else if (choice == "r") {
             adjustRestPose(gaitCommandService_client);
         } else if (choice == "t"){
