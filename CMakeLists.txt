@@ -29,7 +29,14 @@ find_package(catkin REQUIRED COMPONENTS
   dyret_controller
   rosbag
   camera_recorder
+  sensor_msgs
+  cv_bridge
+  roscpp
+  std_msgs
+  image_transport
 )
+
+find_package(OpenCV)
 
 find_package(Boost REQUIRED COMPONENTS 
   program_options
@@ -47,6 +54,7 @@ include_directories(include
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${TBB_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 add_executable(expGui
@@ -64,3 +72,9 @@ add_executable(gaitAdaptationController
               )
 target_link_libraries(gaitAdaptationController ${catkin_LIBRARIES})
 add_dependencies(gaitAdaptationController ${catkin_EXPORTED_TARGETS})
+
+add_executable(rsTerrainCharacterizer
+               src/rsTerrainCharacterizer.cpp
+              )
+target_link_libraries(rsTerrainCharacterizer ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_dependencies(rsTerrainCharacterizer ${catkin_EXPORTED_TARGETS})
