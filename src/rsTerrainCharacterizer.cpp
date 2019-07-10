@@ -43,9 +43,8 @@ public:
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
-      //cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
       cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-      cv_ptr = cv_bridge::toCvCopy(msg);
+      //cv_ptr = cv_bridge::toCvCopy(msg);
     }
     catch (cv_bridge::Exception& e)
     {
@@ -56,18 +55,12 @@ public:
     cv::Mat depth_float_img;
     cv::convertScaleAbs(cv_ptr->image, depth_float_img, 0.03);
     cv::applyColorMap(depth_float_img, depth_float_img, cv::COLORMAP_JET);
-//    depthToCV8UC1(depth_float_img, depth_mono8_img);
 
     // Draw an example circle on the video stream
     if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-      //cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
       cv::circle(depth_float_img, cv::Point(50, 50), 10, CV_RGB(255,0,0));
 
-//    cv::Mat cm_img0;
-//    cv::applyColorMap(depth_mono8_img, cm_img0, cv::COLORMAP_JET);
-
     // Update GUI Window
-    //cv::imshow(OPENCV_WINDOW, depth_float_img);
     cv::imshow(OPENCV_WINDOW, depth_float_img);
     cv::waitKey(3);
 
