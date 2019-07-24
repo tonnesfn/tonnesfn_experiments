@@ -1220,6 +1220,8 @@ void menu_experiments() {
            "      rl - random search, lowLevel\n"
            "    Verify:\n"
            "      vf - verify fitness on single individual\n"
+           "    Sensors:\n"
+           "      rs - record sensors\n"
            "    Misc:\n"
            "      vn - check noise in stability fitness\n");
     printf("\n> ");
@@ -1272,7 +1274,16 @@ void menu_experiments() {
         } else if (choice == "rh") {
             gaitType = "highLevelSplineGait";
             experiments_randomSearch();
-    }
+        } else if (choice == "rs") {
+            printf("  Please choose a label for your recording: ");
+            std::string label;
+            getline(std::cin, label);
+            printf("  How many seconds should be recorded: ");
+            int secondsToRecord;
+            std::cin >> secondsToRecord;
+            recordSensorData(label, secondsToRecord, loggerCommandService_client);
+
+        }
     }
 }
 

@@ -1069,3 +1069,25 @@ void cooldownServos(ros::ServiceClient servoConfigClient, std::array<float, 12> 
         getline(std::cin, input);
     }
 }
+
+void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient loggerCommandService_client){
+    time_t t = time(0);   // get time now
+    struct tm *now = localtime(&t);
+
+    std::stringstream ss;
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensors/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensors/" << label << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    initLog(getDateString(now), ss.str(), loggerCommandService_client);
+    startLogging(loggerCommandService_client);
+    sleep(secondsToRecord);
+    saveLog(loggerCommandService_client);
+}

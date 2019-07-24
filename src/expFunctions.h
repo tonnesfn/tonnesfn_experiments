@@ -130,6 +130,8 @@ void writeVersionLog(std::string givenLogDirectory);
 
 std::vector<double> getRandomIndividual();
 
+void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient loggerCommandService_client);
+
 float getDifficultyFactor(std::vector<std::string> commandQueue);
 
 bool directoryExists(std::string givenPath);
