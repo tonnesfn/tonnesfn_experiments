@@ -1,0 +1,30 @@
+<launch>
+  <arg name="contact_enabled" default="false" doc="Enable OptoForce contact sensors" />
+  <arg name="imu_enabled" default="true" doc="Enable IMU sensor" />
+  <arg name="realsense_enabled" default="false" doc="Enable Realsense" />
+  <arg name="mocap_type" default="" doc="Type of mocap system (blank to not start mocap)" />
+
+  <include file="$(find dyret_controller)/launch/fullController.launch" />
+  <include file="$(find dyret_hardware)/launch/monitor.launch" />
+
+  <include file="$(find dyret_hardware)/launch/dyret_hardware.launch">
+    <arg name="contact_enabled" value="$(arg contact_enabled)" />
+    <arg name="imu_enabled" value="$(arg imu_enabled)" />
+    <arg name="mocap_type" value="$(arg mocap_type)" />
+  </include>
+
+  <node pkg="dyret_hardware" name="mocapMonitor" type="mocapMonitor.py" required="false" />
+
+  <include file="$(find camera_recorder)/launch/init.launch">
+    <arg name="source" value="/dev/video0" />
+    <arg name="size" value="1920x1080" />
+    <arg name="format" value="mjpeg" />
+    <arg name="rate" value="24" />
+    <arg name="vflip" value="false"  />
+    <arg name="hflip" value="false" />
+    <arg name="copy" value="true" />
+  </include>
+
+  <include file="$(find terrain_characterizer)/launch/rs_camera.launch" if="$(arg realsense_enabled)" />
+
+</launch>
