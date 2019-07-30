@@ -138,7 +138,7 @@ bool directoryExists(std::string givenPath);
 
 void cooldownServos(ros::ServiceClient servoConfigClient, std::array<float, 12> servoTemperatures, ros::Publisher poseCommand_pub, std::vector<float> restPose);
 
-std::string makeSensorDataDirectories(std::string givenSurface);
+std::string makeSensorDataDirectories(std::string givenSurface, int givenMorphology);
 
 void runGaitControllerWithActionMessage(bool forward,
                                         int currentIndividual,

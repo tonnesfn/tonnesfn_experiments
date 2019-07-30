@@ -82,7 +82,7 @@ gazebo::WorldConnection* gz;
 
 // Configuration:
 const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
-const int numberOfEvalsInTesting = 1;
+int numberOfEvalsInTesting = 1;
 
 const bool useStopCondition = false;    // Use stop condition in evolution
 const int evalsWithoutImprovement = 64; // Number of individuals without improvement before evolution is stopped
@@ -1204,6 +1204,98 @@ void experiments_randomSearch() {
     }
 }
 
+// TODO (optional): Fix reposition legs code?
+// TODO (optional): Add raw fitness here?
+void experiments_sensorWalking(){
+
+    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::zeroHeight;
+
+    printf("  Label for recording: ");
+    std::string label;
+    getline(std::cin, label);
+    printf("  Chosen morphology: ");
+    int morphology;
+    std::cin >> morphology;
+    std::cin.clear();
+    std::cin.ignore(10000, '\n');
+
+    logDirectoryPath = makeSensorDataDirectories(label, morphology).c_str();
+
+    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individual);
+
+    FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
+    if (sensorLog == NULL) {
+        ROS_ERROR("sensorLog could not be opened (err%d)\n", errno);
+    }
+
+    std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
+    std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
+
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
+    fprintf(sensorLog, "{\n");
+    fprintf(sensorLog, "  \"experiment_info\": {\n");
+    fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
+    if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    fprintf(sensorLog, "    \"type\": \"evolution\",\n");
+    fprintf(sensorLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
+    fprintf(sensorLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+    fprintf(sensorLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
+    fprintf(sensorLog, "    \"machine\": \"%s\",\n", hostname);
+    fprintf(sensorLog, "    \"user\": \"%s\",\n", getenv("USER"));
+
+    if (ros::Time::isSimTime()) fprintf(sensorLog, "    \"platform\": \"simulation\",\n");
+    else
+        fprintf(sensorLog, "    \"platform\": \"hardware\",\n");
+
+    fprintf(sensorLog, "    \"fitness\": [\n");
+    if (!instantFitness) {
+        for (int i = 0; i < fitnessFunctions.size(); i++) {
+            fprintf(sensorLog, "      \"%s\"", fitnessFunctions[i].c_str());
+            if (i != fitnessFunctions.size() - 1) fprintf(sensorLog, ",\n");
+        }
+    } else fprintf(sensorLog, "      \"*INSTANT*\"");
+    fprintf(sensorLog, "\n");
+    fprintf(sensorLog, "    ]\n");
+    fprintf(sensorLog, "  },\n");
+
+    fprintf(sensorLog, "  \"individual\": {\n");
+    printMap(individual, "    ", sensorLog);
+    fprintf(sensorLog, "  },\n");
+
+    fprintf(sensorLog, "  \"fitness\": [\n");
+    fprintf(sensorLog, "    {\n");
+
+    for (int j = 0; j < fitnesses.size(); j++) {
+        int i = 0;
+        for (auto elem : fitnesses[j]) {
+            fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
+            if (i != fitnesses[j].size() - 1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
+            i++;
+        }
+        fprintf(sensorLog, "    }");
+
+        if (j != fitnesses.size()-1) fprintf(sensorLog, ",\n    {");
+        fprintf(sensorLog, "\n");
+    }
+
+    /*fprintf(sensorLog, "      \"raw_fitness\": [\n");
+    fprintf(sensorLog, "        {\n");
+    printMap(rawFitness[0], "          ", sensorLog);
+
+    if (rawFitness.size() > 1) {
+        fprintf(sensorLog, "        },{\n");
+        printMap(rawFitness[1], "          ", sensorLog);
+    }
+
+    fprintf(sensorLog, "        }\n");*/
+    fprintf(sensorLog, "  ]\n");
+    fprintf(sensorLog, "}");
+
+    fclose(sensorLog);
+}
+
 void menu_experiments() {
     std::string choice;
 
@@ -1284,93 +1376,13 @@ void menu_experiments() {
             printf("  How many seconds should be recorded: ");
             int secondsToRecord;
             std::cin >> secondsToRecord;
+            std::cin.clear();
+            std::cin.ignore(10000, '\n');
+
             recordSensorData(label, secondsToRecord, loggerCommandService_client);
         } else if (choice == "rw") {
-            printf("  Label for recording: ");
-            std::string label;
-            getline(std::cin, label);
-            printf("  Chosen morphology: ");
-            int morphology;
-            std::cin >> morphology;
 
-            logDirectoryPath = makeSensorDataDirectories(label).c_str();
-
-
-            std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
-
-            FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
-            if (sensorLog == NULL) {
-                ROS_ERROR("sensorLog could not be opened (err%d)\n", errno);
-            }
-
-            std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
-            std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
-
-            //writeVersionLog(experimentDirectory);
-
-            char hostname[1024];
-            gethostname(hostname, 1024);
-
-            fprintf(sensorLog, "{\n");
-            fprintf(sensorLog, "  \"experiment_info\": {\n");
-            fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
-            if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
-            fprintf(sensorLog, "    \"type\": \"evolution\",\n");
-            fprintf(sensorLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
-            fprintf(sensorLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
-            fprintf(sensorLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
-            fprintf(sensorLog, "    \"machine\": \"%s\",\n", hostname);
-            fprintf(sensorLog, "    \"user\": \"%s\",\n", getenv("USER"));
-
-            if (ros::Time::isSimTime()) fprintf(sensorLog, "    \"platform\": \"simulation\",\n");
-            else
-                fprintf(sensorLog, "    \"platform\": \"hardware\",\n");
-
-            fprintf(sensorLog, "    \"morphology\": \"*evolved*\",\n");
-
-            fprintf(sensorLog, "    \"fitness\": [\n");
-            if (!instantFitness) {
-                for (int i = 0; i < fitnessFunctions.size(); i++) {
-                    fprintf(sensorLog, "      \"%s\"", fitnessFunctions[i].c_str());
-                    if (i != fitnessFunctions.size() - 1) fprintf(sensorLog, ",\n");
-                }
-            } else fprintf(sensorLog, "      \"*INSTANT*\"");
-            fprintf(sensorLog, "\n");
-            fprintf(sensorLog, "    ]\n");
-
-            fprintf(sensorLog, "  },\n");
-
-            fprintf(sensorLog, "  \"fitness\": [\n");
-            fprintf(sensorLog, "    {\n");
-
-            for (int j = 0; j < fitnesses.size(); j++) {
-                int i = 0;
-                for (auto elem : fitnesses[j]) {
-                    fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
-                    if (i != fitnesses[j].size() - 1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
-                    i++;
-                }
-                fprintf(sensorLog, "    }");
-
-                if (j != fitnesses.size()-1) fprintf(sensorLog, ",\n    {");
-                fprintf(sensorLog, "\n");
-            }
-
-            /*fprintf(sensorLog, "      \"raw_fitness\": [\n");
-            fprintf(sensorLog, "        {\n");
-            printMap(rawFitness[0], "          ", sensorLog);
-
-            if (rawFitness.size() > 1) {
-                fprintf(sensorLog, "        },{\n");
-                printMap(rawFitness[1], "          ", sensorLog);
-            }
-
-            fprintf(sensorLog, "        }\n");*/
-            fprintf(sensorLog, "  ]\n");
-            fprintf(sensorLog, "}");
-
-            fclose(sensorLog);
-
+            experiments_sensorWalking();
         }
     }
 }
@@ -1386,6 +1398,7 @@ void menu_configure() {
     printf("    i - enable/disable instant fitness\n");
     printf("    m - enable/disable morphology evolution\n");
     printf("    s - enable/disable stand testing\n");
+    printf("    n - set number of evals\n");
     printf("    f - set frequency factor\n");
     printf("    t - set evaluation timeout\n");
     printf("    e - enable servo torques\n");
@@ -1456,6 +1469,12 @@ void menu_configure() {
             std::cin.clear();
             std::cin.ignore(10000, '\n');
             printf("  FrequencyFactor set to %f\n", frequencyFactor);
+        } else if (choice == "n") {
+            printf("  numberOfEvalsInTesting> ");
+            std::cin >> numberOfEvalsInTesting;
+            std::cin.clear();
+            std::cin.ignore(10000, '\n');
+            printf("  numberOfEvalsInTesting set to %d\n", numberOfEvalsInTesting);
         } else if (choice == "t") {
             printf("  Evaluation timeout (in s)> ");
             std::cin >> evaluationTimeout;

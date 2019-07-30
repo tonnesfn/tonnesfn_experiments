@@ -1070,7 +1070,7 @@ void cooldownServos(ros::ServiceClient servoConfigClient, std::array<float, 12> 
     }
 }
 
-std::string makeSensorDataDirectories(std::string givenSurface){
+std::string makeSensorDataDirectories(std::string givenSurface, int givenMorphology){
     std::stringstream ss;
     ss << getenv("HOME") << "/catkin_ws/experimentResults/";
     mkdir(ss.str().c_str(), 0700);
@@ -1087,7 +1087,7 @@ std::string makeSensorDataDirectories(std::string givenSurface){
     struct tm *now = localtime(&t);
 
     ss.str(std::string());
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/" << getDateString(now) << "/";
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/" << std::to_string(givenMorphology) << "_" << getDateString(now) << "/";
     mkdir(ss.str().c_str(), 0700);
 
     ss << getDateString(now) << ".json";
