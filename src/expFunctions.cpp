@@ -1070,6 +1070,32 @@ void cooldownServos(ros::ServiceClient servoConfigClient, std::array<float, 12> 
     }
 }
 
+std::string makeSensorDataDirectories(std::string givenSurface){
+    std::stringstream ss;
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    time_t t = time(0);   // get time now
+    struct tm *now = localtime(&t);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/" << getDateString(now) << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss << getDateString(now) << ".json";
+
+    return ss.str();
+
+}
+
 void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient loggerCommandService_client){
     time_t t = time(0);   // get time now
     struct tm *now = localtime(&t);
@@ -1088,6 +1114,9 @@ void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient
 
     initLog(getDateString(now), ss.str(), loggerCommandService_client);
     startLogging(loggerCommandService_client);
+    fprintf(stderr, "starting sleep\n");
     sleep(secondsToRecord);
+    fprintf(stderr, "ending sleep\n");
     saveLog(loggerCommandService_client);
+    fprintf(stderr, "Done\n");
 }

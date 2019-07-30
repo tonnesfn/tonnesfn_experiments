@@ -724,7 +724,9 @@ bool stopCondition(){
     return false;
 }
 
-void run_individual(std::string givenGaitType, std::map<std::string, double> givenPhenoTypeMap) {
+std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, std::map<std::string, double> givenPhenoTypeMap) {
+
+    std::vector<std::map<std::string, double>> vectorToReturn;
 
     gaitType = givenGaitType;
 
@@ -734,10 +736,10 @@ void run_individual(std::string givenGaitType, std::map<std::string, double> giv
 
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
-        std::map<std::string, double> fitnessResult = getFitness(givenPhenoTypeMap,
-                                                                 get_gait_evaluation_client,
-                                                                 rawFitnesses);
+        vectorToReturn.push_back(getFitness(givenPhenoTypeMap, get_gait_evaluation_client, rawFitnesses));
     }
+
+    return vectorToReturn;
 }
 
 void menu_demo() {
@@ -1221,7 +1223,8 @@ void menu_experiments() {
            "    Verify:\n"
            "      vf - verify fitness on single individual\n"
            "    Sensors:\n"
-           "      rs - record sensors\n"
+           "      rw - record sensors while walking\n"
+           "      rs - record sensors standing still\n"
            "    Misc:\n"
            "      vn - check noise in stability fitness\n");
     printf("\n> ");
@@ -1282,6 +1285,86 @@ void menu_experiments() {
             int secondsToRecord;
             std::cin >> secondsToRecord;
             recordSensorData(label, secondsToRecord, loggerCommandService_client);
+        } else if (choice == "rw") {
+            printf("  Label for recording: ");
+            std::string label;
+            getline(std::cin, label);
+            printf("  Chosen morphology: ");
+            int morphology;
+            std::cin >> morphology;
+
+            logDirectoryPath = makeSensorDataDirectories(label).c_str();
+
+
+            std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
+
+            FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
+            if (sensorLog == NULL) {
+                ROS_ERROR("sensorLog could not be opened (err%d)\n", errno);
+            }
+
+            std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
+            std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
+
+            //writeVersionLog(experimentDirectory);
+
+            char hostname[1024];
+            gethostname(hostname, 1024);
+
+            fprintf(sensorLog, "{\n");
+            fprintf(sensorLog, "  \"experiment_info\": {\n");
+            fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
+            if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+            fprintf(sensorLog, "    \"type\": \"evolution\",\n");
+            fprintf(sensorLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
+            fprintf(sensorLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+            fprintf(sensorLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
+            fprintf(sensorLog, "    \"machine\": \"%s\",\n", hostname);
+            fprintf(sensorLog, "    \"user\": \"%s\",\n", getenv("USER"));
+
+            if (ros::Time::isSimTime()) fprintf(sensorLog, "    \"platform\": \"simulation\",\n");
+            else
+                fprintf(sensorLog, "    \"platform\": \"hardware\",\n");
+
+            fprintf(sensorLog, "    \"morphology\": \"*evolved*\",\n");
+
+            fprintf(sensorLog, "    \"fitness\": [\n");
+            if (!instantFitness) {
+                for (int i = 0; i < fitnessFunctions.size(); i++) {
+                    fprintf(sensorLog, "      \"%s\"", fitnessFunctions[i].c_str());
+                    if (i != fitnessFunctions.size() - 1) fprintf(sensorLog, ",\n");
+                }
+            } else fprintf(sensorLog, "      \"*INSTANT*\"");
+            fprintf(sensorLog, "\n");
+            fprintf(sensorLog, "    ]\n");
+
+            fprintf(sensorLog, "  },\n");
+
+            fprintf(sensorLog, "  \"fitness\": [\n");
+            fprintf(sensorLog, "    {\n");
+
+            int i = 0;
+            for(auto elem : fitnesses[0]){
+                fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
+                if (i != fitnesses[0].size()-1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
+                i++;
+            }
+            fprintf(sensorLog, "    }\n");
+
+            /*fprintf(sensorLog, "      \"raw_fitness\": [\n");
+            fprintf(sensorLog, "        {\n");
+            printMap(rawFitness[0], "          ", sensorLog);
+
+            if (rawFitness.size() > 1) {
+                fprintf(sensorLog, "        },{\n");
+                printMap(rawFitness[1], "          ", sensorLog);
+            }
+
+            fprintf(sensorLog, "        }\n");*/
+            fprintf(sensorLog, "  ]\n");
+            fprintf(sensorLog, "}");
+
+            fclose(sensorLog);
 
         }
     }
