@@ -1343,13 +1343,18 @@ void menu_experiments() {
             fprintf(sensorLog, "  \"fitness\": [\n");
             fprintf(sensorLog, "    {\n");
 
-            int i = 0;
-            for(auto elem : fitnesses[0]){
-                fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
-                if (i != fitnesses[0].size()-1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
-                i++;
+            for (int j = 0; j < fitnesses.size(); j++) {
+                int i = 0;
+                for (auto elem : fitnesses[j]) {
+                    fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
+                    if (i != fitnesses[j].size() - 1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
+                    i++;
+                }
+                fprintf(sensorLog, "    }");
+
+                if (j != fitnesses.size()-1) fprintf(sensorLog, ",\n    {");
+                fprintf(sensorLog, "\n");
             }
-            fprintf(sensorLog, "    }\n");
 
             /*fprintf(sensorLog, "      \"raw_fitness\": [\n");
             fprintf(sensorLog, "        {\n");
