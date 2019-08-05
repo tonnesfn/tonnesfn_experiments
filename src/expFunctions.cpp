@@ -663,7 +663,7 @@ void runGaitControllerWithActionMessage(bool forward,
         std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/video/";
         mkdir(logPath.c_str(), 0700);
 
-        startVideo(logPath + std::to_string(currentIndividual) + direction + ".mp4");
+        //startVideo(logPath + std::to_string(currentIndividual) + direction + ".mp4");
 
     }
 
@@ -694,7 +694,7 @@ void runGaitControllerWithActionMessage(bool forward,
     // Save and stop bag logging
     if (!ros::Time::isSimTime() && enableLogging) {
         saveLog(loggerCommandService_client);
-        stopVideo();
+        //stopVideo();
     }
 
     // Stop walking
