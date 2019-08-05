@@ -801,10 +801,10 @@ void menu_demo() {
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
-        } else if (choice == "muf") {
+        } else if (choice == "mub") {
             setLegLengths(std::vector<float>{40, 40, 40, 40, 5, 5, 5, 5}, poseCommand_pub);
             printf("Uneven length morphology requested\n");
-        } else if (choice == "mub") {
+        } else if (choice == "muf") {
             setLegLengths(std::vector<float>{5, 5, 5, 5, 40, 40, 40, 40}, poseCommand_pub);
             printf("Uneven length morphology requested\n");
         } else if (choice == "mx") {
