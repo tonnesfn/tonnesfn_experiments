@@ -1219,6 +1219,9 @@ void experiments_sensorWalking(){
     printf("  Total height (0-9): ");
     int height;
     std::cin >> height;
+    printf("  Speed (0-9): ");
+    int speed;
+    std::cin >> speed;
     std::cin.clear();
     std::cin.ignore(10000, '\n');
 
@@ -1235,6 +1238,10 @@ void experiments_sensorWalking(){
 
     individual["femurLength"] = femurLength;
     individual["tibiaLength"] = tibiaLength;
+
+    // Set speed
+    assert(speed >= 0 && speed <= 9);
+    individual["frequency"] = (speed/9.0)*1.0 + 0.1;
 
     logDirectoryPath = makeSensorDataDirectories(label, height).c_str();
 
