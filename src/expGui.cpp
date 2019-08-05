@@ -763,7 +763,8 @@ void menu_demo() {
            "    mm - Request medium morphology\n"
            "    ml - Request large morphology\n"
            "    mt - Test morphology changes\n"
-           "    mu - Request uneven length morphology\n"
+           "    muf - Request uneven length morphology (forward)\n"
+           "    mub - Request uneven length morphology (backward)\n"
            "    cs - Start camera\n"
            "    ch - Stop camera\n"
            "    b - Test beeps\n");
@@ -799,8 +800,11 @@ void menu_demo() {
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
-        } else if (choice == "mu") {
-            setLegLengths(std::vector<float>{25, 25, 25, 25, 5, 5, 5, 5}, poseCommand_pub);
+        } else if (choice == "muf") {
+            setLegLengths(std::vector<float>{40, 40, 40, 40, 5, 5, 5, 5}, poseCommand_pub);
+            printf("Uneven length morphology requested\n");
+        } else if (choice == "mub") {
+            setLegLengths(std::vector<float>{5, 5, 5, 5, 40, 40, 40, 40}, poseCommand_pub);
             printf("Uneven length morphology requested\n");
         } else if (choice == "mx") {
             setLegLengths(10.0, 10.0, poseCommand_pub);
