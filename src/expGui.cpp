@@ -7,6 +7,7 @@
 #include <chrono>
 #include <unistd.h>
 #include <stdio.h>
+#include <cassert>
 
 #include "ros/ros.h"
 #include "ros/package.h"
@@ -1212,18 +1213,30 @@ void experiments_randomSearch() {
 // TODO (optional): Add raw fitness here?
 void experiments_sensorWalking(){
 
-    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::zeroHeight;
-
     printf("  Label for recording: ");
     std::string label;
     getline(std::cin, label);
-    printf("  Chosen morphology: ");
-    int morphology;
-    std::cin >> morphology;
+    printf("  Total height (0-9): ");
+    int height;
+    std::cin >> height;
     std::cin.clear();
     std::cin.ignore(10000, '\n');
 
-    logDirectoryPath = makeSensorDataDirectories(label, morphology).c_str();
+    // Get controller parameters
+    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::zeroHeight;
+
+    // Calculate morphology parameters
+    double femurLength, tibiaLength;
+
+    assert(height >= 0 && height <= 9);
+    if (height > 4) femurLength = 40.0;
+    else femurLength = height * 10.0;
+    tibiaLength = height * 10.0;
+
+    individual["femurLength"] = femurLength;
+    individual["tibiaLength"] = tibiaLength;
+
+    logDirectoryPath = makeSensorDataDirectories(label, height).c_str();
 
     std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individual);
 
@@ -1240,10 +1253,10 @@ void experiments_sensorWalking(){
 
     fprintf(sensorLog, "{\n");
     fprintf(sensorLog, "  \"experiment_info\": {\n");
+    fprintf(sensorLog, "    \"height\": \"%d\",\n", height);
     fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
     if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
-    fprintf(sensorLog, "    \"type\": \"evolution\",\n");
-    fprintf(sensorLog, "    \"gaitDifficultyFactor\": \"%3f\",\n", gaitDifficultyFactor);
+    fprintf(sensorLog, "    \"type\": \"sensorWalking\",\n");
     fprintf(sensorLog, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
     fprintf(sensorLog, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
     fprintf(sensorLog, "    \"machine\": \"%s\",\n", hostname);
