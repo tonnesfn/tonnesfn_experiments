@@ -1211,6 +1211,7 @@ void experiments_randomSearch() {
 
 // TODO (optional): Fix reposition legs code?
 // TODO (optional): Add raw fitness here?
+// TODO: Add support for number of evals
 void experiments_sensorWalking(){
 
     printf("  Label for recording: ");
@@ -1222,6 +1223,9 @@ void experiments_sensorWalking(){
     printf("  Speed (0-9): ");
     int speed;
     std::cin >> speed;
+    printf("  Number of evals: ");
+    int numberOfEvals_old = numberOfEvalsInTesting;
+    std::cin >> numberOfEvalsInTesting;
     std::cin.clear();
     std::cin.ignore(10000, '\n');
 
@@ -1318,6 +1322,8 @@ void experiments_sensorWalking(){
     fprintf(sensorLog, "}");
 
     fclose(sensorLog);
+
+     numberOfEvalsInTesting = numberOfEvals_old;
 }
 
 void menu_experiments() {
