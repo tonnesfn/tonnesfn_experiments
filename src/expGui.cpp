@@ -1230,7 +1230,7 @@ void experiments_sensorWalking(){
     std::cin.ignore(10000, '\n');
 
     // Get controller parameters
-    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::zeroHeight;
+    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::conservativeIndividual;
 
     // Calculate morphology parameters
     double femurLength, tibiaLength;
