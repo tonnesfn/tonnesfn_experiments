@@ -1,0 +1,7 @@
+rosrun image_transport republish compressed in:=/dyret/sensor/camera/color raw out:=/dyret/sensor/camera/color/raw
+
+rosrun image_view image_view image:=/dyret/sensor/camera/color
+
+rosbag filter 0F.bag 0F_raw.bag "topic == '/dyret/sensor/raw/contact/bl' or topic == '/dyret/sensor/raw/contact/br' or topic == '/dyret/sensor/raw/contact/fl' or topic == '/dyret/sensor/raw/contact/fr'"
+
+
