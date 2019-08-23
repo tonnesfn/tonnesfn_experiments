@@ -4,4 +4,6 @@ rosrun image_view image_view image:=/dyret/sensor/camera/color
 
 rosbag filter 0F.bag 0F_raw.bag "topic == '/dyret/sensor/raw/contact/bl' or topic == '/dyret/sensor/raw/contact/br' or topic == '/dyret/sensor/raw/contact/fl' or topic == '/dyret/sensor/raw/contact/fr'"
 
+rosrun tf static_transform_publisher 0 0 0 0 0 0 map camera_depth_optical_frame 50
+
 
