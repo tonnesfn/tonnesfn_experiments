@@ -186,8 +186,11 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         }
     }
 
-    std::string logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/splines/";
-    mkdir(logPath.c_str(), 0700);
+    std::string logPath = "";
+    if (logDirectoryPath != ""){
+        logPath = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/splines/";
+        mkdir(logPath.c_str(), 0700);
+    }
 
     // Set gait parameters
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
