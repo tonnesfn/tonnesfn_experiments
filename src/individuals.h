@@ -98,6 +98,7 @@ namespace individuals_lowLevelSplineGait{
             {"wagAmplitude_y", 2.793298},
             {"femurLength", 0.0},
             {"tibiaLength", 0.0},
+            {"splineScalingFactor", 1.0}
     };
 
     static std::map<std::string, double> mediumHeight = {
