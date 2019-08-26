@@ -1217,12 +1217,15 @@ void experiments_sensorWalking(){
     printf("  Label for recording: ");
     std::string label;
     getline(std::cin, label);
-    printf("  Total height (0-9): ");
-    int height;
-    std::cin >> height;
-    printf("  Speed (0-9): ");
-    int speed;
-    std::cin >> speed;
+    printf("  Femur (0-9): ");
+    int femurLengthInput;
+    std::cin >> femurLengthInput;
+    printf("  Tibia (0-9): ");
+    int tibiaLengthInput;
+    std::cin >> tibiaLengthInput;
+    printf("  Frequency (0.0-1.5): ");
+    int frequency;
+    std::cin >> frequency;
     printf("  Number of evals: ");
     int numberOfEvals_old = numberOfEvalsInTesting;
     std::cin >> numberOfEvalsInTesting;
@@ -1233,21 +1236,20 @@ void experiments_sensorWalking(){
     static std::map<std::string, double> individual = individuals_lowLevelSplineGait::conservativeIndividual;
 
     // Calculate morphology parameters
-    double femurLength, tibiaLength;
+    assert(femurLengthInput >= 0 && femurLengthInput <= 9);
+    assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 9);
 
-    assert(height >= 0 && height <= 9);
-    if (height > 4) femurLength = 40.0;
-    else femurLength = height * 10.0;
-    tibiaLength = height * 10.0;
+    float femurLength = (femurLengthInput/10.0) * 50.0;
+    float tibiaLength = (tibiaLengthInput/10.0) * 50.0;
 
     individual["femurLength"] = femurLength;
     individual["tibiaLength"] = tibiaLength;
 
     // Set speed
-    assert(speed >= 0 && speed <= 9);
-    individual["frequency"] = (speed/9.0)*1.0 + 0.1;
+    assert(frequency >= 0.0 && frequency <= 1.5);
+    individual["frequency"] = frequency;
 
-    logDirectoryPath = makeSensorDataDirectories(label, height).c_str();
+    logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
 
     std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individual);
 
@@ -1264,7 +1266,8 @@ void experiments_sensorWalking(){
 
     fprintf(sensorLog, "{\n");
     fprintf(sensorLog, "  \"experiment_info\": {\n");
-    fprintf(sensorLog, "    \"height\": \"%d\",\n", height);
+    fprintf(sensorLog, "    \"femurLength\": \"%f\",\n", femurLength);
+    fprintf(sensorLog, "    \"tibiaLength\": \"%f\",\n", tibiaLength);
     fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
     if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(sensorLog, "    \"type\": \"sensorWalking\",\n");
