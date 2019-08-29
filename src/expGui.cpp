@@ -1227,7 +1227,7 @@ void experiments_sensorWalking(){
     int tibiaLengthInput;
     std::cin >> tibiaLengthInput;
     printf("  Frequency (0.0-1.5): ");
-    int frequency;
+    float frequency;
     std::cin >> frequency;
     printf("  Number of evals: ");
     int numberOfEvals_old = numberOfEvalsInTesting;
