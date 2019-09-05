@@ -756,6 +756,7 @@ void menu_demo() {
     printf("    ss - Test small robot (small HLSC)\n"
            "    ls - Test large robot (small HLSC)\n"
            "    ll - Test large robot (large HLSC)\n"
+           "    rc - Test conservative robot (LLSC)\n"
            "    rz - Test zero robot (LLSC)\n"
            "    rm - Test medium robot (LLSC)\n"
            "    rd - Test doubleUneven robot (LLASC)\n"
@@ -800,7 +801,10 @@ void menu_demo() {
         } else if (choice == "rf") {
             run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
         } else if (choice == "rb") {
-           run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
+            run_individual("lowLevelAdvancedSplineGait",
+                           individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
+        } else if (choice == "rc"){
+            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::conservativeIndividual);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
