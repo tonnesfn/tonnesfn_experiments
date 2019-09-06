@@ -1233,6 +1233,9 @@ void experiments_sensorWalking(){
     printf("  Frequency (0.0-1.5): ");
     float frequency;
     std::cin >> frequency;
+    printf("  Scaling (0.0-2.0): ");
+    float scaling;
+    std::cin >> scaling;
     printf("  Number of evals: ");
     int numberOfEvals_old = numberOfEvalsInTesting;
     std::cin >> numberOfEvalsInTesting;
@@ -1243,14 +1246,16 @@ void experiments_sensorWalking(){
     static std::map<std::string, double> individual = individuals_lowLevelSplineGait::conservativeIndividual;
 
     // Calculate morphology parameters
-    assert(femurLengthInput >= 0 && femurLengthInput <= 9);
-    assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 9);
+    assert(femurLengthInput >= 0 && femurLengthInput <= 10);
+    assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 10);
 
-    float femurLength = (femurLengthInput/10.0) * 50.0;
-    float tibiaLength = (tibiaLengthInput/10.0) * 50.0;
+    float femurLength = (femurLengthInput/10.0) *  50.0;
+    float tibiaLength = (tibiaLengthInput/10.0) * 100.0;
 
     individual["femurLength"] = femurLength;
     individual["tibiaLength"] = tibiaLength;
+
+    individual["splineScalingFactor"] = scaling;
 
     // Set speed
     assert(frequency >= 0.0 && frequency <= 1.5);

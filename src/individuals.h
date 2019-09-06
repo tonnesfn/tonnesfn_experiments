@@ -51,7 +51,7 @@ namespace individuals_lowLevelSplineGait{
     static std::map<std::string, double> conservativeIndividual = {
             {"originalSpeed",       0.0},
             {"originalStability",   0.0},
-            {"frequency",           0.2},
+            {"frequency",           0.25},
             {"liftDuration",        0.15},
             {"p0_x",                0.0},
             {"p1_x",                0.0},
