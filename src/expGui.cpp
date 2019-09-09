@@ -104,7 +104,10 @@ std::array<int, 8> prismaticActuatorStates;
 bool promptForConfirmation = false; // Prompt for confirmation after each evaluation
 bool currentlyLoggingFitness = false; // Whether gaitEvaluator is logging fitness or not
 
-std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
+//std::vector<float> restPose = {0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, 0.7079652547836304, -1.1992725133895874, -0.1839425265789032, -0.7079652547836304, 1.1992725133895874, 0.1839425265789032, -0.7079652547836304, 1.1992725133895874};
+
+// For groundheight -480:
+std::vector<float> restPose = {0.1651468575000763, 0.40313079953193665, -0.6917276382446289, -0.16514746844768524, 0.4031263291835785, -0.6917226314544678, -0.16514988243579865, -0.40319809317588806, 0.6918479800224304, 0.1651504933834076, -0.4031979739665985, 0.6918441653251648};
 
 unsigned int randomSeed;
 
@@ -1449,7 +1452,7 @@ void menu_configure() {
     printf("    e - enable servo torques\n");
     printf("    d - disable servo torques\n");
     printf("    r - restPose, adjusted\n");
-    printf("    t - restPose, directly\n");
+    printf("    y - restPose, directly\n");
     printf("    q - set random seed\n");
     printf("    x - reset simulation\n");
     printf("\n> ");
@@ -1533,7 +1536,7 @@ void menu_configure() {
             printf("  Evaluation distance set to %.0f\n", evaluationDistance);
         } else if (choice == "r") {
             adjustRestPose(gaitCommandService_client);
-        } else if (choice == "t"){
+        } else if (choice == "y"){
             if (ros::Time::isSystemTime()){
                 setServoSpeeds(0.01, servoConfigClient);
             }
