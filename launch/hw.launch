@@ -1,7 +1,7 @@
 <launch>
-  <arg name="contact_enabled" default="false" doc="Enable OptoForce contact sensors" />
+  <arg name="contact_enabled" default="true" doc="Enable OptoForce contact sensors" />
   <arg name="imu_enabled" default="true" doc="Enable IMU sensor" />
-  <arg name="realsense_enabled" default="false" doc="Enable Realsense" />
+  <arg name="realsense_enabled" default="true" doc="Enable Realsense" />
   <arg name="mocap_type" default="" doc="Type of mocap system (blank to not start mocap)" />
 
   <include file="$(find dyret_controller)/launch/fullController.launch" />
