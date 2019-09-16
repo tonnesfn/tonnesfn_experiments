@@ -97,7 +97,7 @@ const int verificationEvals = 20;
 
 bool cooldownPromptEnabled = true; // Prompt for cooldown between each generation in hardware
 
-const float extraZHeightAtMax = 25.0; // mm to add to the step height at maximum leg lengths
+const float extraZHeightAtMax = 38.0; // mm to add to the step height at maximum leg lengths
 
 //
 
@@ -107,7 +107,10 @@ bool promptForConfirmation = false; // Prompt for confirmation after each evalua
 bool currentlyLoggingFitness = false; // Whether gaitEvaluator is logging fitness or not
 
 // For groundheight -470:
-std::vector<float> restPose = {0.16859818994998932, 0.4772401750087738, -0.8169739842414856, -0.16859693825244904, 0.4772269129753113, -0.8169558644294739, -0.16859693825244904, -0.47723302245140076, 0.8169777989387512, 0.16859568655490875, -0.47720229625701904, 0.816914439201355};
+//std::vector<float> restPose = {0.16859818994998932, 0.4772401750087738, -0.8169739842414856, -0.16859693825244904, 0.4772269129753113, -0.8169558644294739, -0.16859693825244904, -0.47723302245140076, 0.8169777989387512, 0.16859568655490875, -0.47720229625701904, 0.816914439201355};
+
+// For groundheight -485:
+std::vector<float> restPose = {0.16347473859786987, 0.36104413866996765, -0.6202138662338257, -0.1634758710861206, 0.36109134554862976, -0.620297372341156, -0.16347643733024597, -0.36106884479522705, 0.6202582120895386, 0.1634775698184967, -0.3611406683921814, 0.6203758716583252};
 
 unsigned int randomSeed;
 
@@ -1220,31 +1223,32 @@ void experiments_randomSearch() {
 }
 
 float getScaling(float givenFemurLength, float givenTibiaLength){
+
     if (givenFemurLength ==   0.0 && givenTibiaLength ==   0.0) return 1.00;
-    if (givenFemurLength ==   0.0 && givenTibiaLength ==  25.0) return 1.12;
-    if (givenFemurLength ==   0.0 && givenTibiaLength ==  50.0) return 1.24;
-    if (givenFemurLength ==   0.0 && givenTibiaLength ==  75.0) return 1.35;
-    if (givenFemurLength ==   0.0 && givenTibiaLength == 100.0) return 1.46;
-    if (givenFemurLength ==  12.5 && givenTibiaLength ==   0.0) return 1.07;
-    if (givenFemurLength ==  12.5 && givenTibiaLength ==  25.0) return 1.19;
-    if (givenFemurLength ==  12.5 && givenTibiaLength ==  50.0) return 1.31;
-    if (givenFemurLength ==  12.5 && givenTibiaLength ==  75.0) return 1.42;
-    if (givenFemurLength ==  12.5 && givenTibiaLength == 100.0) return 1.53;
-    if (givenFemurLength ==  25.0 && givenTibiaLength ==   0.0) return 1.14;
-    if (givenFemurLength ==  25.0 && givenTibiaLength ==  25.0) return 1.26;
-    if (givenFemurLength ==  25.0 && givenTibiaLength ==  50.0) return 1.38;
-    if (givenFemurLength ==  25.0 && givenTibiaLength ==  75.0) return 1.49;
-    if (givenFemurLength ==  25.0 && givenTibiaLength == 100.0) return 1.59;
-    if (givenFemurLength ==  37.5 && givenTibiaLength ==   0.0) return 1.21;
-    if (givenFemurLength ==  37.5 && givenTibiaLength ==  25.0) return 1.33;
-    if (givenFemurLength ==  37.5 && givenTibiaLength ==  50.0) return 1.44;
-    if (givenFemurLength ==  37.5 && givenTibiaLength ==  75.0) return 1.55;
-    if (givenFemurLength ==  37.5 && givenTibiaLength == 100.0) return 1.66;
-    if (givenFemurLength ==  50.0 && givenTibiaLength ==   0.0) return 1.27;
-    if (givenFemurLength ==  50.0 && givenTibiaLength ==  25.0) return 1.39;
-    if (givenFemurLength ==  50.0 && givenTibiaLength ==  50.0) return 1.51;
-    if (givenFemurLength ==  50.0 && givenTibiaLength ==  75.0) return 1.61;
-    if (givenFemurLength ==  50.0 && givenTibiaLength == 100.0) return 1.72;
+    if (givenFemurLength ==   0.0 && givenTibiaLength ==  20.0) return 1.03;
+    if (givenFemurLength ==   0.0 && givenTibiaLength ==  40.0) return 1.06;
+    if (givenFemurLength ==   0.0 && givenTibiaLength ==  60.0) return 1.09;
+    if (givenFemurLength ==   0.0 && givenTibiaLength ==  80.0) return 1.12;
+    if (givenFemurLength ==  12.5 && givenTibiaLength ==   0.0) return 1.03;
+    if (givenFemurLength ==  12.5 && givenTibiaLength ==  20.0) return 1.06;
+    if (givenFemurLength ==  12.5 && givenTibiaLength ==  40.0) return 1.09;
+    if (givenFemurLength ==  12.5 && givenTibiaLength ==  60.0) return 1.13;
+    if (givenFemurLength ==  12.5 && givenTibiaLength ==  80.0) return 1.16;
+    if (givenFemurLength ==  25.0 && givenTibiaLength ==   0.0) return 1.06;
+    if (givenFemurLength ==  25.0 && givenTibiaLength ==  20.0) return 1.09;
+    if (givenFemurLength ==  25.0 && givenTibiaLength ==  40.0) return 1.13;
+    if (givenFemurLength ==  25.0 && givenTibiaLength ==  60.0) return 1.16;
+    if (givenFemurLength ==  25.0 && givenTibiaLength ==  80.0) return 1.19;
+    if (givenFemurLength ==  37.5 && givenTibiaLength ==   0.0) return 1.09;
+    if (givenFemurLength ==  37.5 && givenTibiaLength ==  20.0) return 1.13;
+    if (givenFemurLength ==  37.5 && givenTibiaLength ==  40.0) return 1.16;
+    if (givenFemurLength ==  37.5 && givenTibiaLength ==  60.0) return 1.19;
+    if (givenFemurLength ==  37.5 && givenTibiaLength ==  80.0) return 1.22;
+    if (givenFemurLength ==  50.0 && givenTibiaLength ==   0.0) return 1.13;
+    if (givenFemurLength ==  50.0 && givenTibiaLength ==  20.0) return 1.16;
+    if (givenFemurLength ==  50.0 && givenTibiaLength ==  40.0) return 1.19;
+    if (givenFemurLength ==  50.0 && givenTibiaLength ==  60.0) return 1.22;
+    if (givenFemurLength ==  50.0 && givenTibiaLength ==  80.0) return 1.25;
 
     ROS_ERROR("Unknown scaling. Returning 1.0");
     return 1.0;
@@ -1258,19 +1262,19 @@ void experiments_sensorWalking(){
     printf("  Label for recording: ");
     std::string label;
     getline(std::cin, label);
-    printf("  Femur (0-5): ");
+    printf("  Femur (0-4): ");
     int femurLengthInput;
     std::cin >> femurLengthInput;
-    printf("  Tibia (0-5): ");
+    printf("  Tibia (0-4): ");
     int tibiaLengthInput;
     std::cin >> tibiaLengthInput;
 
     // Calculate morphology parameters
-    assert(femurLengthInput >= 0 && femurLengthInput <= 5);
-    assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 5);
+    assert(femurLengthInput >= 0 && femurLengthInput <= 4);
+    assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 4);
 
-    float femurLength = (femurLengthInput/5.0) *  50.0;
-    float tibiaLength = (tibiaLengthInput/5.0) * 100.0;
+    float femurLength = (femurLengthInput/4.0) *  50.0;
+    float tibiaLength = (tibiaLengthInput/4.0) * 80.0;
 
     //printf("  Frequency (0.0-1.5): ");
     float frequency = 0.2;
@@ -1285,7 +1289,7 @@ void experiments_sensorWalking(){
     std::cin.ignore(10000, '\n');
 
     // Get controller parameters
-    static std::map<std::string, double> individual = individuals_lowLevelSplineGait::conservativeIndividual;
+    std::map<std::string, double> individual = std::map<std::string, double>(individuals_lowLevelSplineGait::conservativeIndividual);
 
     float extraZHeight = ((femurLength + tibiaLength) / 150.0) * extraZHeightAtMax;
 
