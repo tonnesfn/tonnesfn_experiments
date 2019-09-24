@@ -83,6 +83,7 @@ gazebo::WorldConnection* gz;
 
 // Configuration:
 const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
+const bool pauseAfterEachEvaluation = true; // Wait for confirmation after each evaluation
 int numberOfEvalsInTesting = 1;
 
 const bool useStopCondition = false;    // Use stop condition in evolution
@@ -747,6 +748,10 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
         vectorToReturn.push_back(getFitness(givenPhenoTypeMap, get_gait_evaluation_client, rawFitnesses));
+
+        if (pauseAfterEachEvaluation){
+            getInputFromTerminal("  Press enter when ready");
+        }
     }
 
     return vectorToReturn;
