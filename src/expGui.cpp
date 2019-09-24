@@ -1472,8 +1472,10 @@ void menu_experiments() {
 
             recordSensorData(label, secondsToRecord, loggerCommandService_client);
         } else if (choice == "rw") {
-
+            bool previousValue = cooldownPromptEnabled;
+            cooldownPromptEnabled = false;
             experiments_sensorWalking();
+            cooldownPromptEnabled = previousValue;
         }
     }
 }
