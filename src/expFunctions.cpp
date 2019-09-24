@@ -645,7 +645,7 @@ void runGaitControllerWithActionMessage(bool forward,
                                         float evaluationDistance,
                                         std::string logDirectoryPath){
 
-    sleep(1);
+    //sleep(1);
 
     resetGaitRecording(get_gait_evaluation_client);
 
@@ -677,7 +677,7 @@ void runGaitControllerWithActionMessage(bool forward,
 
         float currentPos = getInferredPosition(inferredPositionClient);
 
-        if ((ros::Time::now() - startTime).sec > (evaluationTimeout)) {
+        if ((ros::Time::now() - startTime).sec >= (evaluationTimeout)) {
             printf("  Timed out at %ds/%ds (dist %.0fmm/%.0fmm)\n", (ros::Time::now() - startTime).sec, evaluationTimeout, currentPos, evaluationDistance);
             break;
         }
