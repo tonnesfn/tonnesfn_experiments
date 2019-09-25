@@ -346,6 +346,21 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         } else {
             if (gaitResultsReverse.empty()) {
                 mapToReturn["MocapSpeed"] = gaitResultsForward["filteredSpeed"];
+
+                mapToReturn["distance"] = gaitResultsForward["distance"];
+                mapToReturn["time"] = gaitResultsForward["time"];
+                mapToReturn["power"] = gaitResultsForward["power"];
+                mapToReturn["energy"] = gaitResultsForward["energy"];
+                mapToReturn["filteredSpeed"] = gaitResultsForward["filteredSpeed"];
+                mapToReturn["inferredSpeed"] = gaitResultsForward["inferredSpeed"];
+                mapToReturn["sensorSpeed"] = gaitResultsForward["sensorSpeed"];
+                mapToReturn["sensorSpeedForward"] = gaitResultsForward["sensorSpeedForward"];
+                mapToReturn["angVel"] = gaitResultsForward["angVel"];
+                mapToReturn["combAngStab"] = gaitResultsForward["combAngStab"];
+                mapToReturn["combImuStab"] = gaitResultsForward["combImuStab"];
+                mapToReturn["linAcc"] = gaitResultsForward["linAcc"];
+                mapToReturn["linAcc_z"] = gaitResultsForward["linAcc_z"];
+
             } else {
                 mapToReturn["MocapSpeed"] = (gaitResultsForward["filteredSpeed"] + gaitResultsReverse["filteredSpeed"]) / 2.0;
             }
