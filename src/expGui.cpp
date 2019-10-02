@@ -1484,13 +1484,28 @@ void menu_experiments() {
             printf("  Please choose a label for your recording: ");
             std::string label;
             getline(std::cin, label);
-            printf("  How many seconds should be recorded: ");
-            int secondsToRecord;
-            std::cin >> secondsToRecord;
-            std::cin.clear();
-            std::cin.ignore(10000, '\n');
+            int secondsToRecord = 2;
+            int numberOfDataPoints = 10;
 
-            recordSensorData(label, secondsToRecord, loggerCommandService_client);
+            printf("  Femur (0-4): ");
+            int femurLengthInput;
+            std::cin >> femurLengthInput;
+            printf("  Tibia (0-4): ");
+            int tibiaLengthInput;
+            std::cin >> tibiaLengthInput;
+
+            // Calculate morphology parameters
+            assert(femurLengthInput >= 0 && femurLengthInput <= 4);
+            assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 4);
+
+            float femurLength = (femurLengthInput/4.0) *  50.0;
+            float tibiaLength = (tibiaLengthInput/4.0) * 80.0;
+
+            setLegLengths(femurLength, tibiaLength, poseCommand_pub);
+            sleep(1);
+            while (!legsAtRest(prismaticActuatorStates) && ros::ok()) {}
+
+            recordSensorData(label, femurLength, tibiaLength, secondsToRecord, numberOfDataPoints, loggerCommandService_client);
         } else if (choice == "rw") {
             bool previousValue = cooldownPromptEnabled;
             cooldownPromptEnabled = false;

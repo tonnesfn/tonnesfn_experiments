@@ -130,7 +130,7 @@ void writeVersionLog(std::string givenLogDirectory);
 
 std::vector<double> getRandomIndividual();
 
-void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient loggerCommandService_client);
+void recordSensorData(std::string label, float femurLength, float tibiaLength, int secondsToRecord, int numberOfDataPoints, ros::ServiceClient loggerCommandService_client);
 
 float getDifficultyFactor(std::vector<std::string> commandQueue);
 

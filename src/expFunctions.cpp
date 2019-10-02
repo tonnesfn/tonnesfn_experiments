@@ -344,8 +344,6 @@ bool initLog(std::string individual, std::string logDirectoryPath, ros::ServiceC
         return false;
     }
 
-    ROS_INFO("Log initialized");
-
     return true;
 }
 
@@ -1097,27 +1095,37 @@ std::string makeSensorDataDirectories(std::string givenSurface, int givenFemurLe
 
 }
 
-void recordSensorData(std::string label, int secondsToRecord, ros::ServiceClient loggerCommandService_client){
-    time_t t = time(0);   // get time now
-    struct tm *now = localtime(&t);
-
+void recordSensorData(std::string label, float femurLength, float tibiaLength, int secondsToRecord, int numberOfDataPoints, ros::ServiceClient loggerCommandService_client){
     std::stringstream ss;
     ss << getenv("HOME") << "/catkin_ws/experimentResults/";
     mkdir(ss.str().c_str(), 0700);
 
-    ss.str(std::string());
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensors/";
+    ss << "sensors/";
     mkdir(ss.str().c_str(), 0700);
 
-    ss.str(std::string());
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensors/" << label << "/";
+    ss << label << "/";
     mkdir(ss.str().c_str(), 0700);
 
-    initLog(getDateString(now), ss.str(), loggerCommandService_client);
-    startLogging(loggerCommandService_client);
-    fprintf(stderr, "starting sleep\n");
-    sleep(secondsToRecord);
-    fprintf(stderr, "ending sleep\n");
-    saveLog(loggerCommandService_client);
-    fprintf(stderr, "Done\n");
+    ss << std::setprecision(3) << femurLength << "_" << tibiaLength << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    std::cin.ignore(10000, '\n');
+    std::cin.clear();
+
+    for (int i = 0; i < numberOfDataPoints; i++){
+        playSound("beep_high");
+        std::string input = getInputFromTerminal("  Ready");
+
+        time_t t = time(0);   // get time now
+        struct tm *now = localtime(&t);
+
+        initLog(getDateString(now), ss.str(), loggerCommandService_client);
+        startLogging(loggerCommandService_client);
+        sleep(secondsToRecord);
+        saveLog(loggerCommandService_client);
+    }
+
+    playSound("beep_low");
+    playSound("beep_low");
+    playSound("beep_low");
 }
