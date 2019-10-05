@@ -83,7 +83,7 @@ gazebo::WorldConnection* gz;
 
 // Configuration:
 const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
-const bool pauseAfterEachEvaluation = true; // Wait for confirmation after each evaluation
+bool pauseAfterEachEvaluation = true; // Wait for confirmation after each evaluation
 int numberOfEvalsInTesting = 1;
 
 const bool useStopCondition = false;    // Use stop condition in evolution
@@ -147,6 +147,7 @@ std::string fullCommand; // Used to store commands from the arguments permanentl
 
 // This function takes in a phenotype, and returns the fitness for the individual
 std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
+                                         bool liveUpdate,
                                          const ros::ServiceClient& get_gait_evaluation_client,
                                          std::vector<std::map<std::string, double>> &rawFitnesses) {
 
@@ -216,7 +217,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_rear"), (float) phenoType.at("tibiaLength_rear")};
     }
 
-    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, false, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, liveUpdate, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -225,8 +226,9 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     //start
-    playSound("beep_low");
-    getInputFromTerminal("  Press enter when ready");
+    if (!liveUpdate) playSound("beep_low");
+
+    if (pauseAfterEachEvaluation) getInputFromTerminal("  Press enter when ready");
 
     // Run gait
     if (ros::Time::isSystemTime() || useActionMessageInSim) {
@@ -240,7 +242,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                                            evaluationTimeout,
                                            evaluationDistance,
                                            logDirectoryPath);
-
+        //if (!liveUpdate) playSound("beep_high");
     } else {
         gz->step(100);
         runGaitWithServiceCalls(evaluationDistance, evaluationTimeout, gz, get_gait_evaluation_client, inferredPositionClient, gaitCommandService_client);
@@ -307,6 +309,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                                                evaluationTimeout,
                                                evaluationDistance,
                                                logDirectoryPath);
+            if (!liveUpdate) playSound("beep_high");
         } else {
             gz->step(100);
             runGaitWithServiceCalls(evaluationDistance, evaluationTimeout, gz, get_gait_evaluation_client, inferredPositionClient, gaitCommandService_client);
@@ -351,6 +354,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                 mapToReturn["time"] = gaitResultsForward["time"];
                 mapToReturn["power"] = gaitResultsForward["power"];
                 mapToReturn["energy"] = gaitResultsForward["energy"];
+                mapToReturn["cot"] = gaitResultsForward["cot"];
                 mapToReturn["filteredSpeed"] = gaitResultsForward["filteredSpeed"];
                 mapToReturn["inferredSpeed"] = gaitResultsForward["inferredSpeed"];
                 mapToReturn["sensorSpeed"] = gaitResultsForward["sensorSpeed"];
@@ -384,7 +388,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
-        playSound("warning_mocap");
+        if (!liveUpdate) playSound("warning_mocap");
     }
 
     printf("\n");
@@ -443,7 +447,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         validSolution = true;
 
         rawFitness.clear();
-        fitnessResult = getFitness(individualParameters, get_gait_evaluation_client, rawFitness);
+        fitnessResult = getFitness(individualParameters, false, get_gait_evaluation_client, rawFitness);
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
@@ -750,7 +754,7 @@ bool stopCondition(){
     return false;
 }
 
-std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, std::map<std::string, double> givenPhenoTypeMap) {
+std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, bool continuousEvaluation, std::map<std::string, double> givenPhenoTypeMap) {
 
     std::vector<std::map<std::string, double>> vectorToReturn;
 
@@ -760,9 +764,16 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
     fitnessFunctions.emplace_back("MocapSpeed");
     fitnessFunctions.emplace_back("Stability");
 
+    bool liveUpdate = false;
+
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
-        vectorToReturn.push_back(getFitness(givenPhenoTypeMap, get_gait_evaluation_client, rawFitnesses));
+        vectorToReturn.push_back(getFitness(givenPhenoTypeMap, liveUpdate, get_gait_evaluation_client, rawFitnesses));
+
+        if (continuousEvaluation){
+            pauseAfterEachEvaluation = false;
+            liveUpdate = true; // Only prepare first when doing continuous evaluation
+        }
 
         if (pauseAfterEachEvaluation){
             getInputFromTerminal("  Press enter when ready");
@@ -811,26 +822,26 @@ void menu_demo() {
 
     if (choice.empty() == false) {
         if (choice == "ss") {
-            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::smallRobotSmallControl);
+            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::smallRobotSmallControl);
         } else if (choice == "ls") {
-            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotSmallControl);
+            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::largeRobotSmallControl);
         } else if (choice == "ll") {
-            run_individual("highLevelSplineGait", individuals_highLevelSplineGait::largeRobotLargeControl);
+            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::largeRobotLargeControl);
         } else if (choice == "rz") {
-            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::zeroHeight);
+            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::zeroHeight);
         } else if (choice == "rm") {
-            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::mediumHeight);
+            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::mediumHeight);
         } else if (choice == "rd") {
-            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::doubleUneven);
+            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::doubleUneven);
         } else if (choice == "ru") {
-            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rf") {
-            run_individual("lowLevelAdvancedSplineGait", individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
         } else if (choice == "rb") {
-            run_individual("lowLevelAdvancedSplineGait",
+            run_individual("lowLevelAdvancedSplineGait", false,
                            individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "rc"){
-            run_individual("lowLevelSplineGait", individuals_lowLevelSplineGait::conservativeIndividual);
+            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::conservativeIndividual);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
@@ -1095,6 +1106,7 @@ void experiments_verifyFitness() {
         std::vector<std::map<std::string, double>> rawFitnesses;
 
         std::map<std::string, double> fitnessResult = getFitness(individuals_journal2019[individualId],
+                                                                 false,
                                                                  get_gait_evaluation_client,
                                                                  rawFitnesses);
 
@@ -1277,7 +1289,7 @@ float getScaling(float givenFemurLength, float givenTibiaLength){
 // TODO (optional): Fix reposition legs code?
 // TODO (optional): Add raw fitness here?
 // TODO: Add support for number of evals
-void experiments_sensorWalking(){
+void experiments_sensorWalking(bool continuousEvaluation){
 
     printf("  Label for recording: ");
     std::string label;
@@ -1329,7 +1341,7 @@ void experiments_sensorWalking(){
 
     logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
 
-    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", individual);
+    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", continuousEvaluation, individual);
 
     FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
     if (sensorLog == NULL) {
@@ -1412,14 +1424,17 @@ void menu_experiments() {
 
     std::cout << "  Please choose one experiment: (enter to go back)\n";
 
-    printf("      curr - run current experiment\n"
+    printf(
+           "    Adaptation:\n"
+           "      cot - get COT from one sequence\n"
            "    Evolution:\n"
-           "      cs - evolve control, small morphology, highLevel\n"
-           "      cm - evolve control, medium morphology, highLevel\n"
-           "      cl - evolve control, large morphology, highLevel\n"
-           "      mn - evolve cont+morph, highLevel\n"
-           "      me - evolve map-elites, highLevel\n"
-           "      el - evolve cont+morph, lowLevel\n"
+           "      curr - run current experiment\n"
+           "      cs   - evolve control, small morphology, highLevel\n"
+           "      cm   - evolve control, medium morphology, highLevel\n"
+           "      cl   - evolve control, large morphology, highLevel\n"
+           "      mn   - evolve cont+morph, highLevel\n"
+           "      me   - evolve map-elites, highLevel\n"
+           "      el   - evolve cont+morph, lowLevel\n"
            "    Random:\n"
            "      rh - random search, highLevel\n"
            "      rl - random search, lowLevel\n"
@@ -1453,6 +1468,29 @@ void menu_experiments() {
             zeroPrismaticActuators(true, poseCommand_pub, prismaticActuatorStates);
 
             experiments_evolve("nsga2", "", "lowLevelSplineGait");
+        } else if (choice == "cot") {
+            // Reconfigure morphology & prepare gait (?)
+            bool previousCooldownValue = cooldownPromptEnabled;
+            cooldownPromptEnabled = false;
+            bool previousPauseValue = pauseAfterEachEvaluation;
+            pauseAfterEachEvaluation = true; // Pause only first
+            int previousTimeoutValue = evaluationTimeout;
+            evaluationTimeout = 5.0;
+
+            experiments_sensorWalking(true);
+            cooldownPromptEnabled = previousCooldownValue;
+            evaluationTimeout = previousTimeoutValue;
+            pauseAfterEachEvaluation = previousPauseValue;
+
+            // Evaluate for 1 sequence
+
+            // Print results
+
+            // Evaluate for 1 sequence
+
+            // Print results
+
+
         } else if (choice == "cs") {
             experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "cm") {
@@ -1504,12 +1542,13 @@ void menu_experiments() {
             setLegLengths(femurLength, tibiaLength, poseCommand_pub);
             sleep(1);
             while (!legsAtRest(prismaticActuatorStates) && ros::ok()) {}
+            adjustRestPose(gaitCommandService_client);
 
             recordSensorData(label, femurLength, tibiaLength, secondsToRecord, numberOfDataPoints, loggerCommandService_client);
         } else if (choice == "rw") {
             bool previousValue = cooldownPromptEnabled;
             cooldownPromptEnabled = false;
-            experiments_sensorWalking();
+            experiments_sensorWalking(false);
             cooldownPromptEnabled = previousValue;
         }
     }

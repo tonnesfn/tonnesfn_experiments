@@ -698,8 +698,6 @@ void runGaitControllerWithActionMessage(bool forward,
     // Stop walking
     stopWalking(gaitCommandService_client);
 
-    playSound("beep_high");
-
 }
 
 void spinGaitControllerOnce(ros::ServiceClient gaitCommandService_client){
