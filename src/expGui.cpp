@@ -8,9 +8,12 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <cassert>
+#include <cmath>
 
 #include "ros/ros.h"
 #include "ros/package.h"
+
+#include <std_msgs/Float64MultiArray.h>
 
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
@@ -75,11 +78,15 @@ ros::ServiceClient gaitConfiguration_client;
 ros::ServiceClient gaitCommandService_client;
 ros::ServiceClient loggerCommandService_client;
 ros::Subscriber dyretState_sub;
+ros::Subscriber roughnessFeature_sub;
+ros::Subscriber hardnessFeature_sub;
 ros::Subscriber actuator_boardState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher poseCommand_pub;
 
 gazebo::WorldConnection* gz;
+
+
 
 // Configuration:
 const bool skipReverseEvaluation = true; // Only evaluate forwards, not back again
@@ -100,7 +107,11 @@ bool cooldownPromptEnabled = true; // Prompt for cooldown between each generatio
 
 const float extraZHeightAtMax = 38.0; // mm to add to the step height at maximum leg lengths
 
+const bool fallDetection_enabled = false;
+
 //
+
+std::map<std::string, double> adaptiveIndividual;
 
 std::array<int, 8> prismaticActuatorStates;
 
@@ -140,6 +151,8 @@ bool enableLogging = true;
 char **argv_g;
 
 std::vector<std::vector<float>> lastOptimalParents;
+
+float currentRoughness, currentHardness;
 
 std::vector<std::string> fitnessFunctions; // Used to specify which fitness functions to use
 std::vector<std::string> commandQueue; // Used to store commands from the arguments temporarily
@@ -271,8 +284,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Print forward results
-    printf("  Res F:\n");
-    printMap(gaitResultsForward, "    ");
+    //printf("  Res F:\n");
+    //printMap(gaitResultsForward, "    ");
 
     std::map<std::string, double> gaitResultsReverse;
 
@@ -337,7 +350,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Handle robots that fell
-    if ((gaitResultsForward.at("linAcc_z") > 0) || ((!gaitResultsReverse.empty()) && (gaitResultsReverse.at("linAcc_z") > 0))){
+    if (((gaitResultsForward.at("linAcc_z") > 0) || ((!gaitResultsReverse.empty()) && (gaitResultsReverse.at("linAcc_z") > 0))) || !fallDetection_enabled){
         if (gaitResultsReverse.empty()) {
             mapToReturn["Stability"] = fmax(-1.0, gaitResultsForward["combImuStab"]);
         } else {
@@ -364,6 +377,8 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                 mapToReturn["combImuStab"] = gaitResultsForward["combImuStab"];
                 mapToReturn["linAcc"] = gaitResultsForward["linAcc"];
                 mapToReturn["linAcc_z"] = gaitResultsForward["linAcc_z"];
+                mapToReturn["lastRoughness"] = currentRoughness;
+                mapToReturn["lastHardness"] = currentHardness;
 
             } else {
                 mapToReturn["MocapSpeed"] = (gaitResultsForward["filteredSpeed"] + gaitResultsReverse["filteredSpeed"]) / 2.0;
@@ -411,6 +426,16 @@ void dyretStateCallback(const dyret_common::State::ConstPtr &msg) {
 
     for (int i = 0; i < msg->revolute.size(); i++){
         servoTemperatures[i] = msg->revolute[i].temperature;
+    }
+}
+
+void environmentFeatureCallback(const std_msgs::Float64MultiArray::ConstPtr &msg, std::string givenFeature) {
+    if (givenFeature == "roughness"){
+        currentRoughness = msg->data[1]; // MSE
+    } else if (givenFeature == "hardness") {
+        currentHardness = msg->data[4]; // Front legs
+    } else {
+        ROS_WARN("Received unknown environment feature: %s", givenFeature.c_str());
     }
 }
 
@@ -754,7 +779,9 @@ bool stopCondition(){
     return false;
 }
 
-std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, bool continuousEvaluation, std::map<std::string, double> givenPhenoTypeMap) {
+std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, bool continuousEvaluation, bool doAdaptation, std::map<std::string, double> givenPhenoTypeMap) {
+
+    std::map<std::string, double> currentIndividual = givenPhenoTypeMap;
 
     std::vector<std::map<std::string, double>> vectorToReturn;
 
@@ -766,9 +793,18 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
 
     bool liveUpdate = false;
 
+    std::vector<double> cot;
+    std::vector<double> roughness;
+    std::vector<double> hardness;
+    std::vector<std::string> terrain;
+    std::vector<int> individual;
+
+    int currentIndividualIndex = 0;
+
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
-        vectorToReturn.push_back(getFitness(givenPhenoTypeMap, liveUpdate, get_gait_evaluation_client, rawFitnesses));
+
+        vectorToReturn.push_back(getFitness(currentIndividual, liveUpdate, get_gait_evaluation_client, rawFitnesses));
 
         if (continuousEvaluation){
             pauseAfterEachEvaluation = false;
@@ -778,7 +814,77 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
         if (pauseAfterEachEvaluation){
             getInputFromTerminal("  Press enter when ready");
         }
+
+        cot.push_back(vectorToReturn.back()["cot"]);
+        hardness.push_back(vectorToReturn.back()["lastHardness"]);
+        roughness.push_back(vectorToReturn.back()["lastRoughness"]);
+        individual.push_back(currentIndividualIndex);
+
+        std::string lastSurface = "";
+        if (continuousEvaluation){
+            float distToConcreteCenter = sqrt(pow((currentHardness - 135.0),2) + pow((currentRoughness - 12.8), 2));
+            float distToGravelCenter = sqrt(pow((currentHardness - 62.1),2) + pow((currentRoughness - 30.3), 2));
+
+            fprintf(stderr, "Distances:\n  concrete: %.2f, gravel: %.2f\n", distToConcreteCenter, distToGravelCenter);
+
+            if (distToGravelCenter < distToConcreteCenter){
+
+                if (currentIndividualIndex == 0) {
+                    playSound("beep_high", 1);
+
+                    if (doAdaptation){
+                        currentIndividual = adaptiveIndividual;
+                        liveUpdate = false;
+                        currentIndividualIndex += 1;
+                    }
+                }
+
+                lastSurface = "g";
+            } else {
+                lastSurface = "c";
+            }
+
+            terrain.push_back(lastSurface);
+
+        }
     }
+
+    printf("\n");
+    printf("cot = [");
+    for (int i = 0; i < cot.size(); i++){
+        printf("%f", cot[i]);
+        if (i != cot.size()-1) printf(", ");
+    }
+    printf("]\n");
+
+    printf("hardness = [");
+    for (int i = 0; i < hardness.size(); i++){
+        printf("%f", hardness[i]);
+        if (i != hardness.size()-1) printf(", ");
+    }
+    printf("]\n");
+
+    printf("roughness = [");
+    for (int i = 0; i < roughness.size(); i++){
+        printf("%f", roughness[i]);
+        if (i != roughness.size()-1) printf(", ");
+    }
+    printf("]\n");
+
+    printf("terrain = [");
+    for (int i = 0; i < terrain.size(); i++){
+        printf("%s", terrain[i].c_str());
+        if (i != terrain.size()-1) printf(", ");
+    }
+    printf("]\n");
+
+    printf("individual = [");
+    for (int i = 0; i < individual.size(); i++){
+        printf("%d", individual[i]);
+        if (i != individual.size()-1) printf(", ");
+    }
+    printf("]\n");
+
 
     return vectorToReturn;
 }
@@ -822,26 +928,26 @@ void menu_demo() {
 
     if (choice.empty() == false) {
         if (choice == "ss") {
-            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::smallRobotSmallControl);
+            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::smallRobotSmallControl);
         } else if (choice == "ls") {
-            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::largeRobotSmallControl);
+            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::largeRobotSmallControl);
         } else if (choice == "ll") {
-            run_individual("highLevelSplineGait", false, individuals_highLevelSplineGait::largeRobotLargeControl);
+            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::largeRobotLargeControl);
         } else if (choice == "rz") {
-            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::zeroHeight);
+            run_individual("lowLevelSplineGait", false, false,individuals_lowLevelSplineGait::zeroHeight);
         } else if (choice == "rm") {
-            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::mediumHeight);
+            run_individual("lowLevelSplineGait", false, false,individuals_lowLevelSplineGait::mediumHeight);
         } else if (choice == "rd") {
-            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::doubleUneven);
+            run_individual("lowLevelAdvancedSplineGait", false, false, individuals_lowLevelAdvancedSplineGait::doubleUneven);
         } else if (choice == "ru") {
-            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", false, false, individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rf") {
-            run_individual("lowLevelAdvancedSplineGait", false, individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", false, false,individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
         } else if (choice == "rb") {
-            run_individual("lowLevelAdvancedSplineGait", false,
+            run_individual("lowLevelAdvancedSplineGait", false, false,
                            individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "rc"){
-            run_individual("lowLevelSplineGait", false, individuals_lowLevelSplineGait::conservativeIndividual);
+            run_individual("lowLevelSplineGait", false, false, individuals_lowLevelSplineGait::conservativeIndividual);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
@@ -1286,11 +1392,40 @@ float getScaling(float givenFemurLength, float givenTibiaLength){
     return 1.0;
 }
 
+void setAdaptiveIndividual(int givenFemurLength, int givenTibiaLength){
+    // Make comparison individual:
+    // Get controller parameters
+    float adaptiveFemurLength = 0;
+    float adaptiveTibiaLength = 0;
+
+    float femurLength = (adaptiveFemurLength/4.0) *  50.0;
+    float tibiaLength = (adaptiveTibiaLength/4.0) * 80.0;
+
+    adaptiveIndividual = std::map<std::string, double>(individuals_lowLevelSplineGait::conservativeIndividual);
+
+    float extraZHeight = ((femurLength + tibiaLength) / 150.0) * extraZHeightAtMax;
+
+    // Add extra z-height:
+    adaptiveIndividual["p2_z"] = adaptiveIndividual["p2_z"] + extraZHeight / 2;
+    adaptiveIndividual["p3_z"] = adaptiveIndividual["p3_z"] + extraZHeight;
+    adaptiveIndividual["p4_z"] = adaptiveIndividual["p4_z"] + extraZHeight / 2;
+
+    adaptiveIndividual["femurLength"] = femurLength;
+    adaptiveIndividual["tibiaLength"] = tibiaLength;
+
+    float scaling = getScaling(femurLength, tibiaLength);
+    adaptiveIndividual["splineScalingFactor"] = scaling;
+
+    // Set speed
+    double frequency = 0.2;
+    adaptiveIndividual["frequency"] = frequency;
+
+}
+
 // TODO (optional): Fix reposition legs code?
 // TODO (optional): Add raw fitness here?
 // TODO: Add support for number of evals
 void experiments_sensorWalking(bool continuousEvaluation){
-
     printf("  Label for recording: ");
     std::string label;
     getline(std::cin, label);
@@ -1300,6 +1435,29 @@ void experiments_sensorWalking(bool continuousEvaluation){
     printf("  Tibia (0-4): ");
     int tibiaLengthInput;
     std::cin >> tibiaLengthInput;
+
+    std::cin.clear();
+    std::cin.ignore(10000, '\n');
+    std::string doAdaptationInput;
+    printf("  Do adaptation? (y/n): ");
+    getline(std::cin, doAdaptationInput);
+
+    bool doAdaptation = false;
+    if (doAdaptationInput == "y"){
+        doAdaptation = true;
+
+        printf("  Adaptation Femur (0-4): ");
+        int adaptationFemurLengthInput;
+        std::cin >> adaptationFemurLengthInput;
+        printf("  Adaptation Tibia (0-4): ");
+        int adaptationTibiaLengthInput;
+        std::cin >> adaptationTibiaLengthInput;
+        setAdaptiveIndividual(adaptationFemurLengthInput, adaptationTibiaLengthInput);
+
+    } else {
+        printf("    Not doing adaptation.\n");
+    }
+
 
     // Calculate morphology parameters
     assert(femurLengthInput >= 0 && femurLengthInput <= 4);
@@ -1341,7 +1499,7 @@ void experiments_sensorWalking(bool continuousEvaluation){
 
     logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
 
-    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", continuousEvaluation, individual);
+    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", continuousEvaluation, doAdaptation, individual);
 
     FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
     if (sensorLog == NULL) {
@@ -1476,11 +1634,15 @@ void menu_experiments() {
             pauseAfterEachEvaluation = true; // Pause only first
             int previousTimeoutValue = evaluationTimeout;
             evaluationTimeout = 5.0;
+            int previousDistanceValue = evaluationDistance;
+            evaluationDistance = 999999999;
 
             experiments_sensorWalking(true);
+
             cooldownPromptEnabled = previousCooldownValue;
             evaluationTimeout = previousTimeoutValue;
             pauseAfterEachEvaluation = previousPauseValue;
+            evaluationDistance = previousDistanceValue;
 
             // Evaluate for 1 sequence
 
@@ -1713,6 +1875,9 @@ int main(int argc, char **argv) {
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
     actuator_boardState_sub = rch.subscribe("/dyret/actuator_board/state", 1, actuator_boardStateCallback);
+
+    roughnessFeature_sub = rch.subscribe<std_msgs::Float64MultiArray>("/dyret/environment/realsenseFeature", 1, boost::bind(environmentFeatureCallback, _1, "roughness"));
+    hardnessFeature_sub = rch.subscribe<std_msgs::Float64MultiArray>("/dyret/environment/optoforceFeature", 1, boost::bind(environmentFeatureCallback, _1, "hardness"));
 
     waitForRosInit(get_gait_evaluation_client, "get_gait_evaluation");
     waitForRosInit(gaitControllerStatus_client, "gaitControllerStatus");
