@@ -1093,6 +1093,32 @@ std::string makeSensorDataDirectories(std::string givenSurface, int givenFemurLe
 
 }
 
+std::string makeAdaptationDataDirectories(std::string givenArea){
+    std::stringstream ss;
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/adaptation/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/adaptation/" << givenArea << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    time_t t = time(0);   // get time now
+    struct tm *now = localtime(&t);
+
+    ss.str(std::string());
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/adaptation/" << givenArea << "/" << getDateString(now) << "/";
+    mkdir(ss.str().c_str(), 0700);
+
+    ss << getDateString(now) << ".json";
+
+    return ss.str();
+
+}
+
 void recordSensorData(std::string label, float femurLength, float tibiaLength, int secondsToRecord, int numberOfDataPoints, ros::ServiceClient loggerCommandService_client){
     std::stringstream ss;
     ss << getenv("HOME") << "/catkin_ws/experimentResults/";

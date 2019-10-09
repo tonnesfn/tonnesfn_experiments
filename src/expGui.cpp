@@ -322,7 +322,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
                                                evaluationTimeout,
                                                evaluationDistance,
                                                logDirectoryPath);
-            if (!liveUpdate) playSound("beep_high");
+            //if (!liveUpdate) playSound("beep_high");
         } else {
             gz->step(100);
             runGaitWithServiceCalls(evaluationDistance, evaluationTimeout, gz, get_gait_evaluation_client, inferredPositionClient, gaitCommandService_client);
@@ -403,7 +403,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
-        if (!liveUpdate) playSound("warning_mocap");
+        //if (!liveUpdate) playSound("warning_mocap");
     }
 
     printf("\n");
@@ -822,15 +822,15 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
 
         std::string lastSurface = "";
         if (continuousEvaluation){
-            float distToConcreteCenter = sqrt(pow((currentHardness - 135.0),2) + pow((currentRoughness - 12.8), 2));
-            float distToGravelCenter = sqrt(pow((currentHardness - 62.1),2) + pow((currentRoughness - 30.3), 2));
+            float distToConcreteCenter = sqrt(pow((currentHardness - 100.0),2) + pow((currentRoughness - 10.0), 2));
+            float distToGravelCenter = sqrt(pow((currentHardness - 60),2) + pow((currentRoughness - 30.0), 2));
 
             fprintf(stderr, "Distances:\n  concrete: %.2f, gravel: %.2f\n", distToConcreteCenter, distToGravelCenter);
 
             if (distToGravelCenter < distToConcreteCenter){
 
                 if (currentIndividualIndex == 0) {
-                    playSound("beep_high", 1);
+                    //playSound("beep_high", 1);
 
                     if (doAdaptation){
                         currentIndividual = adaptiveIndividual;
@@ -880,7 +880,7 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
 
     printf("individual = [");
     for (int i = 0; i < individual.size(); i++){
-        printf("%d", individual[i]);
+        printf("\"%d\"", individual[i]);
         if (i != individual.size()-1) printf(", ");
     }
     printf("]\n");
@@ -1516,6 +1516,12 @@ void experiments_sensorWalking(bool continuousEvaluation){
     fprintf(sensorLog, "  \"experiment_info\": {\n");
     fprintf(sensorLog, "    \"femurLength\": \"%f\",\n", femurLength);
     fprintf(sensorLog, "    \"tibiaLength\": \"%f\",\n", tibiaLength);
+    if (doAdaptation){
+      fprintf(sensorLog, "    \"adaptation\": \"true\",\n");
+    } else {
+      fprintf(sensorLog, "    \"adaptation\": \"false\",\n");
+    }
+
     fprintf(sensorLog, "    \"time\": \"%s\",\n", timeString.c_str());
     if (fullCommand.size() != 0) fprintf(sensorLog, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(sensorLog, "    \"type\": \"sensorWalking\",\n");
@@ -1577,6 +1583,140 @@ void experiments_sensorWalking(bool continuousEvaluation){
      numberOfEvalsInTesting = numberOfEvals_old;
 }
 
+void experiments_continueAdaptation(){
+    printf("  Running continuous adaptation\n");
+    printf("    Area label: ");
+    std::string areaLabel;
+    getline(std::cin, areaLabel);
+
+    bool previousCooldownValue = cooldownPromptEnabled;
+    cooldownPromptEnabled = false;
+    bool previousPauseValue = pauseAfterEachEvaluation;
+    pauseAfterEachEvaluation = false;
+    int previousTimeoutValue = evaluationTimeout;
+    evaluationTimeout = 5.0;
+    int previousDistanceValue = evaluationDistance;
+    evaluationDistance = 999999999;
+
+    int initialFemurLength = 1;
+    int initialTibiaLength = 1;
+
+    float femurLength = (initialFemurLength/4.0) *  50.0;
+    float tibiaLength = (initialTibiaLength/4.0) * 80.0;
+
+    float frequency = 0.2;
+    float scaling = getScaling(femurLength, tibiaLength);
+    int numberOfEvals_old = numberOfEvalsInTesting;
+    numberOfEvalsInTesting = 1;
+
+    // Get controller parameters
+    std::map<std::string, double> individual = std::map<std::string, double>(individuals_lowLevelSplineGait::conservativeIndividual);
+
+    float extraZHeight = ((femurLength + tibiaLength) / 150.0) * extraZHeightAtMax;
+
+    // Add extra z-height:
+    individual["p2_z"] = individual["p2_z"] + extraZHeight / 2;
+    individual["p3_z"] = individual["p3_z"] + extraZHeight;
+    individual["p4_z"] = individual["p4_z"] + extraZHeight / 2;
+    individual["femurLength"] = femurLength;
+    individual["tibiaLength"] = tibiaLength;
+    individual["splineScalingFactor"] = scaling;
+    individual["frequency"] = frequency;
+
+    logDirectoryPath = makeAdaptationDataDirectories(areaLabel).c_str();
+
+    printf(" %s\n", logDirectoryPath.c_str());
+
+    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", false, false, individual);
+
+    FILE *log = fopen(logDirectoryPath.c_str(), "a");
+    if (log == NULL) {
+        ROS_ERROR("adaptationLog could not be opened (err%d)\n", errno);
+    }
+
+    std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
+    std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
+
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
+    fprintf(log, "{\n");
+    fprintf(log, "  \"experiment_info\": {\n");
+    fprintf(log, "    \"femurLength\": \"%f\",\n", femurLength);
+    fprintf(log, "    \"tibiaLength\": \"%f\",\n", tibiaLength);
+    fprintf(log, "    \"time\": \"%s\",\n", timeString.c_str());
+    if (fullCommand.size() != 0) fprintf(log, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
+    fprintf(log, "    \"type\": \"adaptation\",\n");
+    fprintf(log, "    \"evaluationTimeout\": \"%d\",\n", evaluationTimeout);
+    fprintf(log, "    \"evaluationDistance\": \"%.0f\",\n", evaluationDistance);
+    fprintf(log, "    \"machine\": \"%s\",\n", hostname);
+    fprintf(log, "    \"user\": \"%s\",\n", getenv("USER"));
+    fprintf(log, "    \"fitness\": [\n");
+    for (int i = 0; i < fitnessFunctions.size(); i++) {
+        fprintf(log, "      \"%s\"", fitnessFunctions[i].c_str());
+        if (i != fitnessFunctions.size() - 1) fprintf(log, ",\n");
+    }
+    fprintf(log, "\n");
+    fprintf(log, "    ]\n");
+    fprintf(log, "  },\n");
+
+    fprintf(log, "  \"individual\": {\n");
+    printMap(individual, "    ", log);
+    fprintf(log, "  },\n");
+
+    fprintf(log, "  \"fitness\": [\n");
+    fprintf(log, "    {\n");
+
+    for (int j = 0; j < fitnesses.size(); j++) {
+        int i = 0;
+        for (auto elem : fitnesses[j]) {
+            fprintf(log, "      \"%s\": %f", elem.first.c_str(), elem.second);
+            if (i != fitnesses[j].size() - 1) fprintf(log, ",\n"); else fprintf(log, "\n");
+            i++;
+        }
+        fprintf(log, "    }");
+
+        if (j != fitnesses.size()-1) fprintf(log, ",\n    {");
+        fprintf(log, "\n");
+    }
+
+    fprintf(log, "  ]\n");
+    fprintf(log, "}");
+
+    fclose(log);
+
+    numberOfEvalsInTesting = numberOfEvals_old;
+
+
+
+    // Do initialization (smart or dumb)
+
+    // Request new morphology
+
+    // Wait for morphology
+
+    // Take one step sequence to get hardness measure
+
+    // Loop until converged
+
+        // Measure roughness and hardness
+
+        // Get predicted map for current roughness and hardness
+
+        // Send new morphology command
+
+        // Send message to update map model
+
+        // Start walking
+
+        // Wait until one full step sequence has been done on the new terrain
+
+    cooldownPromptEnabled = previousCooldownValue;
+    evaluationTimeout = previousTimeoutValue;
+    pauseAfterEachEvaluation = previousPauseValue;
+    evaluationDistance = previousDistanceValue;
+}
+
 void menu_experiments() {
     std::string choice;
 
@@ -1585,6 +1725,7 @@ void menu_experiments() {
     printf(
            "    Adaptation:\n"
            "      cot - get COT from one sequence\n"
+           "      ca  - continuous adaptation\n"
            "    Evolution:\n"
            "      curr - run current experiment\n"
            "      cs   - evolve control, small morphology, highLevel\n"
@@ -1644,15 +1785,8 @@ void menu_experiments() {
             pauseAfterEachEvaluation = previousPauseValue;
             evaluationDistance = previousDistanceValue;
 
-            // Evaluate for 1 sequence
-
-            // Print results
-
-            // Evaluate for 1 sequence
-
-            // Print results
-
-
+        } else if (choice == "ca") {
+            experiments_continueAdaptation();
         } else if (choice == "cs") {
             experiments_evolve("nsga2", "small", "highLevelSplineGait");
         } else if (choice == "cm") {
