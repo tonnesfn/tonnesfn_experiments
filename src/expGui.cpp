@@ -1634,6 +1634,8 @@ void experiments_continueAdaptation(){
         ROS_ERROR("adaptationLog could not be opened (err%d)\n", errno);
     }
 
+    // Start log writing:
+
     std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
     std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
 
@@ -1660,34 +1662,37 @@ void experiments_continueAdaptation(){
     fprintf(log, "    ]\n");
     fprintf(log, "  },\n");
 
-    fprintf(log, "  \"individual\": {\n");
-    printMap(individual, "    ", log);
-    fprintf(log, "  },\n");
+    fprintf(log, "  \"evaluation\": [{\n");
+    fprintf(log, "    \"individual\": {\n");
+    printMap(individual, "      ", log);
+    fprintf(log, "    },\n");
 
-    fprintf(log, "  \"fitness\": [\n");
-    fprintf(log, "    {\n");
+    fprintf(log, "    \"fitness\": [\n");
+    fprintf(log, "      {\n");
 
     for (int j = 0; j < fitnesses.size(); j++) {
         int i = 0;
         for (auto elem : fitnesses[j]) {
-            fprintf(log, "      \"%s\": %f", elem.first.c_str(), elem.second);
+            fprintf(log, "        \"%s\": %f", elem.first.c_str(), elem.second);
             if (i != fitnesses[j].size() - 1) fprintf(log, ",\n"); else fprintf(log, "\n");
             i++;
         }
-        fprintf(log, "    }");
+        fprintf(log, "      }");
 
-        if (j != fitnesses.size()-1) fprintf(log, ",\n    {");
+        if (j != fitnesses.size()-1) fprintf(log, ",\n      {");
         fprintf(log, "\n");
     }
 
-    fprintf(log, "  ]\n");
+    fprintf(log, "    ]\n");
+
+    // Rest of the evaluations here
+
+    fprintf(log, "  }]\n");
     fprintf(log, "}");
 
     fclose(log);
 
     numberOfEvalsInTesting = numberOfEvals_old;
-
-
 
     // Do initialization (smart or dumb)
 

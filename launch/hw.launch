@@ -2,6 +2,7 @@
   <arg name="contact_enabled" default="true" doc="Enable OptoForce contact sensors" />
   <arg name="imu_enabled" default="true" doc="Enable IMU sensor" />
   <arg name="realsense_enabled" default="true" doc="Enable Realsense" />
+  <arg name="terrain_enabled" default="true" doc="Enable terrain characterization nodes" />
   <arg name="mocap_type" default="" doc="Type of mocap system (blank to not start mocap)" />
 
   <include file="$(find dyret_controller)/launch/fullController.launch" />
@@ -26,5 +27,9 @@
   </include>
 
   <include file="$(find terrain_characterizer)/launch/rs_camera.launch" if="$(arg realsense_enabled)" />
+
+  <node pkg="terrain_characterizer" name="optoforceFeatureExtractor" type="optoforceFeatureExtractor" required="false" if="$(arg terrain_enabled)"/>
+  <node pkg="terrain_characterizer" name="pointCloudPlaneFitter" type="pointCloudPlaneFitter" required="false" if="$(arg terrain_enabled)"/>
+  <node pkg="tonnesfn_experiments" name="mapPredictor" type="mapPredictor.py" required="false" if="$(arg terrain_enabled)"/>
 
 </launch>
