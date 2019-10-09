@@ -1,0 +1,4 @@
+float64 roughness
+float64 hardness
+---
+float64[] map

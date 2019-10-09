@@ -39,6 +39,18 @@ find_package(Boost REQUIRED COMPONENTS
 
 find_package(TBB REQUIRED)
 
+
+add_service_files(
+  FILES
+  getMap.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+
 catkin_package(
   CATKIN_DEPENDS message_runtime
 )
