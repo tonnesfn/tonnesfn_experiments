@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from tonnesfn_experiments.srv import getMap, getMapResponse
+from tonnesfn_experiments.msg import DataPoint
+
 import rospy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,8 +22,26 @@ feature_1d = [[] * 5 for i in range(5)]
 model_1d = [[] * 5 for i in range(5)]
 limit_1d = [[] * 5 for i in range(5)]
 
-feature_2d = [[] * 5 for i in range(5)]
-model_2d = [[] * 5 for i in range(5)]
+feature_2d = [[[] for i in range(5)] for j in range(5)]
+model_2d = [[[] for i in range(5)] for j in range(5)]
+#feature_2d = [[] * 5 for i in range(5)]
+#model_2d = [[] * 5 for i in range(5)]
+
+newPoints_roughness = [[[] for i in range(5)] for j in range(5)]
+newPoints_hardness = [[[] for i in range(5)] for j in range(5)]
+newPoints_cot = [[[] for i in range(5)] for j in range(5)]
+
+def datapointCallback(data):
+    newPoints_roughness[data.femurLength][data.tibiaLength].append(data.roughness)
+    newPoints_hardness[data.femurLength][data.tibiaLength].append(data.hardness)
+    newPoints_cot[data.femurLength][data.tibiaLength].append(data.cot)
+
+    # Regenerate model:
+    for femur in range(5):
+        for tibia in range(5):
+            generateModel2d(femur, tibia)
+
+    print("Successfully updated 2d model")
 
 def readOriginalMaps():
     # Get all data
@@ -219,6 +239,11 @@ def generateModel2d(givenFemur, givenTibia):
     roughness = list(currentMorphology['roughness_mean'])
     hardness = list(currentMorphology['hardness_mean'])
 
+    if len(newPoints_cot[givenFemur][givenTibia]) > 0:
+        cot.extend(newPoints_cot[givenFemur][givenTibia])
+        roughness.extend(newPoints_roughness[givenFemur][givenTibia])
+        hardness.extend(newPoints_hardness[givenFemur][givenTibia])
+
     # Linear regression:
     x_training = np.array(list(zip(roughness, hardness)))
     y = np.array(cot)
@@ -230,8 +255,8 @@ def generateModel2d(givenFemur, givenTibia):
     poly_model = LinearRegression()
     poly_model.fit(x_poly, y)
 
-    feature_2d[givenFemur].append(polynomial_features)
-    model_2d[givenFemur].append(poly_model)
+    feature_2d[givenFemur][givenTibia] = polynomial_features
+    model_2d[givenFemur][givenTibia] = poly_model
 
 def getValueFromModel2d(givenX, givenFemur, givenTibia):
 
@@ -240,9 +265,6 @@ def getValueFromModel2d(givenX, givenFemur, givenTibia):
     poly_pred = poly_model.predict(x_new)
 
     return poly_pred
-
-def make2dModel():
-    print("Test")
 
 def getMap_handle(req):
 
@@ -279,7 +301,9 @@ def mapPredictor_server():
 
     print("Successfully instantiated 2d model")
 
-    s = rospy.Service('/dyret/getMap', getMap, getMap_handle)
+    ser = rospy.Service('/dyret/getMap', getMap, getMap_handle)
+    sub = rospy.Subscriber("/dyret/datapoint", DataPoint, datapointCallback)
+
     rospy.spin()
 
 if __name__ == "__main__":
