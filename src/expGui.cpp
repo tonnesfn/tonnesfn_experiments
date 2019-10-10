@@ -24,6 +24,7 @@
 #include <dynamic_reconfigure/Config.h>
 
 #include <tonnesfn_experiments/getMap.h>
+#include <tonnesfn_experiments/DataPoint.h>
 
 #include "dyret_common/Configuration.h"
 #include "dyret_common/Configure.h"
@@ -86,6 +87,7 @@ ros::Subscriber hardnessFeature_sub;
 ros::Subscriber actuator_boardState_sub;
 ros::Subscriber gaitInferredPos_sub;
 ros::Publisher poseCommand_pub;
+ros::Publisher dataPoint_pub;
 
 gazebo::WorldConnection* gz;
 
@@ -1817,7 +1819,15 @@ void experiments_continueAdaptation() {
         currentTibiaCommand = bestNext[1];
 
         // Send message to update map model
-        // TODO: implement this
+        tonnesfn_experiments::DataPoint msg;
+
+        msg.femurLength = lastLegCommands[0];
+        msg.tibiaLength = lastLegCommands[1];
+        msg.roughness   = currentRoughness;
+        msg.hardness    = currentHardness;
+        msg.cot         = fitnesses.back()["cot"];
+
+        dataPoint_pub.publish(msg);
 
         // Send new morphology command
         individual = getIndividual(currentFemurCommand, currentTibiaCommand);
@@ -1834,11 +1844,10 @@ void experiments_continueAdaptation() {
 
             if (!legsAtRest(prismaticActuatorStates)) {
                 printf("  Legs are still changing\n");
-            } else if (counter == 0 && (lastLegCommands[0] != individual["femurLength"] && lastLegCommands[1] != individual["tibiaLength"])){
+            } else if (counter == 0 && (lastLegCommands[0] != individual["femurLength"] || lastLegCommands[1] != individual["tibiaLength"])){
                 printf(" Waiting one cycle to get status\n");
             }else{
                 printf("  Legs are at rest\n");
-                printf("    last0: %.2f, current: %.2f last0: %.2f, current: %.2f, counter: %d\n", lastLegCommands[0], individual["femurLength"], lastLegCommands[1], individual["tibiaLength"], counter);
                 waitingForLegs = false;
             }
 
@@ -1848,6 +1857,7 @@ void experiments_continueAdaptation() {
             counter++;
         }
 
+        fitnesses.emplace_back(currentFitness);
         lastLegCommands = std::array<double, 2>{individual["femurLength"], individual["tibiaLength"]};
     }
 
@@ -2157,6 +2167,8 @@ int main(int argc, char **argv) {
             "get_gait_controller_status");
 
     poseCommand_pub = rch.advertise<dyret_common::Pose>("/dyret/command", 10);
+    dataPoint_pub = rch.advertise<tonnesfn_experiments::DataPoint>("/dyret/datapoint", 1);
+
     dyretState_sub = rch.subscribe("/dyret/state", 1, dyretStateCallback);
     actuator_boardState_sub = rch.subscribe("/dyret/actuator_board/state", 1, actuator_boardStateCallback);
 

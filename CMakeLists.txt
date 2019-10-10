@@ -39,6 +39,12 @@ find_package(Boost REQUIRED COMPONENTS
 
 find_package(TBB REQUIRED)
 
+add_message_files(
+  DIRECTORY msg
+  FILES
+  DataPoint.msg
+)
+
 
 add_service_files(
   FILES
