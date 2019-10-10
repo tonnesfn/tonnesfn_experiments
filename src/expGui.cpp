@@ -23,6 +23,8 @@
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
 
+#include <tonnesfn_experiments/getMap.h>
+
 #include "dyret_common/Configuration.h"
 #include "dyret_common/Configure.h"
 #include "dyret_common/Pose.h"
@@ -77,6 +79,7 @@ ros::ServiceClient servoStatus_client;
 ros::ServiceClient gaitConfiguration_client;
 ros::ServiceClient gaitCommandService_client;
 ros::ServiceClient loggerCommandService_client;
+ros::ServiceClient getMapService_client;
 ros::Subscriber dyretState_sub;
 ros::Subscriber roughnessFeature_sub;
 ros::Subscriber hardnessFeature_sub;
@@ -160,9 +163,11 @@ std::string fullCommand; // Used to store commands from the arguments permanentl
 
 // This function takes in a phenotype, and returns the fitness for the individual
 std::map<std::string, double> getFitness(std::map<std::string, double> phenoType,
+                                         bool prepareForGait,
                                          bool liveUpdate,
                                          const ros::ServiceClient& get_gait_evaluation_client,
-                                         std::vector<std::map<std::string, double>> &rawFitnesses) {
+                                         std::vector<std::map<std::string, double>> &rawFitnesses,
+                                         bool printResults = true) {
 
     std::map<std::string, double> mapToReturn;
 
@@ -196,8 +201,10 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         cooldownServos(servoConfigClient, servoTemperatures, poseCommand_pub, restPose);
     }
 
-    printf("\n  %03u: Evaluating individual:\n", currentIndividual);
-    printMap(phenoType, "    ");
+    if (printResults){
+        printf("\n  %03u: Evaluating individual:\n", currentIndividual);
+        printMap(phenoType, "    ");
+    }
 
     // Check servo temperature and consider fitness invalid if too high (due to DC motor characterics)
     if (ros::Time::isSystemTime()) { // Only check temperature in real world
@@ -230,7 +237,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         tibiaLengths = {(float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_front"), (float) phenoType.at("tibiaLength_rear"), (float) phenoType.at("tibiaLength_rear")};
     }
 
-    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, true, liveUpdate, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
+    setGaitParams(gaitType, logPath + std::to_string(currentIndividual), true, prepareForGait, liveUpdate, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
     if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
         ros::spinOnce();
@@ -300,7 +307,7 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
 
         // Set gait parameters
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) unpauseGazebo();
-        setGaitParams(gaitType, "", false, true, false, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
+        setGaitParams(gaitType, "", false, prepareForGait, false, femurLengths, tibiaLengths, phenoType, gaitConfiguration_client);
 
         if (!(ros::Time::isSystemTime() || useActionMessageInSim)) {
             ros::spinOnce();
@@ -398,15 +405,16 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
     }
 
     // Print total results
-    printf("  Res total: \n");
-    printMap(mapToReturn, "    ");
+    if (printResults){
+        printf("  Res total: \n");
+        printMap(mapToReturn, "    ");
+        printf("\n");
+    }
 
     if (mapToReturn["MocapSpeed"] == 0.0){
         ROS_WARN("MocapSpeed 0");
         //if (!liveUpdate) playSound("warning_mocap");
     }
-
-    printf("\n");
 
     // Add raw fitnesses to container
     rawFitnesses.push_back(gaitResultsForward);
@@ -472,7 +480,7 @@ std::map<std::string, double> evaluateIndividual(std::vector<double> givenIndivi
         validSolution = true;
 
         rawFitness.clear();
-        fitnessResult = getFitness(individualParameters, false, get_gait_evaluation_client, rawFitness);
+        fitnessResult = getFitness(individualParameters, true, false, get_gait_evaluation_client, rawFitness);
 
         // Check after each eval if enabled. If not - do regular checks
         if (promptForConfirmation) {
@@ -779,7 +787,7 @@ bool stopCondition(){
     return false;
 }
 
-std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, bool continuousEvaluation, bool doAdaptation, std::map<std::string, double> givenPhenoTypeMap) {
+std::vector<std::map<std::string, double>> run_individual(std::string givenGaitType, bool prepareForGait, bool continuousEvaluation, bool doAdaptation, std::map<std::string, double> givenPhenoTypeMap) {
 
     std::map<std::string, double> currentIndividual = givenPhenoTypeMap;
 
@@ -804,7 +812,7 @@ std::vector<std::map<std::string, double>> run_individual(std::string givenGaitT
     for (int i = 0; i < numberOfEvalsInTesting; i++) {
         std::vector<std::map<std::string, double>> rawFitnesses;
 
-        vectorToReturn.push_back(getFitness(currentIndividual, liveUpdate, get_gait_evaluation_client, rawFitnesses));
+        vectorToReturn.push_back(getFitness(currentIndividual, prepareForGait, liveUpdate, get_gait_evaluation_client, rawFitnesses));
 
         if (continuousEvaluation){
             pauseAfterEachEvaluation = false;
@@ -928,26 +936,26 @@ void menu_demo() {
 
     if (choice.empty() == false) {
         if (choice == "ss") {
-            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::smallRobotSmallControl);
+            run_individual("highLevelSplineGait", true, false, false,individuals_highLevelSplineGait::smallRobotSmallControl);
         } else if (choice == "ls") {
-            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::largeRobotSmallControl);
+            run_individual("highLevelSplineGait", true, false, false,individuals_highLevelSplineGait::largeRobotSmallControl);
         } else if (choice == "ll") {
-            run_individual("highLevelSplineGait", false, false,individuals_highLevelSplineGait::largeRobotLargeControl);
+            run_individual("highLevelSplineGait", true, false, false,individuals_highLevelSplineGait::largeRobotLargeControl);
         } else if (choice == "rz") {
-            run_individual("lowLevelSplineGait", false, false,individuals_lowLevelSplineGait::zeroHeight);
+            run_individual("lowLevelSplineGait", true, false, false,individuals_lowLevelSplineGait::zeroHeight);
         } else if (choice == "rm") {
-            run_individual("lowLevelSplineGait", false, false,individuals_lowLevelSplineGait::mediumHeight);
+            run_individual("lowLevelSplineGait", true, false, false,individuals_lowLevelSplineGait::mediumHeight);
         } else if (choice == "rd") {
-            run_individual("lowLevelAdvancedSplineGait", false, false, individuals_lowLevelAdvancedSplineGait::doubleUneven);
+            run_individual("lowLevelAdvancedSplineGait", true, false, false, individuals_lowLevelAdvancedSplineGait::doubleUneven);
         } else if (choice == "ru") {
-            run_individual("lowLevelAdvancedSplineGait", false, false, individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", true, false, false, individuals_lowLevelAdvancedSplineGait::unevenSmallFrontLeaning);
         } else if (choice == "rf") {
-            run_individual("lowLevelAdvancedSplineGait", false, false,individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
+            run_individual("lowLevelAdvancedSplineGait", true, false, false,individuals_lowLevelAdvancedSplineGait::unevenLargeFrontLeaning);
         } else if (choice == "rb") {
-            run_individual("lowLevelAdvancedSplineGait", false, false,
+            run_individual("lowLevelAdvancedSplineGait", true, false, false,
                            individuals_lowLevelAdvancedSplineGait::unevenLargeBackLeaning);
         } else if (choice == "rc"){
-            run_individual("lowLevelSplineGait", false, false, individuals_lowLevelSplineGait::conservativeIndividual);
+            run_individual("lowLevelSplineGait", true, false, false, individuals_lowLevelSplineGait::conservativeIndividual);
         } else if (choice == "ms") {
             setLegLengths(0.0, 0.0, poseCommand_pub);
             printf("Small morphology requested\n");
@@ -1212,6 +1220,7 @@ void experiments_verifyFitness() {
         std::vector<std::map<std::string, double>> rawFitnesses;
 
         std::map<std::string, double> fitnessResult = getFitness(individuals_journal2019[individualId],
+                                                                 true, // prepareForGait
                                                                  false,
                                                                  get_gait_evaluation_client,
                                                                  rawFitnesses);
@@ -1499,7 +1508,7 @@ void experiments_sensorWalking(bool continuousEvaluation){
 
     logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
 
-    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", continuousEvaluation, doAdaptation, individual);
+    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, continuousEvaluation, doAdaptation, individual);
 
     FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
     if (sensorLog == NULL) {
@@ -1583,7 +1592,31 @@ void experiments_sensorWalking(bool continuousEvaluation){
      numberOfEvalsInTesting = numberOfEvals_old;
 }
 
-void experiments_continueAdaptation(){
+std::map<std::string, double> getIndividual(double givenFemurCommand, double givenTibiaCommand){
+
+    float femurLength = (givenFemurCommand/4.0) *  50.0;
+    float tibiaLength = (givenTibiaCommand/4.0) * 80.0;
+    float frequency = 0.2;
+    float scaling = getScaling(femurLength, tibiaLength);
+    int numberOfEvals_old = numberOfEvalsInTesting;
+    numberOfEvalsInTesting = 1;
+
+    std::map<std::string, double> individual = std::map<std::string, double>(individuals_lowLevelSplineGait::conservativeIndividual);
+
+    float extraZHeight = ((femurLength + tibiaLength) / 150.0) * extraZHeightAtMax;
+    individual["p2_z"] = individual["p2_z"] + extraZHeight / 2;
+    individual["p3_z"] = individual["p3_z"] + extraZHeight;
+    individual["p4_z"] = individual["p4_z"] + extraZHeight / 2;
+    individual["femurLength"] = femurLength;
+    individual["tibiaLength"] = tibiaLength;
+    individual["splineScalingFactor"] = scaling;
+    individual["frequency"] = frequency;
+
+    return individual;
+
+}
+
+void experiments_continueAdaptation() {
     printf("  Running continuous adaptation\n");
     printf("    Area label: ");
     std::string areaLabel;
@@ -1597,44 +1630,27 @@ void experiments_continueAdaptation(){
     evaluationTimeout = 5.0;
     int previousDistanceValue = evaluationDistance;
     evaluationDistance = 999999999;
-
-    int initialFemurLength = 1;
-    int initialTibiaLength = 1;
-
-    float femurLength = (initialFemurLength/4.0) *  50.0;
-    float tibiaLength = (initialTibiaLength/4.0) * 80.0;
-
-    float frequency = 0.2;
-    float scaling = getScaling(femurLength, tibiaLength);
     int numberOfEvals_old = numberOfEvalsInTesting;
-    numberOfEvalsInTesting = 1;
 
-    // Get controller parameters
-    std::map<std::string, double> individual = std::map<std::string, double>(individuals_lowLevelSplineGait::conservativeIndividual);
+    //////////////////////////////////////////////
+    /// Do initialization to choose morphology ///
+    //////////////////////////////////////////////
 
-    float extraZHeight = ((femurLength + tibiaLength) / 150.0) * extraZHeightAtMax;
+    int currentFemurCommand = 0; // Do something smart here?
+    int currentTibiaCommand = 0; // Do something smart here?
 
-    // Add extra z-height:
-    individual["p2_z"] = individual["p2_z"] + extraZHeight / 2;
-    individual["p3_z"] = individual["p3_z"] + extraZHeight;
-    individual["p4_z"] = individual["p4_z"] + extraZHeight / 2;
-    individual["femurLength"] = femurLength;
-    individual["tibiaLength"] = tibiaLength;
-    individual["splineScalingFactor"] = scaling;
-    individual["frequency"] = frequency;
+    std::map<std::string, double> individual = getIndividual(currentFemurCommand, currentTibiaCommand);
+
+    //////////////////////////
+    /// Initialize logging ///
+    //////////////////////////
 
     logDirectoryPath = makeAdaptationDataDirectories(areaLabel).c_str();
-
-    printf(" %s\n", logDirectoryPath.c_str());
-
-    std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", false, false, individual);
 
     FILE *log = fopen(logDirectoryPath.c_str(), "a");
     if (log == NULL) {
         ROS_ERROR("adaptationLog could not be opened (err%d)\n", errno);
     }
-
-    // Start log writing:
 
     std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
     std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
@@ -1644,8 +1660,8 @@ void experiments_continueAdaptation(){
 
     fprintf(log, "{\n");
     fprintf(log, "  \"experiment_info\": {\n");
-    fprintf(log, "    \"femurLength\": \"%f\",\n", femurLength);
-    fprintf(log, "    \"tibiaLength\": \"%f\",\n", tibiaLength);
+    fprintf(log, "    \"femurLength\": \"%f\",\n", individual["femurLength"]);
+    fprintf(log, "    \"tibiaLength\": \"%f\",\n", individual["tibiaLength"]);
     fprintf(log, "    \"time\": \"%s\",\n", timeString.c_str());
     if (fullCommand.size() != 0) fprintf(log, "    \"command\": \"%s\",\n", trim(fullCommand).c_str());
     fprintf(log, "    \"type\": \"adaptation\",\n");
@@ -1661,6 +1677,24 @@ void experiments_continueAdaptation(){
     fprintf(log, "\n");
     fprintf(log, "    ]\n");
     fprintf(log, "  },\n");
+
+    currentRoughness = -1.0;
+    currentHardness = -1.0;
+
+    ROS_INFO("Logging initialized");
+
+    //////////////////////////////////////////////////////////////
+    /// Reconfigure morphology and evaluate for one step cycle ///
+    //////////////////////////////////////////////////////////////
+
+    std::vector <std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, false, false,
+                                                                           individual);
+
+    ROS_INFO("Evaluated for the first step sequence");
+
+    //////////////////////////////
+    /// Log initial individual ///
+    //////////////////////////////
 
     fprintf(log, "  \"evaluation\": [{\n");
     fprintf(log, "    \"individual\": {\n");
@@ -1679,43 +1713,153 @@ void experiments_continueAdaptation(){
         }
         fprintf(log, "      }");
 
-        if (j != fitnesses.size()-1) fprintf(log, ",\n      {");
+        if (j != fitnesses.size() - 1) fprintf(log, ",\n      {");
         fprintf(log, "\n");
     }
 
     fprintf(log, "    ]\n");
 
-    // Rest of the evaluations here
+    /// Rest of the evaluations here
+
+    fprintf(log, "    },{\n");
+    fprintf(log, "    \"individual\": {\n");
+    printMap(individual, "      ", log);
+    fprintf(log, "    },\n");
+
+    fprintf(log, "    \"fitness\": [\n");
+    fprintf(log, "      {\n");
+
+    for (int j = 0; j < fitnesses.size(); j++) {
+        int i = 0;
+        for (auto elem : fitnesses[j]) {
+            fprintf(log, "        \"%s\": %f", elem.first.c_str(), elem.second);
+            if (i != fitnesses[j].size() - 1) fprintf(log, ",\n"); else fprintf(log, "\n");
+            i++;
+        }
+        fprintf(log, "      }");
+
+        if (j != fitnesses.size() - 1) fprintf(log, ",\n      {");
+        fprintf(log, "\n");
+    }
+
+    fprintf(log, "    ]\n");
+
+
+    /////////////////////////////
+    /// Loop until converged: ///
+    /////////////////////////////
+    bool hasConverged = false;
+    int counter = 0;
+
+    std::array<double, 2> lastLegCommands = {individual["femurLength"], individual["tibiaLength"]};
+
+    while (!hasConverged) {
+        counter++;
+        if (counter > 3){
+            break;
+        }
+
+        ////////////////////////////////////////////////////////////
+        /// Get predicted map for current roughness and hardness ///
+        ////////////////////////////////////////////////////////////
+        printf("  Current roughness: %.2f, current hardness: %.2f\n", currentRoughness, currentHardness);
+
+        tonnesfn_experiments::getMap srv;
+
+        srv.request.roughness = currentRoughness;
+        srv.request.hardness = currentHardness;
+
+        if (!getMapService_client.call(srv)) {
+            ROS_ERROR("Error while calling getMap service");
+        }
+
+        std::vector<double> predictedMap = srv.response.map;
+
+        printf("    ");
+        printf("F: 0  1  2  3  4\n    ");
+        for (int i = 0; i < 25; i++) {
+            printf("%.2f ", srv.response.map[i]);
+            if ((i + 1) % 5 == 0)printf("\n    ");
+        }
+        printf("\n");
+
+        ///////////////////////////////////////
+        /// Select next morphology from map ///
+        ///////////////////////////////////////
+
+
+        // Find all neighbors:
+        std::vector <std::array<int, 2>> neighbors;
+
+        for (int i = currentFemurCommand - 1; i <= currentFemurCommand + 1; i++) {
+            for (int j = currentTibiaCommand - 1; j <= currentTibiaCommand + 1; j++) {
+                if (i >= 0 && i <= 4 && j >= 0 && j <= 4 &&
+                    (i != currentFemurCommand || j != currentTibiaCommand))
+                    neighbors.emplace_back(std::array < int, 2 > {i, j});
+            }
+        }
+
+        printf("  Current COT: %.2f. Predicted for neigbors:\n", fitnesses[0]["cot"]);
+        std::array<int, 2> bestNext = {currentFemurCommand, currentTibiaCommand};
+        double bestCOT = fitnesses[0]["cot"];
+        for (int i = 0; i < neighbors.size(); i++) {
+            printf("    %d, %d: %.2f\n", neighbors[i][0], neighbors[i][1],
+                   predictedMap[neighbors[i][0] + neighbors[i][1] * 5]);
+            if (predictedMap[neighbors[i][0] + neighbors[i][1] * 5] < bestCOT) {
+                bestCOT = predictedMap[neighbors[i][0] + neighbors[i][1] * 5];
+                bestNext = std::array < int, 2 > {neighbors[i][0], neighbors[i][1]};
+            }
+        }
+
+        printf("  Next individual: %d, %d, with predicted COT of %.2f\n", bestNext[0], bestNext[1], bestCOT);
+
+        currentFemurCommand = bestNext[0];
+        currentTibiaCommand = bestNext[1];
+
+        // Send message to update map model
+        // TODO: implement this
+
+        // Send new morphology command
+        individual = getIndividual(currentFemurCommand, currentTibiaCommand);
+        setLegLengths(individual["femurLength"], individual["tibiaLength"], poseCommand_pub);
+
+        // Start walking
+        std::vector <std::map<std::string, double>> rawFitnesses;
+        std::map<std::string, double> currentFitness;
+
+        bool waitingForLegs = true;
+        int counter = 0;
+        while (waitingForLegs){
+            // Check if morphology change has been completed already
+
+            if (!legsAtRest(prismaticActuatorStates)) {
+                printf("  Legs are still changing\n");
+            } else if (counter == 0 && (lastLegCommands[0] != individual["femurLength"] && lastLegCommands[1] != individual["tibiaLength"])){
+                printf(" Waiting one cycle to get status\n");
+            }else{
+                printf("  Legs are at rest\n");
+                printf("    last0: %.2f, current: %.2f last0: %.2f, current: %.2f, counter: %d\n", lastLegCommands[0], individual["femurLength"], lastLegCommands[1], individual["tibiaLength"], counter);
+                waitingForLegs = false;
+            }
+
+            rawFitnesses.clear();
+            currentFitness = getFitness(individual, true, true, get_gait_evaluation_client, rawFitnesses, false);
+
+            counter++;
+        }
+
+        lastLegCommands = std::array<double, 2>{individual["femurLength"], individual["tibiaLength"]};
+    }
+
+    ///////////////////////////
+    /// Finish log printing ///
+    ///////////////////////////
 
     fprintf(log, "  }]\n");
     fprintf(log, "}");
-
     fclose(log);
 
     numberOfEvalsInTesting = numberOfEvals_old;
-
-    // Do initialization (smart or dumb)
-
-    // Request new morphology
-
-    // Wait for morphology
-
-    // Take one step sequence to get hardness measure
-
-    // Loop until converged
-
-        // Measure roughness and hardness
-
-        // Get predicted map for current roughness and hardness
-
-        // Send new morphology command
-
-        // Send message to update map model
-
-        // Start walking
-
-        // Wait until one full step sequence has been done on the new terrain
-
     cooldownPromptEnabled = previousCooldownValue;
     evaluationTimeout = previousTimeoutValue;
     pauseAfterEachEvaluation = previousPauseValue;
@@ -2005,6 +2149,7 @@ int main(int argc, char **argv) {
     gaitCommandService_client = rch.serviceClient<dyret_controller::GaitControllerCommandService>("/dyret/dyret_controller/gaitControllerCommandService");
     inferredPositionClient = rch.serviceClient<dyret_controller::GetInferredPosition>("/dyret/dyret_controller/getInferredPosition");
     loggerCommandService_client = rch.serviceClient<dyret_controller::LoggerCommand>("/dyret/dyret_logger/loggerCommand");
+    getMapService_client = rch.serviceClient<tonnesfn_experiments::getMap>("/dyret/getMap");
 
     servoConfigClient = rch.serviceClient<dyret_common::Configure>("/dyret/configuration");
     get_gait_evaluation_client = rch.serviceClient<dyret_controller::GetGaitEvaluation>("get_gait_evaluation");
