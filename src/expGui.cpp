@@ -1699,8 +1699,9 @@ void experiments_continueAdaptation() {
     /// Reconfigure morphology and evaluate for one step cycle ///
     //////////////////////////////////////////////////////////////
 
-    std::vector <std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, false, false,
-                                                                           individual);
+    pauseAfterEachEvaluation = true;
+    std::vector <std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, false, false, individual); // prepareForGait, doAdaptation, ...
+    pauseAfterEachEvaluation = false;
 
     ROS_INFO("Evaluated for the first step sequence");
 
@@ -1741,9 +1742,7 @@ void experiments_continueAdaptation() {
 
     while (!hasConverged) {
         counter++;
-        if (counter > 3){
-            break;
-        }
+
         fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
 
         ////////////////////////////////////////////////////////////
@@ -1830,8 +1829,8 @@ void experiments_continueAdaptation() {
 
         msg.femurLength = lastLegCommands[0];
         msg.tibiaLength = lastLegCommands[1];
-        msg.roughness   = currentRoughness;
-        msg.hardness    = currentHardness;
+        msg.roughness   = fitnesses.back()["lastRoughness"];
+        msg.hardness    = fitnesses.back()["lastHardness"];
         msg.cot         = fitnesses.back()["cot"];
 
         dataPoint_pub.publish(msg);
