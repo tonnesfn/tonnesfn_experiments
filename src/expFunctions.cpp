@@ -676,12 +676,12 @@ void runGaitControllerWithActionMessage(bool forward,
         float currentPos = getInferredPosition(inferredPositionClient);
 
         if ((ros::Time::now() - startTime).sec >= (evaluationTimeout)) {
-            printf("  Timed out at %ds/%ds (dist %.0fmm/%.0fmm)\n", (ros::Time::now() - startTime).sec, evaluationTimeout, currentPos, evaluationDistance);
+            if (enableLogging) printf("  Timed out at %ds/%ds (dist %.0fmm/%.0fmm)\n", (ros::Time::now() - startTime).sec, evaluationTimeout, currentPos, evaluationDistance);
             break;
         }
 
         if (currentPos > evaluationDistance){
-            printf("  Reached position with %.2fmm / %.2fmm (time %ds/%ds)\n", currentPos, evaluationDistance, (ros::Time::now() - startTime).sec, evaluationTimeout);
+            if (enableLogging) printf("  Reached position with %.2fmm / %.2fmm (time %ds/%ds)\n", currentPos, evaluationDistance, (ros::Time::now() - startTime).sec, evaluationTimeout);
             break;
         }
     }
