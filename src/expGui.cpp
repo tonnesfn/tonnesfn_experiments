@@ -1623,6 +1623,12 @@ void experiments_continueAdaptation() {
     printf("    Area label: ");
     std::string areaLabel;
     getline(std::cin, areaLabel);
+    printf("    Pause for each? (y/n): ");
+    std::string pauseInput;
+    getline(std::cin, pauseInput);
+
+    bool pauseForEachEval = false;
+    if (pauseInput == "y") pauseForEachEval = true;
 
     bool previousCooldownValue = cooldownPromptEnabled;
     cooldownPromptEnabled = false;
@@ -1725,32 +1731,6 @@ void experiments_continueAdaptation() {
 
     fprintf(log, "    ]\n");
 
-    /// Rest of the evaluations here
-
-    fprintf(log, "    },{\n");
-    fprintf(log, "    \"individual\": {\n");
-    printMap(individual, "      ", log);
-    fprintf(log, "    },\n");
-
-    fprintf(log, "    \"fitness\": [\n");
-    fprintf(log, "      {\n");
-
-    for (int j = 0; j < fitnesses.size(); j++) {
-        int i = 0;
-        for (auto elem : fitnesses[j]) {
-            fprintf(log, "        \"%s\": %f", elem.first.c_str(), elem.second);
-            if (i != fitnesses[j].size() - 1) fprintf(log, ",\n"); else fprintf(log, "\n");
-            i++;
-        }
-        fprintf(log, "      }");
-
-        if (j != fitnesses.size() - 1) fprintf(log, ",\n      {");
-        fprintf(log, "\n");
-    }
-
-    fprintf(log, "    ]\n");
-
-
     /////////////////////////////
     /// Loop until converged: ///
     /////////////////////////////
@@ -1805,7 +1785,6 @@ void experiments_continueAdaptation() {
         /// Select next morphology from map ///
         ///////////////////////////////////////
 
-
         // Find all neighbors:
         std::vector <std::array<int, 2>> neighbors;
 
@@ -1834,6 +1813,14 @@ void experiments_continueAdaptation() {
 
         printf("  Next individual: %d, %d, with predicted COT of %.2f\n", bestNext[0], bestNext[1], bestCOT);
         fprintf(log_adapt, "  Next individual: %d, %d, with predicted COT of %.2f\n", bestNext[0], bestNext[1], bestCOT);
+
+        if (pauseForEachEval){
+            playSound("beep_high", 1);
+            printf("  Press enter when robot is ready or q for quit>");
+            std::string input;
+            getline(std::cin, input);
+            if (input == "q") break;
+        }
 
         currentFemurCommand = bestNext[0];
         currentTibiaCommand = bestNext[1];
