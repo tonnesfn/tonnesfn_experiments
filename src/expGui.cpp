@@ -1643,6 +1643,8 @@ void experiments_continueAdaptation() {
 
     std::map<std::string, double> individual = getIndividual(currentFemurCommand, currentTibiaCommand);
 
+    printf("  Starting with individual %.2f, %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+
     //////////////////////////
     /// Initialize logging ///
     //////////////////////////
@@ -1653,6 +1655,8 @@ void experiments_continueAdaptation() {
     if (log == NULL) {
         ROS_ERROR("adaptationLog could not be opened (err%d)\n", errno);
     }
+
+    FILE *log_adapt = fopen((logDirectoryPath.substr(0, logDirectoryPath.size()-5)+"_adaptLog.txt").c_str(), "a");
 
     std::string experimentDirectory = logDirectoryPath.substr(0, logDirectoryPath.find_last_of("\\/")) + "/";
     std::string timeString = logDirectoryPath.substr(logDirectoryPath.find_last_of("\\/") + 1);
@@ -1683,7 +1687,7 @@ void experiments_continueAdaptation() {
     currentRoughness = -1.0;
     currentHardness = -1.0;
 
-    ROS_INFO("Logging initialized");
+    ROS_INFO("CSV logging initialized");
 
     //////////////////////////////////////////////////////////////
     /// Reconfigure morphology and evaluate for one step cycle ///
@@ -1760,11 +1764,15 @@ void experiments_continueAdaptation() {
         if (counter > 3){
             break;
         }
+        fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
 
         ////////////////////////////////////////////////////////////
         /// Get predicted map for current roughness and hardness ///
         ////////////////////////////////////////////////////////////
-        printf("  Current roughness: %.2f, current hardness: %.2f\n", currentRoughness, currentHardness);
+        double recordedRoughness = currentRoughness;
+        double recordedHardness = currentHardness;
+
+        printf("  Current roughness: %.2f, current hardness: %.2f\n", recordedRoughness, currentHardness);
 
         tonnesfn_experiments::getMap srv;
 
@@ -1777,11 +1785,19 @@ void experiments_continueAdaptation() {
 
         std::vector<double> predictedMap = srv.response.map;
 
+        fprintf(log_adapt, "  Predicted map:\n");
+        fprintf(log_adapt, "    F: 0  1  2  3  4\n    ");
+
         printf("    ");
         printf("F: 0  1  2  3  4\n    ");
         for (int i = 0; i < 25; i++) {
             printf("%.2f ", srv.response.map[i]);
-            if ((i + 1) % 5 == 0)printf("\n    ");
+            fprintf(log_adapt, "%.2f ", srv.response.map[i]);
+
+            if (((i + 1) % 5 == 0) && i != 24){
+                printf("\n    ");
+                fprintf(log_adapt, "\n    ");
+            }
         }
         printf("\n");
 
@@ -1802,10 +1818,13 @@ void experiments_continueAdaptation() {
         }
 
         printf("  Current COT: %.2f. Predicted for neigbors:\n", fitnesses[0]["cot"]);
+        fprintf(log_adapt, "  Current COT: %.2f. Predicted for neigbors:\n", fitnesses[0]["cot"]);
         std::array<int, 2> bestNext = {currentFemurCommand, currentTibiaCommand};
         double bestCOT = fitnesses[0]["cot"];
         for (int i = 0; i < neighbors.size(); i++) {
             printf("    %d, %d: %.2f\n", neighbors[i][0], neighbors[i][1],
+                   predictedMap[neighbors[i][0] + neighbors[i][1] * 5]);
+            fprintf(log_adapt, "    %d, %d: %.2f\n", neighbors[i][0], neighbors[i][1],
                    predictedMap[neighbors[i][0] + neighbors[i][1] * 5]);
             if (predictedMap[neighbors[i][0] + neighbors[i][1] * 5] < bestCOT) {
                 bestCOT = predictedMap[neighbors[i][0] + neighbors[i][1] * 5];
@@ -1814,6 +1833,7 @@ void experiments_continueAdaptation() {
         }
 
         printf("  Next individual: %d, %d, with predicted COT of %.2f\n", bestNext[0], bestNext[1], bestCOT);
+        fprintf(log_adapt, "  Next individual: %d, %d, with predicted COT of %.2f\n", bestNext[0], bestNext[1], bestCOT);
 
         currentFemurCommand = bestNext[0];
         currentTibiaCommand = bestNext[1];
@@ -1846,6 +1866,7 @@ void experiments_continueAdaptation() {
                 printf("  Legs are still changing\n");
             } else if (counter == 0 && (lastLegCommands[0] != individual["femurLength"] || lastLegCommands[1] != individual["tibiaLength"])){
                 printf(" Waiting one cycle to get status\n");
+
             }else{
                 printf("  Legs are at rest\n");
                 waitingForLegs = false;
@@ -1857,6 +1878,26 @@ void experiments_continueAdaptation() {
             counter++;
         }
 
+        fprintf(log_adapt, "  Leglength %.2f, %.2f achieved a COT of %.2f on hardness %.2f and softness %.2f terrain\n\n", individual["femurLength"], individual["tibiaLength"], currentFitness["cot"], currentFitness["lastHardness"], currentFitness["lastRoughness"]);
+
+        // Write individual in log
+        fprintf(log, "    },{\n");
+        fprintf(log, "    \"individual\": {\n");
+        printMap(individual, "      ", log);
+        fprintf(log, "    },\n");
+
+        fprintf(log, "    \"fitness\": [\n");
+        fprintf(log, "      {\n");
+
+        for (auto iter = currentFitness.begin(); iter != currentFitness.end(); ++iter) {
+            fprintf(log, "        \"%s\": %f", iter->first.c_str(), iter->second);
+            if (std::next(iter) != currentFitness.end()) {
+                fprintf(log, ",\n");
+            }
+        }
+
+        fprintf(log, "\n      }]\n");
+
         fitnesses.emplace_back(currentFitness);
         lastLegCommands = std::array<double, 2>{individual["femurLength"], individual["tibiaLength"]};
     }
@@ -1865,9 +1906,12 @@ void experiments_continueAdaptation() {
     /// Finish log printing ///
     ///////////////////////////
 
+
     fprintf(log, "  }]\n");
     fprintf(log, "}");
     fclose(log);
+
+    fclose(log_adapt);
 
     numberOfEvalsInTesting = numberOfEvals_old;
     cooldownPromptEnabled = previousCooldownValue;
