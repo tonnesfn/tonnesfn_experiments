@@ -1698,7 +1698,7 @@ void experiments_continueAdaptation() {
     //////////////////////////////////////////////////////////////
     /// Reconfigure morphology and evaluate for one step cycle ///
     //////////////////////////////////////////////////////////////
-
+    
     pauseAfterEachEvaluation = true;
     std::vector <std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, false, false, individual); // prepareForGait, doAdaptation, ...
     pauseAfterEachEvaluation = false;

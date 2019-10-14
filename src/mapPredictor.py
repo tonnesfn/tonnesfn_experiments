@@ -31,17 +31,24 @@ newPoints_roughness = [[[] for i in range(5)] for j in range(5)]
 newPoints_hardness = [[[] for i in range(5)] for j in range(5)]
 newPoints_cot = [[[] for i in range(5)] for j in range(5)]
 
+def getLengthIndexes(givenFemurLength, givenTibiaLength):
+    return [int((givenFemurLength / 50.0) * 4), int((givenTibiaLength / 80.0) * 4)]
+
 def datapointCallback(data):
-    newPoints_roughness[data.femurLength][data.tibiaLength].append(data.roughness)
-    newPoints_hardness[data.femurLength][data.tibiaLength].append(data.hardness)
-    newPoints_cot[data.femurLength][data.tibiaLength].append(data.cot)
+    lengths = getLengthIndexes(data.femurLength, data.tibiaLength)
+
+    newPoints_roughness[lengths[0]][lengths[1]].append(data.roughness)
+    newPoints_hardness[lengths[0]][lengths[1]].append(data.hardness)
+    newPoints_cot[lengths[0]][lengths[1]].append(data.cot)
 
     # Regenerate model:
-    for femur in range(5):
-        for tibia in range(5):
-            generateModel2d(femur, tibia)
+#    for femur in range(5):
+#        for tibia in range(5):
+#            generateModel2d(femur, tibia)
 
-    print("Successfully updated 2d model")
+    generateModel2d(lengths[0], lengths[1])
+
+    print("Successfully updated 2d model for {},{}".format(lengths[0], lengths[1]))
 
 def readOriginalMaps():
     # Get all data
