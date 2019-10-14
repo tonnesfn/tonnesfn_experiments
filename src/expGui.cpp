@@ -1644,8 +1644,18 @@ void experiments_continueAdaptation() {
     /// Do initialization to choose morphology ///
     //////////////////////////////////////////////
 
-    int currentFemurCommand = 0; // Do something smart here?
-    int currentTibiaCommand = 0; // Do something smart here?
+    printf("    Femur (0-4): ");
+    int currentFemurCommand;
+    std::cin >> currentFemurCommand;
+    printf("    Tibia (0-4): ");
+    int currentTibiaCommand;
+    std::cin >> currentTibiaCommand;
+    std::cin.clear();
+    std::cin.ignore(10000, '\n');
+
+    // Calculate morphology parameters
+    assert(currentFemurCommand >= 0 && currentFemurCommand <= 4);
+    assert(currentTibiaCommand >= 0 && currentTibiaCommand <= 4);
 
     std::map<std::string, double> individual = getIndividual(currentFemurCommand, currentTibiaCommand);
 
@@ -1698,7 +1708,7 @@ void experiments_continueAdaptation() {
     //////////////////////////////////////////////////////////////
     /// Reconfigure morphology and evaluate for one step cycle ///
     //////////////////////////////////////////////////////////////
-    
+
     pauseAfterEachEvaluation = true;
     std::vector <std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, false, false, individual); // prepareForGait, doAdaptation, ...
     pauseAfterEachEvaluation = false;
