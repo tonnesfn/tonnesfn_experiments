@@ -1750,10 +1750,11 @@ void experiments_continueAdaptation() {
 
     std::array<double, 2> lastLegCommands = {individual["femurLength"], individual["tibiaLength"]};
 
-    while (!hasConverged) {
-        counter++;
+    fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+    fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", fitnesses[0]["cot"], fitnesses[0]["lastHardness"], fitnesses[0]["lastRoughness"]);
 
-        fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+    while (counter < 16 && !hasConverged) {
+        counter++;
 
         ////////////////////////////////////////////////////////////
         /// Get predicted map for current roughness and hardness ///
@@ -1789,6 +1790,7 @@ void experiments_continueAdaptation() {
             }
         }
         printf("\n");
+        fprintf(log_adapt, "\n  ");
 
         ///////////////////////////////////////
         /// Select next morphology from map ///
@@ -1805,10 +1807,11 @@ void experiments_continueAdaptation() {
             }
         }
 
-        printf("  Current COT: %.2f. Predicted for neigbors:\n", fitnesses[0]["cot"]);
-        fprintf(log_adapt, "  Current COT: %.2f. Predicted for neigbors:\n", fitnesses[0]["cot"]);
+        printf("  Current COT: %.2f. Predicted for neigbors:\n", fitnesses.back()["cot"]);
+        fprintf(log_adapt, " Current COT: %.2f. Predicted for current: %.2f, Predicted for neigbors:\n", fitnesses.back()["cot"], predictedMap[currentFemurCommand + (currentTibiaCommand*5)]);
         std::array<int, 2> bestNext = {currentFemurCommand, currentTibiaCommand};
-        double bestCOT = fitnesses[0]["cot"];
+        double bestCOT = fitnesses.back()["cot"];
+
         for (int i = 0; i < neighbors.size(); i++) {
             printf("    %d, %d: %.2f\n", neighbors[i][0], neighbors[i][1],
                    predictedMap[neighbors[i][0] + neighbors[i][1] * 5]);
@@ -1874,7 +1877,8 @@ void experiments_continueAdaptation() {
             counter++;
         }
 
-        fprintf(log_adapt, "  Leglength %.2f, %.2f achieved a COT of %.2f on hardness %.2f and softness %.2f terrain\n\n", individual["femurLength"], individual["tibiaLength"], currentFitness["cot"], currentFitness["lastHardness"], currentFitness["lastRoughness"]);
+        fprintf(log_adapt, "\nIndividual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+        fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", currentFitness["cot"], currentFitness["lastHardness"], currentFitness["lastRoughness"]);
 
         // Write individual in log
         fprintf(log, "    },{\n");
