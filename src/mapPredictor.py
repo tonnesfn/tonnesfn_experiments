@@ -32,7 +32,7 @@ newPoints_hardness = [[[] for i in range(5)] for j in range(5)]
 newPoints_cot = [[[] for i in range(5)] for j in range(5)]
 
 def getLengthIndexes(givenFemurLength, givenTibiaLength):
-    return [int((givenFemurLength / 50.0) * 4), int((givenTibiaLength / 80.0) * 4)]
+    return [int((givenFemurLength / 48.0) * 4), int((givenTibiaLength / 80.0) * 4)]
 
 def datapointCallback(data):
     lengths = getLengthIndexes(data.femurLength, data.tibiaLength)
