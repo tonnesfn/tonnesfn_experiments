@@ -1754,7 +1754,7 @@ void experiments_continueAdaptation() {
     fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", fitnesses[0]["cot"], fitnesses[0]["lastHardness"], fitnesses[0]["lastRoughness"]);
 
     fclose(log_adapt);
-
+    
     while (!hasConverged) {
         log_adapt = fopen((logDirectoryPath.substr(0, logDirectoryPath.size()-5)+"_adaptLog.txt").c_str(), "a");
 
@@ -1875,11 +1875,13 @@ void experiments_continueAdaptation() {
                 printf("  Legs are at rest\n");
                 enableLogging = true;
                 waitingForLegs = false;
+                evaluationTimeout = 15.0; // Evaluate three steps outside
             }
 
             rawFitnesses.clear();
             currentFitness = getFitness(individual, true, true, get_gait_evaluation_client, rawFitnesses, false);
 
+            evaluationTimeout = 5.0; // Reset evaluation to one step
             counter++;
         }
 
