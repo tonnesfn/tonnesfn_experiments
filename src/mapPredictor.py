@@ -278,12 +278,12 @@ def getMap_handle(req):
     mapArray = []
 
     if (req.hardness == 0): # Use 1d model:
-        for femur in range(5):
-            for tibia in range(5):
+        for tibia in range(5):
+            for femur in range(5):
                 mapArray.append(getValueFromModel1d(req.roughness, femur, tibia))
     else:
-        for femur in range(5):
-            for tibia in range(5):
+        for tibia in range(5):
+            for femur in range(5):
                 mapArray.append(getValueFromModel2d([[req.roughness, req.hardness]], femur, tibia))
     return getMapResponse(
         map=mapArray
