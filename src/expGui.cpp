@@ -1746,7 +1746,7 @@ void experiments_continueAdaptation() {
     /// Loop until converged: ///
     /////////////////////////////
     bool hasConverged = false;
-    int counter = 0;
+    int morphologyCounter = 0;
 
     std::array<double, 2> lastLegCommands = {individual["femurLength"], individual["tibiaLength"]};
 
@@ -1758,7 +1758,18 @@ void experiments_continueAdaptation() {
     while (!hasConverged) {
         log_adapt = fopen((logDirectoryPath.substr(0, logDirectoryPath.size()-5)+"_adaptLog.txt").c_str(), "a");
 
-        counter++;
+        if (morphologyCounter == 32 || morphologyCounter == 64){
+            playSound("beep_high", 5);
+            printf("  Move to opposite terrain, please> ");
+            std::string input;
+            getline(std::cin, input);
+        } else if (morphologyCounter == 96){
+            playSound("beep_high", 5);
+            printf("  Done\n");
+            break;
+        }
+
+        morphologyCounter++;
 
         ////////////////////////////////////////////////////////////
         /// Get predicted map for current roughness and hardness ///
