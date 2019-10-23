@@ -284,11 +284,11 @@ std::map<std::string, double> getFitness(std::map<std::string, double> phenoType
         if (std::isnan(elem.second)){
             ROS_ERROR("Got NAN value for %s", elem.first.c_str());
 
-            for(const auto elem2 : gaitResultsForward){
+            /*for(const auto elem2 : gaitResultsForward){
                 fprintf(stderr, "  %s: %.2f\n", elem2.first.c_str(), elem2.second);
             }
 
-            return std::map<std::string, double>();
+            return std::map<std::string, double>();*/
         }
     }
 
@@ -1753,7 +1753,11 @@ void experiments_continueAdaptation() {
     fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
     fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", fitnesses[0]["cot"], fitnesses[0]["lastHardness"], fitnesses[0]["lastRoughness"]);
 
-    while (counter < 16 && !hasConverged) {
+    fclose(log_adapt);
+
+    while (!hasConverged) {
+        log_adapt = fopen((logDirectoryPath.substr(0, logDirectoryPath.size()-5)+"_adaptLog.txt").c_str(), "a");
+
         counter++;
 
         ////////////////////////////////////////////////////////////
@@ -1863,11 +1867,13 @@ void experiments_continueAdaptation() {
 
             if (!legsAtRest(prismaticActuatorStates)) {
                 printf("  Legs are still changing\n");
+                enableLogging = false;
             } else if (counter == 0 && (lastLegCommands[0] != individual["femurLength"] || lastLegCommands[1] != individual["tibiaLength"])){
                 printf(" Waiting one cycle to get status\n");
-
+                enableLogging = false;
             }else{
                 printf("  Legs are at rest\n");
+                enableLogging = true;
                 waitingForLegs = false;
             }
 
@@ -1900,6 +1906,8 @@ void experiments_continueAdaptation() {
 
         fitnesses.emplace_back(currentFitness);
         lastLegCommands = std::array<double, 2>{individual["femurLength"], individual["tibiaLength"]};
+
+        fclose(log_adapt);
     }
 
     ///////////////////////////
