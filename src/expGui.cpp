@@ -1881,6 +1881,10 @@ void experiments_continueAdaptation() {
             rawFitnesses.clear();
             currentFitness = getFitness(individual, true, true, get_gait_evaluation_client, rawFitnesses, false);
 
+            if (waitingForLegs){
+                fprintf(log_adapt, "  femur %.2f, tibia %.2f, roughness %.2f, hardness %.2f, cot %.2f\n", currentFemurLength, currentTibiaLength, currentFitness["lastRoughness"], currentFitness["lastHardness"], currentFitness["cot"]);
+            }
+
             evaluationTimeout = 5.0; // Reset evaluation to one step
             counter++;
         }
