@@ -1750,7 +1750,7 @@ void experiments_continueAdaptation() {
 
     std::array<double, 2> lastLegCommands = {individual["femurLength"], individual["tibiaLength"]};
 
-    fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+    fprintf(log_adapt, "Individual: femur %.2f, tibia %.2f (%d)\n", individual["femurLength"], individual["tibiaLength"], morphologyCounter);
     fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", fitnesses[0]["cot"], fitnesses[0]["lastHardness"], fitnesses[0]["lastRoughness"]);
 
     fclose(log_adapt);
@@ -1777,7 +1777,7 @@ void experiments_continueAdaptation() {
         double recordedRoughness = currentRoughness;
         double recordedHardness = currentHardness;
 
-        printf("  Current roughness: %.2f, current hardness: %.2f\n", recordedRoughness, currentHardness);
+        printf("  Current roughness: %.2f, current hardness: %.2f, current individual: %d\n", recordedRoughness, currentHardness, morphologyCounter);
 
         tonnesfn_experiments::getMap srv;
 
@@ -1900,7 +1900,7 @@ void experiments_continueAdaptation() {
             counter++;
         }
 
-        fprintf(log_adapt, "\nIndividual: femur %.2f, tibia %.2f\n", individual["femurLength"], individual["tibiaLength"]);
+        fprintf(log_adapt, "\nIndividual: femur %.2f, tibia %.2f (%d)\n", individual["femurLength"], individual["tibiaLength"], morphologyCounter);
         fprintf(log_adapt, "  Achieved a COT of %.2f on terrain with hardness %.2f and roughness %.2f\n", currentFitness["cot"], currentFitness["lastHardness"], currentFitness["lastRoughness"]);
 
         // Write individual in log
