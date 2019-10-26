@@ -1453,6 +1453,11 @@ void experiments_sensorWalking(bool continuousEvaluation){
     printf("  Do adaptation? (y/n): ");
     getline(std::cin, doAdaptationInput);
 
+    int oldEvaluationTimeout = evaluationTimeout;
+    evaluationTimeout = 15.0; // Evaluate three steps outside
+    int oldEvaluationDistance = evaluationDistance;
+    evaluationDistance = 9999999990;
+
     bool doAdaptation = false;
     if (doAdaptationInput == "y"){
         doAdaptation = true;
@@ -1484,8 +1489,8 @@ void experiments_sensorWalking(bool continuousEvaluation){
     float scaling = getScaling(femurLength, tibiaLength);
     //std::cin >> scaling;
     printf("  Number of evals: ");
-    int numberOfEvals_old = numberOfEvalsInTesting;
-    std::cin >> numberOfEvalsInTesting;
+    int evalsInSensorWalking;
+    std::cin >> evalsInSensorWalking;
     std::cin.clear();
     std::cin.ignore(10000, '\n');
 
@@ -1510,6 +1515,7 @@ void experiments_sensorWalking(bool continuousEvaluation){
 
     logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
 
+    // Do first eval
     std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, continuousEvaluation, doAdaptation, individual);
 
     FILE *sensorLog = fopen(logDirectoryPath.c_str(), "a");
@@ -1570,28 +1576,34 @@ void experiments_sensorWalking(bool continuousEvaluation){
             if (i != fitnesses[j].size() - 1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
             i++;
         }
-        fprintf(sensorLog, "    }");
+    }
+    fclose(sensorLog);
 
-        if (j != fitnesses.size()-1) fprintf(sensorLog, ",\n    {");
-        fprintf(sensorLog, "\n");
+    for (int i = 0; i < evalsInSensorWalking-1; i++){
+        std::vector <std::map<std::string, double>> rawFitnesses;
+        std::map<std::string, double> currentFitness = getFitness(individual, true, true, get_gait_evaluation_client, rawFitnesses, false);
+
+        sensorLog = fopen(logDirectoryPath.c_str(), "a");
+        fprintf(sensorLog, "    },{\n");
+        printf("  Individual: %d\n", i+1);
+        int cnt = 0;
+        for (auto elem : currentFitness) {
+            fprintf(sensorLog, "      \"%s\": %f", elem.first.c_str(), elem.second);
+            printf("      \"%s\": %f\n", elem.first.c_str(), elem.second);
+            if (cnt++ != currentFitness.size() - 1) fprintf(sensorLog, ",\n"); else fprintf(sensorLog, "\n");
+        }
+        fclose(sensorLog);
     }
 
-    /*fprintf(sensorLog, "      \"raw_fitness\": [\n");
-    fprintf(sensorLog, "        {\n");
-    printMap(rawFitness[0], "          ", sensorLog);
-
-    if (rawFitness.size() > 1) {
-        fprintf(sensorLog, "        },{\n");
-        printMap(rawFitness[1], "          ", sensorLog);
-    }
-
-    fprintf(sensorLog, "        }\n");*/
+    sensorLog = fopen(logDirectoryPath.c_str(), "a");
+    fprintf(sensorLog, "    }\n");
     fprintf(sensorLog, "  ]\n");
     fprintf(sensorLog, "}");
 
     fclose(sensorLog);
 
-     numberOfEvalsInTesting = numberOfEvals_old;
+    evaluationTimeout = oldEvaluationTimeout;
+    evaluationDistance = oldEvaluationDistance;
 }
 
 std::map<std::string, double> getIndividual(double givenFemurCommand, double givenTibiaCommand){
