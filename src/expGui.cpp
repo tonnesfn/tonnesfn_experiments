@@ -1447,6 +1447,10 @@ void experiments_sensorWalking(bool continuousEvaluation){
     int tibiaLengthInput;
     std::cin >> tibiaLengthInput;
 
+    printf("  Speed (0-6), 0 to disable function: ");
+    int speedInput;
+    std::cin >> speedInput;
+
     std::cin.clear();
     std::cin.ignore(10000, '\n');
     std::string doAdaptationInput;
@@ -1474,7 +1478,6 @@ void experiments_sensorWalking(bool continuousEvaluation){
         printf("    Not doing adaptation.\n");
     }
 
-
     // Calculate morphology parameters
     assert(femurLengthInput >= 0 && femurLengthInput <= 4);
     assert(tibiaLengthInput >= 0 && tibiaLengthInput <= 4);
@@ -1483,7 +1486,7 @@ void experiments_sensorWalking(bool continuousEvaluation){
     float tibiaLength = (tibiaLengthInput/4.0) * 80.0;
 
     //printf("  Frequency (0.0-1.5): ");
-    float frequency = 0.2;
+    float frequency = 0.25;
     //std::cin >> frequency;
     //printf("  Scaling (0.0-2.0): ");
     float scaling = getScaling(femurLength, tibiaLength);
@@ -1513,7 +1516,37 @@ void experiments_sensorWalking(bool continuousEvaluation){
     assert(frequency >= 0.0 && frequency <= 1.5);
     individual["frequency"] = frequency;
 
-    logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
+    // Set speed if set
+    if (speedInput > 0){
+        individual["splineScalingFactor"] = 1.0;
+
+        if (speedInput == 1 || speedInput == 2){
+            individual["frequency"] = 0.15;
+        } else if (speedInput == 3 || speedInput == 4){
+            individual["frequency"] = 0.20;
+        } if (speedInput == 5 || speedInput == 6){
+            individual["frequency"] = 0.25;
+        }
+
+        evaluationTimeout = (1.0/individual["frequency"])*8; // Evaluate 8 steps
+
+        if (speedInput == 1 || speedInput == 3 || speedInput == 5) {
+            individual["p0_y"] = 25.0;
+            individual["p1_y"] = -55.0;
+            individual["p2_y"] = 25.0;
+            individual["p4_y"] = -55.0;
+        } else if (speedInput == 2 || speedInput == 4 || speedInput == 6){
+            individual["p0_y"] = 45.0;
+            individual["p1_y"] = -75.0;
+            individual["p2_y"] = 45.0;
+            individual["p4_y"] = -75.0;
+        }
+
+        logDirectoryPath = makeSensorDataDirectories(label, std::to_string(speedInput)).c_str();
+
+    } else {
+        logDirectoryPath = makeSensorDataDirectories(label, femurLength, tibiaLength).c_str();
+    }
 
     // Do first eval
     std::vector<std::map<std::string, double>> fitnesses = run_individual("lowLevelSplineGait", true, continuousEvaluation, doAdaptation, individual);
