@@ -4,6 +4,7 @@
   <arg name="realsense_enabled" default="true" doc="Enable Realsense" />
   <arg name="terrain_enabled" default="true" doc="Enable terrain characterization nodes" />
   <arg name="mocap_type" default="" doc="Type of mocap system (blank to not start mocap)" />
+  <arg name="actuatorboard_enabled" default="true" doc="Enable actuator board" />
 
   <include file="$(find dyret_controller)/launch/fullController.launch" />
   <include file="$(find dyret_hardware)/launch/monitor.launch" />
@@ -12,6 +13,7 @@
     <arg name="contact_enabled" value="$(arg contact_enabled)" />
     <arg name="imu_enabled" value="$(arg imu_enabled)" />
     <arg name="mocap_type" value="$(arg mocap_type)" />
+    <arg name="actuatorboard_enabled" value="$(arg actuatorboard_enabled)" />
   </include>
 
   <node pkg="dyret_hardware" name="mocapMonitor" type="mocapMonitor.py" required="false" />
