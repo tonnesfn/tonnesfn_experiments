@@ -1067,7 +1067,7 @@ void cooldownServos(ros::ServiceClient servoConfigClient, std::array<float, 12> 
     }
 }
 
-std::string makeSensorDataDirectories(std::string givenSurface, int givenFemurLength, int givenTibiaLength){
+std::string makeSensorDataDirectories(std::string givenSurface, std::string givenPrefix){
     std::stringstream ss;
     ss << getenv("HOME") << "/catkin_ws/experimentResults/";
     mkdir(ss.str().c_str(), 0700);
@@ -1084,13 +1084,17 @@ std::string makeSensorDataDirectories(std::string givenSurface, int givenFemurLe
     struct tm *now = localtime(&t);
 
     ss.str(std::string());
-    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/" << std::to_string(givenFemurLength) << "_" << std::to_string(givenTibiaLength) << "_" << getDateString(now) << "/";
+    ss << getenv("HOME") << "/catkin_ws/experimentResults/sensorWalking/" << givenSurface << "/" << givenPrefix << "_" << getDateString(now) << "/";
     mkdir(ss.str().c_str(), 0700);
 
     ss << getDateString(now) << ".json";
 
     return ss.str();
 
+}
+
+std::string makeSensorDataDirectories(std::string givenSurface, int givenFemurLength, int givenTibiaLength){
+  makeSensorDataDirectories(givenSurface, std::to_string(givenFemurLength) + "_" + std::to_string(givenTibiaLength));
 }
 
 std::string makeAdaptationDataDirectories(std::string givenArea){
